@@ -25,6 +25,8 @@ interface Props {
         city?: string;
         country?: string;
         avatar?: string;
+
+        twoFactorEnabled: boolean;
     };
 }
 
@@ -43,7 +45,7 @@ export default function ProfileForm({
             city: user.city ?? "",
             country: user.country ?? "",
             avatar: user.avatar ?? "",
-            
+
         },
     });
 
@@ -74,7 +76,10 @@ export default function ProfileForm({
 
             <PersonalInfo form={form} />
 
-            <SecuritySettings />
+            <SecuritySettings
+                twoFactorEnabled={user.twoFactorEnabled}
+                onRefresh={() => window.location.reload()}
+            />
 
             <AddressForm form={form} />
 
