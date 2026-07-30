@@ -2,13 +2,25 @@ import { Types } from "mongoose";
 
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
+import { ListingModel } from "../modules/listing/listing.model.js";
 
 class ChatService {
     async startConversation(
         senderId: string,
-        receiverId: string,
-        listingId?: string
+        listingId: string
     ) {
+        const listing = await ListingModel.findById(listingId);
+
+        if (!listing) {
+            throw new Error("Listing not found");
+        }
+
+        const receiverId = listing.seller.toString();
+
+        if (receiverId === senderId) {
+            throw new Error("You cannot contact your own listing.");
+        }
+
         let conversation = await Conversation.findOne({
             participants: {
                 $all: [
@@ -16,9 +28,7 @@ class ChatService {
                     new Types.ObjectId(receiverId),
                 ],
             },
-            ...(listingId && {
-                listing: new Types.ObjectId(listingId),
-            }),
+            listing: listing._id,
         });
 
         if (conversation) {
@@ -30,10 +40,9 @@ class ChatService {
                 new Types.ObjectId(senderId),
                 new Types.ObjectId(receiverId),
             ],
-            listing: listingId
-                ? new Types.ObjectId(listingId)
-                : undefined,
+            listing: listing._id,
             lastMessage: "",
+            lastMessageAt: new Date(),
         });
 
         return conversation;

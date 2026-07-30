@@ -11,15 +11,11 @@ class ChatController {
         try {
             const senderId = req.userId!;
 
-            const {
-                receiverId,
-                listingId,
-            } = req.body;
+            const { listingId } = req.body;
 
             const conversation =
                 await chatService.startConversation(
                     senderId,
-                    receiverId,
                     listingId
                 );
 
