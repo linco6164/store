@@ -14,13 +14,13 @@ export interface RegisterDto {
 
 class AuthService {
     async register(dto: RegisterDto) {
-    const { data } = await api.post(
-        ENDPOINTS.AUTH.REGISTER,
-        dto
-    );
+        const { data } = await api.post(
+            ENDPOINTS.AUTH.REGISTER,
+            dto
+        );
 
-    return data;
-}
+        return data;
+    }
 
     async login(dto: LoginDto) {
         const { data } = await api.post(
@@ -86,6 +86,23 @@ class AuthService {
 
         return data;
     }
+
+    async loginTwoFactor(
+        userId: string,
+        token: string
+    ) {
+        const { data } = await api.post(
+            ENDPOINTS.AUTH.TWO_FACTOR_LOGIN,
+            {
+                userId,
+                token,
+            }
+        );
+
+        return data;
+    }
 }
+
+
 
 export default new AuthService();
