@@ -7,6 +7,9 @@ import {
     useState,
 } from "react";
 
+import { api } from "@/app/lib/api";
+import { ENDPOINTS } from "@/app/lib/endpoints";
+
 export interface CurrentUser {
     _id: string;
     username: string;
@@ -39,31 +42,18 @@ export function AuthProvider({
 
             if (!token) {
                 setUser(null);
-                setLoading(false);
                 return;
             }
 
-            const res = await fetch(
-                "http://localhost:3001/api/auth/me",
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+            const { data } = await api.get<CurrentUser>(
+                ENDPOINTS.AUTH.ME
             );
-
-            if (!res.ok) {
-                localStorage.removeItem("token");
-                setUser(null);
-                setLoading(false);
-                return;
-            }
-
-            const data = await res.json();
 
             setUser(data);
         } catch (err) {
             console.error(err);
+
+            localStorage.removeItem("token");
             setUser(null);
         } finally {
             setLoading(false);
@@ -76,6 +66,7 @@ export function AuthProvider({
 
     async function login(token: string) {
         localStorage.setItem("token", token);
+
         await loadUser();
     }
 
