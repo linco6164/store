@@ -30,7 +30,7 @@ export default function DiscordCallbackContent() {
 
         localStorage.setItem("token", data.token);
 
-        router.push("/dashboard");
+        router.push("/");
     } catch (error: any) {
         alert(
             error.response?.data?.message ??
