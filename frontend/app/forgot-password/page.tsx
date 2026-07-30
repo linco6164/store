@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { API } from "../lib/api";
+import { api } from "../lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -10,7 +10,7 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const res = await fetch(`${API}/auth/forgot-password`, {
+    const res = await fetch(`${api}/auth/forgot-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

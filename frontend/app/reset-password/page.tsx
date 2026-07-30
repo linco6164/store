@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { API } from "../lib/api";
+import { api } from "../lib/api";
 
 export default function ResetPasswordPage() {
   const params = useSearchParams();
@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    const res = await fetch(`${API}/auth/reset-password`, {
+    const res = await fetch(`${api}/auth/reset-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
