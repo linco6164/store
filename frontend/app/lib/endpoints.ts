@@ -1,6 +1,7 @@
 export const ENDPOINTS = {
     AUTH: {
         LOGIN: "/auth/login",
+        TWO_FACTOR_LOGIN: "/auth/2fa/login",
         REGISTER: "/auth/register",
 
         ME: "/auth/me",

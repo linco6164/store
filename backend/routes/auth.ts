@@ -7,6 +7,7 @@ import User from "../models/Users.js";
 import { OAuth2Client } from "google-auth-library";
 import qs from "querystring";
 import auth, { AuthRequest } from "../middleware/auth.js";
+import speakeasy from "speakeasy";
 
 const client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID
@@ -82,6 +83,14 @@ router.post("/login", async (req, res) => {
             });
         }
 
+        if (user.twoFactorEnabled) {
+            return res.json({
+                success: true,
+                requiresTwoFactor: true,
+                userId: user._id,
+            });
+        }
+
         const token = jwt.sign(
             {
                 id: user._id,
@@ -92,7 +101,9 @@ router.post("/login", async (req, res) => {
             }
         );
 
-        res.json({
+        return res.json({
+            success: true,
+            requiresTwoFactor: false,
             token,
             user: {
                 id: user._id,
@@ -488,5 +499,78 @@ router.get(
         }
     }
 );
+
+router.post("/2fa/login", async (req, res) => {
+
+    try {
+
+        const { userId, token } = req.body;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        if (!user.twoFactorSecret) {
+            return res.status(400).json({
+                message: "2FA not configured",
+            });
+        }
+
+        const verified = speakeasy.totp.verify({
+
+            secret: user.twoFactorSecret,
+
+            encoding: "base32",
+
+            token,
+
+            window: 1,
+
+        });
+
+        if (!verified) {
+
+            return res.status(401).json({
+                message: "Invalid code",
+            });
+
+        }
+
+        const jwtToken = jwt.sign(
+            {
+                id: user._id,
+            },
+            process.env.JWT_SECRET!,
+            {
+                expiresIn: "7d",
+            }
+        );
+
+        res.json({
+            success: true,
+            token: jwtToken,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                avatar: user.avatar,
+            },
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            message: "Server error",
+        });
+
+    }
+
+});
 
 export default router;

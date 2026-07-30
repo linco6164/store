@@ -9,6 +9,8 @@ import uploadRoutes from "./modules/upload/upload.routes.js"
 
 import { listingRoutes } from "./modules/listing/index.js";
 import profileRoutes from "./modules/profile/profile.routes.js"
+import twoFactorRoutes from "./modules/profile/2fa.routes.js";
+
 
 const app = express();
 
@@ -17,7 +19,11 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/listings", listingRoutes);
-app.use("/api/profile", profileRoutes)
+app.use("/api/profile", profileRoutes);
+app.use(
+    "/api/profile/2fa",
+    twoFactorRoutes
+);
 
 async function start() {
   await connectDB();

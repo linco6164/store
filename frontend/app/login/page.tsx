@@ -34,6 +34,15 @@ export default function LoginPage() {
         try {
             const data = await AuthService.login(form);
 
+            if (data.requiresTwoFactor) {
+
+                router.push(
+                    `/login/2fa?userId=${data.userId}`
+                );
+
+                return;
+            }
+
             await authLogin(data.token);
 
             router.push("/");

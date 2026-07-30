@@ -15,37 +15,52 @@ const StoreUserSchema = new mongoose.Schema({
     default: null
   },
   provider: {
-      type: String,
-      enum: ["credentials", "google", "facebook", "discord"],
-      default: "credentials",
-    },
+    type: String,
+    enum: ["credentials", "google", "facebook", "discord"],
+    default: "credentials",
+  },
 
-    googleId: {
-      type: String,
-      default: null,
-    },
-    facebookId: {
+  googleId: {
     type: String,
     default: null,
-},
-discordId: {
+  },
+  facebookId: {
     type: String,
     default: null,
-},
+  },
+  discordId: {
+    type: String,
+    default: null,
+  },
 
-    avatar: {
-      type: String,
-      default: "",
-    },
-   resetPasswordToken: {
-      type: String,
-      default: null,
-    },
+  avatar: {
+    type: String,
+    default: "",
+  },
+  resetPasswordToken: {
+    type: String,
+    default: null,
+  },
 
-    resetPasswordExpires: {
-      type: Date,
-      default: null,
+  resetPasswordExpires: {
+    type: Date,
+    default: null,
+  },
+  
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false,
+  },
+
+  twoFactorSecret: {
+    type: String,
+  },
+
+  twoFactorRecoveryCodes: [
+    {
+      type: String,
     },
+  ],
 }, {
   timestamps: true
 });
