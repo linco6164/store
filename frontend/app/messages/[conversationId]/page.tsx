@@ -17,6 +17,7 @@ export default function ConversationPage({
     params,
 }: Props) {
     const { conversationId } = use(params);
+     console.log("conversationId:", conversationId);
 
     const [conversation, setConversation] =
         useState<Conversation | null>(null);

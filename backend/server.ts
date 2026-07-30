@@ -17,6 +17,8 @@ import chatRoutes from "./routes/chat.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 
+import mongoose from "mongoose";
+
 const app = express();
 
 const httpServer = createServer(app);
@@ -59,5 +61,7 @@ async function start() {
         console.log(`🚀 Server running on port ${PORT}`);
     });
 }
+
+console.log("Registered models:", mongoose.modelNames());
 
 start().catch(console.error);
