@@ -41,7 +41,10 @@ export default function EditProfilePage() {
             </div>
 
             <ProfileForm
-                user={profile.user}
+                user={{
+                    ...profile.user,
+                    twoFactorEnabled: false,
+                }}
             />
 
         </main>
