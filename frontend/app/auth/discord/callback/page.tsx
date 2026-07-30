@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { API } from "@/app/lib/api";
+import { api } from "@/app/lib/api";
 
 export default function DiscordCallback() {
 
@@ -24,7 +24,7 @@ export default function DiscordCallback() {
 
     async function login(code: string) {
 
-        const res = await fetch(`${API}/auth/discord`, {
+        const res = await fetch(`${api}/auth/discord`, {
 
             method: "POST",
 
