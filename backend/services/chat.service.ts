@@ -63,33 +63,48 @@ class ChatService {
         conversationId: string,
         userId: string
     ) {
+        console.log(
+            Conversation.schema.path("participants")?.options
+        );
+
+        console.log(
+            Message.schema.path("sender")?.options
+        );
+
+        console.log("1");
+
         const conversation = await Conversation.findById(
             conversationId
-        )
-            .populate(
-                "participants",
-                "_id username avatar"
-            )
-            .populate(
-                "listing",
-                "_id title price images"
-            );
+        );
 
-        if (!conversation) {
+        console.log("2");
+
+        const populated = await conversation
+            ?.populate("participants", "_id username avatar");
+
+        console.log("3");
+
+        await populated?.populate(
+            "listing",
+            "_id title price images"
+        );
+
+        console.log("4");
+
+        if (!populated) {
             throw new Error("Conversation not found");
         }
 
-        const isParticipant =
-            conversation.participants.some(
-                (participant: any) =>
-                    participant._id.toString() === userId
-            );
+        const isParticipant = populated.participants.some(
+            (participant: any) =>
+                participant._id.toString() === userId
+        );
 
         if (!isParticipant) {
             throw new Error("Access denied");
         }
 
-        return conversation;
+        return populated;
     }
 
     async getMessages(conversationId: string) {

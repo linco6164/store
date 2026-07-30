@@ -76,7 +76,10 @@ class ChatController {
 
             res.json(conversation);
         } catch (error: any) {
-            res.status(400).json({
+            console.error(error);
+
+            return res.status(400).json({
+                success: false,
                 message: error.message,
             });
         }

@@ -3,23 +3,26 @@ import { Conversation, Message } from "../types/chat";
 
 export const chatService = {
     async startConversation(listingId: string): Promise<Conversation> {
-        const { data } = await api.post<Conversation>(
-            "/chat/start",
-            { listingId }
-        );
+        const { data } = await api.post<{
+            success: boolean;
+            conversation: Conversation;
+        }>("/chat/start", { listingId });
 
-        return data;
+        return data.conversation;
     },
 
     async getConversations(): Promise<Conversation[]> {
-        const { data } = await api.get<Conversation[]>(
-            "/chat/conversations"
-        );
+        const { data } = await api.get<{
+            success: boolean;
+            conversations: Conversation[];
+        }>("/chat/conversations");
 
-        return data;
+        return data.conversations;
     },
 
-    async getConversation(conversationId: string): Promise<Conversation> {
+    async getConversation(
+        conversationId: string
+    ): Promise<Conversation> {
         const { data } = await api.get<Conversation>(
             `/chat/${conversationId}`
         );
@@ -27,14 +30,13 @@ export const chatService = {
         return data;
     },
 
-    async getMessages(
-        conversationId: string
-    ): Promise<Message[]> {
-        const { data } = await api.get<Message[]>(
-            `/chat/${conversationId}/messages`
-        );
+    async getMessages(conversationId: string): Promise<Message[]> {
+        const { data } = await api.get<{
+            success: boolean;
+            messages: Message[];
+        }>(`/chat/${conversationId}/messages`);
 
-        return data;
+        return data.messages;
     },
 
     async sendMessage(
