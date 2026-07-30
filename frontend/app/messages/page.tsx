@@ -1,68 +1,51 @@
-import { api } from "../lib/api";
-import { Conversation, Message } from "../types/chat";
+"use client";
 
-export const chatService = {
-    async startConversation(listingId: string): Promise<Conversation> {
-        const { data } = await api.post<Conversation>(
-            "/chat/start",
-            { listingId }
+import { useEffect, useState } from "react";
+
+import { chatService } from "../services/chat.service";
+import { Conversation } from "../types/chat";
+
+import ConversationList from "../components/Chat/ConversationList";
+import EmptyChat from "../components/Chat/EmptyChat";
+
+export default function MessagesPage() {
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadConversations();
+    }, []);
+
+    async function loadConversations() {
+        try {
+            const data =
+                await chatService.getConversations();
+
+            setConversations(data);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+                Loading...
+            </div>
         );
+    }
 
-        return data;
-    },
+    if (conversations.length === 0) {
+        return <EmptyChat />;
+    }
 
-    // LISTA tuturor conversațiilor
-    async getConversations(): Promise<Conversation[]> {
-        const { data } = await api.get<Conversation[]>(
-            "/chat/conversations"
-        );
-
-        return data;
-    },
-
-    // O singură conversație
-    async getConversation(
-        conversationId: string
-    ): Promise<Conversation> {
-        const { data } = await api.get<Conversation>(
-            `/chat/${conversationId}`
-        );
-
-        return data;
-    },
-
-    async getMessages(
-        conversationId: string
-    ): Promise<Message[]> {
-        const { data } = await api.get<Message[]>(
-            `/chat/${conversationId}/messages`
-        );
-
-        return data;
-    },
-
-    async sendMessage(
-        conversationId: string,
-        text: string,
-        images: string[] = []
-    ): Promise<Message> {
-        const { data } = await api.post<Message>(
-            "/chat/send",
-            {
-                conversationId,
-                text,
-                images,
-            }
-        );
-
-        return data;
-    },
-
-    async markAsSeen(
-        conversationId: string
-    ): Promise<void> {
-        await api.patch(
-            `/chat/${conversationId}/seen`
-        );
-    },
-};
+    return (
+        <div className="h-[calc(100vh-64px)]">
+            <ConversationList
+                conversations={conversations}
+            />
+        </div>
+    );
+}

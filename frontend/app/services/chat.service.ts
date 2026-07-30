@@ -11,6 +11,14 @@ export const chatService = {
         return data;
     },
 
+    async getConversations(): Promise<Conversation[]> {
+        const { data } = await api.get<Conversation[]>(
+            "/chat/conversations"
+        );
+
+        return data;
+    },
+
     async getConversation(conversationId: string): Promise<Conversation> {
         const { data } = await api.get<Conversation>(
             `/chat/${conversationId}`
