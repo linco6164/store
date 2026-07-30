@@ -103,7 +103,7 @@ export default function LoginPage() {
     function discordLogin() {
         const params = new URLSearchParams({
             client_id: process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!,
-            redirect_uri: "https://localhost:3000/auth/discord/callback",
+            redirect_uri: "https://nx-store.com/auth/discord/callback",
             response_type: "code",
             scope: "identify email",
             prompt: "consent",
