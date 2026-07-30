@@ -63,6 +63,12 @@ router.post("/login", async (req, res) => {
             });
         }
 
+        if (!user.password) {
+            return res.status(401).json({
+                message: "This account uses social login.",
+            });
+        }
+
         const validPassword = await bcrypt.compare(
             password,
             user.password
@@ -184,76 +190,76 @@ router.post("/google", async (req, res) => {
         });
 
     } catch (err) {
-  console.error("Google login error:", err);
+        console.error("Google login error:", err);
 
-  return res.status(500).json({
-    message: "Google login failed",
-    error: err instanceof Error ? err.message : err,
-  });
-}
+        return res.status(500).json({
+            message: "Google login failed",
+            error: err instanceof Error ? err.message : err,
+        });
+    }
 
 });
 
 router.post("/facebook", async (req, res) => {
-  try {
-    const { accessToken } = req.body;
-console.log("Access Token:", accessToken);
-   const response = await fetch(
-  `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
-);
+    try {
+        const { accessToken } = req.body;
+        console.log("Access Token:", accessToken);
+        const response = await fetch(
+            `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
+        );
 
-const data = await response.json();
+        const data = await response.json();
 
-console.log("Facebook status:", response.status);
-console.log("Facebook response:", data);
+        console.log("Facebook status:", response.status);
+        console.log("Facebook response:", data);
 
-if (!response.ok) {
-  return res.status(response.status).json(data);
-}
+        if (!response.ok) {
+            return res.status(response.status).json(data);
+        }
 
-    let user = await User.findOne({
-      email: data.email,
-    });
+        let user = await User.findOne({
+            email: data.email,
+        });
 
-    if (!user) {
-      user = await User.create({
-        username: data.name,
-        email: data.email,
-        provider: "facebook",
-        facebookId: data.id,
-        avatar: data.picture?.data?.url,
-      });
-    }   else {
-    user.facebookId = data.id;
+        if (!user) {
+            user = await User.create({
+                username: data.name,
+                email: data.email,
+                provider: "facebook",
+                facebookId: data.id,
+                avatar: data.picture?.data?.url,
+            });
+        } else {
+            user.facebookId = data.id;
 
-    if (data.picture?.data?.url) {
-        user.avatar = data.picture.data.url;
+            if (data.picture?.data?.url) {
+                user.avatar = data.picture.data.url;
+            }
+
+            await user.save();
+        }
+
+        const token = jwt.sign(
+            {
+                id: user._id,
+            },
+            process.env.JWT_SECRET!,
+            {
+                expiresIn: "7d",
+            }
+        );
+
+        res.json({
+            token,
+            user,
+        });
+    } catch (err) {
+        console.error(err);
+
+        res.status(500).json({
+            message: "Facebook login failed",
+        });
     }
-
-    await user.save();
-}
-
-    const token = jwt.sign(
-      {
-        id: user._id,
-      },
-      process.env.JWT_SECRET!,
-      {
-        expiresIn: "7d",
-      }
-    );
-
-    res.json({
-      token,
-      user,
-    });
-  } catch (err) {
-    console.error(err);
-
-    res.status(500).json({
-      message: "Facebook login failed",
-    });
-  }
 });
 
 router.post("/discord", async (req, res) => {
@@ -261,10 +267,10 @@ router.post("/discord", async (req, res) => {
         const { code } = req.body;
 
         console.log({
-    client_id: process.env.DISCORD_CLIENT_ID,
-    redirect_uri: process.env.DISCORD_REDIRECT_URI,
-    code,
-});
+            client_id: process.env.DISCORD_CLIENT_ID,
+            redirect_uri: process.env.DISCORD_REDIRECT_URI,
+            code,
+        });
 
         const tokenResponse = await fetch(
             "https://discord.com/api/oauth2/token",
