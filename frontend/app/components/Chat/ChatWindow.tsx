@@ -31,6 +31,7 @@ export default function ChatWindow({
     }, [conversationId]);
 
     useEffect(() => {
+        console.log("Socket connected:", socket.connected);
         socket.emit("joinConversation", conversationId);
 
         const onNewMessage = (message: Message) => {
