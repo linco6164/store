@@ -33,7 +33,14 @@ export default function ChatWindow({
         socket.emit("joinConversation", conversationId);
 
         const onNewMessage = (message: Message) => {
-            if (message.conversation !== conversationId) return;
+            const messageConversationId =
+                typeof message.conversation === "string"
+                    ? message.conversation
+                    : (message.conversation as any)._id;
+
+            if (messageConversationId !== conversationId) {
+                return;
+            }
 
             setMessages((prev) => [...prev, message]);
         };
