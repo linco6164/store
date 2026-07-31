@@ -37,6 +37,12 @@ const StoreUserSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+
+  lastSeen: {
+    type: Date,
+    default: Date.now,
+  },
+
   resetPasswordToken: {
     type: String,
     default: null,
@@ -46,7 +52,7 @@ const StoreUserSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
-  
+
   twoFactorEnabled: {
     type: Boolean,
     default: false,

@@ -1,20 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SendHorizonal } from "lucide-react";
 
 import { socket } from "../../lib/socket";
 
+import { Message } from "../../types/chat";
+
 import { chatService } from "../../services/chat.service";
+
+import ImageUploader from "./ImageUploader";
+import ReplyPreview from "./ReplyPreview";
+
+import EmojiPicker from "./EmojiPicker";
+import { Smile } from "lucide-react";
 
 interface MessageInputProps {
     conversationId: string;
+
+    replyMessage: Message | null;
+
+    onCancelReply: () => void;
 }
 
 export default function MessageInput({
     conversationId,
+    replyMessage,
+    onCancelReply,
 }: MessageInputProps) {
     const [message, setMessage] = useState("");
+
+    const [emojiOpen, setEmojiOpen] =
+        useState(false);
+
+    const [images, setImages] =
+        useState<File[]>([]);
 
     function handleTyping() {
         socket.emit("typing", {
@@ -28,16 +48,35 @@ export default function MessageInput({
         });
     }
 
+    function handleEmojiSelect(
+        emoji: string
+    ) {
+        setMessage(
+            (prev) => prev + emoji
+        );
+    }
+
     async function sendMessage() {
-        if (!message.trim()) return;
+        if (!message.trim() && images.length === 0) {
+            return;
+        }
+
+        let uploadedImages: string[] = [];
+
+        if (images.length > 0) {
+            uploadedImages =
+                await chatService.uploadImages(images);
+        }
 
         socket.emit("sendMessage", {
             conversationId,
             text: message.trim(),
-            images: [],
+            images: uploadedImages,
         });
 
         setMessage("");
+        setImages([]);
+        onCancelReply();
         handleStopTyping();
     }
 
@@ -53,6 +92,41 @@ export default function MessageInput({
     return (
         <div className="border-t bg-white p-4">
             <div className="flex items-end gap-3">
+
+                <div className="relative">
+
+                    <button
+                        onClick={() =>
+                            setEmojiOpen(
+                                (prev) => !prev
+                            )
+                        }
+                        className="rounded-lg p-2 transition hover:bg-gray-100"
+                    >
+                        <Smile size={22} />
+                    </button>
+
+                    <EmojiPicker
+                        open={emojiOpen}
+                        onClose={() =>
+                            setEmojiOpen(false)
+                        }
+                        onEmojiSelect={
+                            handleEmojiSelect
+                        }
+                    />
+
+                </div>
+
+                <ImageUploader
+                    images={images}
+                    onChange={setImages}
+                />
+
+                <ReplyPreview
+                    message={replyMessage}
+                    onCancel={onCancelReply}
+                />
 
                 <textarea
                     value={message}

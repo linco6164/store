@@ -7,7 +7,12 @@ import { chatService } from "../../services/chat.service";
 
 import { Conversation, Message } from "../../types/chat";
 
-import MessageBubble from "./MessageBubble";
+import { CHAT_EVENTS } from "@/app/lib/chat-events";
+
+import { toast } from "sonner";
+
+import TypingIndicator from "./TypingIndicator";
+import MessageGroup from "./MessageGroup";
 import MessageInput from "./MessageInput";
 import ChatHeader from "./ChatHeader";
 
@@ -27,12 +32,38 @@ export default function ChatWindow({
 
     const { user } = useAuth();
 
+    const typingParticipant =
+        conversation.participants.find(
+            (p) => p._id === typingUser
+        );
+
+    const [replyMessage, setReplyMessage] =
+        useState<Message | null>(null);
+
+    const notification = useRef<
+        HTMLAudioElement | null
+    >(null);
+
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         console.log("Registering socket listeners");
         loadMessages();
     }, [conversationId]);
+
+    useEffect(() => {
+        notification.current =
+            new Audio("/sounds/notification.mp3");
+    }, []);
+
+    useEffect(() => {
+        if (
+            Notification.permission !==
+            "granted"
+        ) {
+            Notification.requestPermission();
+        }
+    }, []);
 
     useEffect(() => {
         console.log("Socket connected:", socket.connected);
@@ -49,7 +80,36 @@ export default function ChatWindow({
 
             console.log("ADDED");
 
+            if (message.sender._id !== user?._id) {
+                toast.success(
+                    `${message.sender.username} ți-a trimis un mesaj`
+                );
+                notification.current?.play();
+            }
+
+            if (
+                document.hidden &&
+                Notification.permission === "granted"
+            ) {
+                new Notification(
+                    message.sender.username,
+                    {
+                        body: message.text,
+                        icon:
+                            message.sender.avatar,
+                    }
+                );
+            }
+
             setMessages((prev) => [...prev, message]);
+
+            socket.emit(
+                CHAT_EVENTS.DELIVER_MESSAGE,
+                {
+                    conversationId,
+                    messageId: message._id,
+                }
+            );
         };
 
         const onTyping = (userId: string) => {
@@ -60,26 +120,59 @@ export default function ChatWindow({
             setTypingUser(null);
         };
 
-        const onMessagesSeen = () => {
+        const onDelivered = (
+            messageId: string
+        ) => {
             setMessages((prev) =>
-                prev.map((m) => ({
-                    ...m,
-                }))
+                prev.map((m) =>
+                    m._id === messageId
+                        ? {
+                            ...m,
+                            delivered: true,
+                        }
+                        : m
+                )
+            );
+        };
+
+        const onMessagesSeen = (
+            data: {
+                messageId: string;
+                userId: string;
+            }
+        ) => {
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m._id === data.messageId
+                        ? {
+                            ...m,
+                            seen: true,
+                        }
+                        : m
+                )
             );
         };
 
         socket.on("newMessage", onNewMessage);
         socket.on("typing", onTyping);
         socket.on("stopTyping", onStopTyping);
+        socket.on(
+            CHAT_EVENTS.MESSAGE_DELIVERED,
+            onDelivered
+        );
         socket.on("messagesSeen", onMessagesSeen);
 
         return () => {
-             console.log("Removing socket listeners");
+            console.log("Removing socket listeners");
             socket.emit("leaveConversation", conversationId);
 
             socket.off("newMessage", onNewMessage);
             socket.off("typing", onTyping);
             socket.off("stopTyping", onStopTyping);
+            socket.off(
+                CHAT_EVENTS.MESSAGE_DELIVERED,
+                onDelivered
+            );
             socket.off("messagesSeen", onMessagesSeen);
         };
     }, [conversationId]);
@@ -101,9 +194,23 @@ export default function ChatWindow({
 
             setMessages(data);
 
-            await chatService.markAsSeen(
-                conversationId
-            );
+            if (data.length > 0) {
+                const lastMessage =
+                    data[data.length - 1];
+
+                await chatService.markAsSeen(
+                    conversationId,
+                    lastMessage._id
+                );
+
+                socket.emit(
+                    CHAT_EVENTS.SEEN,
+                    {
+                        conversationId,
+                        messageId: lastMessage._id,
+                    }
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -122,24 +229,22 @@ export default function ChatWindow({
 
             {conversation.listing && (
                 <ChatHeader
-                    listing={conversation.listing}
+                    conversation={conversation}
                 />
             )}
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
 
-                {messages.map((message) => (
-                    <MessageBubble
-                        key={message._id}
-                        message={message}
-                        currentUserId={user!._id}
-                    />
-                ))}
+                <MessageGroup
+                    messages={messages}
+                    currentUserId={user!._id}
+                />
 
-                {typingUser && (
-                    <div className="text-sm text-gray-500 italic">
-                        Typing...
-                    </div>
+                {typingUser && typingParticipant && (
+                    <TypingIndicator
+                        username={typingParticipant.username}
+                        avatar={typingParticipant.avatar}
+                    />
                 )}
 
                 <div ref={bottomRef} />
@@ -148,6 +253,10 @@ export default function ChatWindow({
 
             <MessageInput
                 conversationId={conversationId}
+                replyMessage={replyMessage}
+                onCancelReply={() =>
+                    setReplyMessage(null)
+                }
             />
 
         </div>

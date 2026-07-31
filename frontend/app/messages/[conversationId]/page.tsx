@@ -2,10 +2,10 @@
 
 import { use, useEffect, useState } from "react";
 
-import ChatWindow from "../../components/Chat/ChatWindow";
+import ChatLayout from "../../components/Chat/ChatLayout";
 
-import { Conversation } from "../../types/chat";
 import { chatService } from "../../services/chat.service";
+import { Conversation } from "../../types/chat";
 
 interface Props {
     params: Promise<{
@@ -17,25 +17,36 @@ export default function ConversationPage({
     params,
 }: Props) {
     const { conversationId } = use(params);
-     console.log("conversationId:", conversationId);
-
-    const [conversation, setConversation] =
-        useState<Conversation | null>(null);
 
     const [loading, setLoading] = useState(true);
 
+    const [conversation, setConversation] =
+        useState<Conversation>();
+
+    const [conversations, setConversations] =
+        useState<Conversation[]>([]);
+
     useEffect(() => {
-        loadConversation();
+        loadData();
     }, [conversationId]);
 
-    async function loadConversation() {
+    async function loadData() {
         try {
-            const data =
-                await chatService.getConversation(
+            const [
+                currentConversation,
+                allConversations,
+            ] = await Promise.all([
+                chatService.getConversation(
                     conversationId
-                );
+                ),
+                chatService.getConversations(),
+            ]);
 
-            setConversation(data);
+            setConversation(currentConversation);
+
+            setConversations(allConversations);
+        } catch (err) {
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -43,23 +54,18 @@ export default function ConversationPage({
 
     if (loading) {
         return (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-[calc(100vh-64px)] items-center justify-center">
                 Loading...
             </div>
         );
     }
 
-    if (!conversation) {
-        return (
-            <div className="flex h-full items-center justify-center">
-                Conversation not found.
-            </div>
-        );
-    }
-
     return (
-        <div className="h-[calc(100vh-64px)]">
-            <ChatWindow conversation={conversation} />
+        <div className="p-6">
+            <ChatLayout
+                conversations={conversations}
+                activeConversation={conversation}
+            />
         </div>
     );
 }

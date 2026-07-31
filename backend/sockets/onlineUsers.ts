@@ -14,12 +14,12 @@ class OnlineUsers {
         }
     }
 
-    getSocketId(userId: string) {
-        return this.users.get(userId);
-    }
-
     isOnline(userId: string) {
         return this.users.has(userId);
+    }
+
+    getSocketId(userId: string) {
+        return this.users.get(userId);
     }
 
     getAll() {

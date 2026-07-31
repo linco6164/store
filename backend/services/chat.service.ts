@@ -18,7 +18,9 @@ class ChatService {
         const receiverId = listing.seller.toString();
 
         if (receiverId === senderId) {
-            throw new Error("You cannot contact your own listing.");
+            throw new Error(
+                "You cannot contact your own listing."
+            );
         }
 
         let conversation = await Conversation.findOne({
@@ -43,6 +45,7 @@ class ChatService {
             listing: listing._id,
             lastMessage: "",
             lastMessageAt: new Date(),
+            unread: {},
         });
 
         return conversation;
@@ -52,8 +55,14 @@ class ChatService {
         return Conversation.find({
             participants: new Types.ObjectId(userId),
         })
-            .populate("participants", "username avatar")
-            .populate("listing", "title price images")
+            .populate(
+                "participants",
+                "_id username avatar"
+            )
+            .populate(
+                "listing",
+                "_id title price images"
+            )
             .sort({
                 updatedAt: -1,
             });
@@ -63,55 +72,66 @@ class ChatService {
         conversationId: string,
         userId: string
     ) {
-        console.log(
-            Conversation.schema.path("participants")?.options
-        );
+        const conversation =
+            await Conversation.findById(
+                conversationId
+            )
+                .populate(
+                    "participants",
+                    "_id username avatar"
+                )
+                .populate(
+                    "listing",
+                    "_id title price images"
+                );
 
-        console.log(
-            Message.schema.path("sender")?.options
-        );
-
-        console.log("1");
-
-        const conversation = await Conversation.findById(
-            conversationId
-        );
-
-        console.log("2");
-
-        const populated = await conversation
-            ?.populate("participants", "_id username avatar");
-
-        console.log("3");
-
-        await populated?.populate(
-            "listing",
-            "_id title price images"
-        );
-
-        console.log("4");
-
-        if (!populated) {
-            throw new Error("Conversation not found");
+        if (!conversation) {
+            throw new Error(
+                "Conversation not found"
+            );
         }
 
-        const isParticipant = populated.participants.some(
-            (participant: any) =>
-                participant._id.toString() === userId
-        );
+        const isParticipant =
+            conversation.participants.some(
+                (participant: any) =>
+                    participant._id.toString() ===
+                    userId
+            );
 
         if (!isParticipant) {
             throw new Error("Access denied");
         }
 
-        return populated;
+        return conversation;
     }
 
-    async getMessages(conversationId: string) {
+    async getConversationById(
+        conversationId: string
+    ) {
+        return Conversation.findById(
+            conversationId
+        )
+            .populate(
+                "participants",
+                "_id username avatar"
+            )
+            .populate(
+                "listing",
+                "_id title price images"
+            )
+            .lean();
+    }
+
+    async getMessages(
+        conversationId: string
+    ) {
         return Message.find({
             conversation: conversationId,
         })
-            .populate("sender", "username avatar")
+            .populate(
+                "sender",
+                "_id username avatar"
+            )
             .sort({
                 createdAt: 1,
             });
@@ -123,24 +143,81 @@ class ChatService {
         text: string,
         images: string[] = []
     ) {
-        const message = await Message.create({
-            conversation: conversationId,
-            sender: senderId,
-            text,
-            images,
-            seenBy: [senderId],
-        });
+        const message =
+            await Message.create({
+                conversation:
+                    conversationId,
+                sender: senderId,
+                text,
+                images,
+                deliveredTo: [senderId],
+                seenBy: [senderId],
+            });
 
-        await Conversation.findByIdAndUpdate(
-            conversationId,
-            {
-                lastMessage: text,
-                lastMessageAt: new Date(),
+        const conversation =
+            await Conversation.findById(
+                conversationId
+            );
+
+        if (!conversation) {
+            throw new Error(
+                "Conversation not found"
+            );
+        }
+
+        const unread =
+            conversation.unread ||
+            new Map();
+
+        conversation.participants.forEach(
+            (participant: any) => {
+                const id =
+                    participant.toString();
+
+                if (id !== senderId) {
+                    unread.set(
+                        id,
+                        (unread.get(id) ||
+                            0) + 1
+                    );
+                }
             }
         );
 
-        return Message.findById(message._id)
-            .populate("sender", "username avatar");
+        conversation.lastMessage = text;
+        conversation.lastMessageAt =
+            new Date();
+        conversation.unread = unread;
+
+        await conversation.save();
+
+        return Message.findById(
+            message._id
+        ).populate(
+            "sender",
+            "_id username avatar"
+        );
+    }
+
+    async markAsDelivered(
+        conversationId: string,
+        userId: string
+    ) {
+        await Message.updateMany(
+            {
+                conversation:
+                    conversationId,
+                deliveredTo: {
+                    $ne: userId,
+                },
+            },
+            {
+                $push: {
+                    deliveredTo:
+                        userId,
+                },
+            }
+        );
     }
 
     async markAsSeen(
@@ -149,7 +226,8 @@ class ChatService {
     ) {
         await Message.updateMany(
             {
-                conversation: conversationId,
+                conversation:
+                    conversationId,
                 seenBy: {
                     $ne: userId,
                 },
@@ -160,6 +238,23 @@ class ChatService {
                 },
             }
         );
+
+        const conversation =
+            await Conversation.findById(
+                conversationId
+            );
+
+        if (
+            conversation &&
+            conversation.unread
+        ) {
+            conversation.unread.set(
+                userId,
+                0
+            );
+
+            await conversation.save();
+        }
     }
 }
 

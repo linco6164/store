@@ -1,5 +1,4 @@
 export const CHAT_EVENTS = {
-    JOIN: "join",
     JOIN_CONVERSATION: "joinConversation",
     LEAVE_CONVERSATION: "leaveConversation",
 
@@ -9,11 +8,11 @@ export const CHAT_EVENTS = {
     TYPING: "typing",
     STOP_TYPING: "stopTyping",
 
-    MESSAGE_DELIVERED: "messageDelivered",
-    DELIVER_MESSAGE: "deliverMessage",
-
     SEEN: "seen",
     MESSAGES_SEEN: "messagesSeen",
+
+    DELIVER_MESSAGE: "deliverMessage",
+    MESSAGE_DELIVERED: "messageDelivered",
 
     USER_ONLINE: "userOnline",
     USER_OFFLINE: "userOffline",
@@ -21,6 +20,3 @@ export const CHAT_EVENTS = {
 
     CONVERSATION_UPDATED: "conversationUpdated",
 } as const;
-
-export type ChatEvent =
-    (typeof CHAT_EVENTS)[keyof typeof CHAT_EVENTS];

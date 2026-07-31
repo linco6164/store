@@ -22,6 +22,11 @@ export default function registerChatSocket(io: Server) {
 
         onlineUsers.add(socket.userId, socket.id);
 
+        io.emit(
+            CHAT_EVENTS.ONLINE_USERS,
+            onlineUsers.getAll()
+        );
+
         socket.broadcast.emit(
             CHAT_EVENTS.USER_ONLINE,
             socket.userId
@@ -61,6 +66,16 @@ export default function registerChatSocket(io: Server) {
                         CHAT_EVENTS.NEW_MESSAGE,
                         message
                     );
+
+                    const conversation =
+                        await chatService.getConversationById(
+                            data.conversationId
+                        );
+
+                    io.emit(
+                        CHAT_EVENTS.CONVERSATION_UPDATED,
+                        conversation
+                    );
                 } catch (error) {
                     console.error(error);
                 }
@@ -88,8 +103,24 @@ export default function registerChatSocket(io: Server) {
         );
 
         socket.on(
+            CHAT_EVENTS.DELIVER_MESSAGE,
+            (data: {
+                conversationId: string;
+                messageId: string;
+            }) => {
+                socket.to(data.conversationId).emit(
+                    CHAT_EVENTS.MESSAGE_DELIVERED,
+                    data.messageId
+                );
+            }
+        );
+
+        socket.on(
             CHAT_EVENTS.SEEN,
-            async (data: SeenPayload) => {
+            async (data: {
+                conversationId: string;
+                messageId: string;
+            }) => {
                 try {
                     await chatService.markAsSeen(
                         data.conversationId,
@@ -98,7 +129,10 @@ export default function registerChatSocket(io: Server) {
 
                     io.to(data.conversationId).emit(
                         CHAT_EVENTS.MESSAGES_SEEN,
-                        socket.userId
+                        {
+                            messageId: data.messageId,
+                            userId: socket.userId,
+                        }
                     );
                 } catch (error) {
                     console.error(error);
@@ -106,8 +140,15 @@ export default function registerChatSocket(io: Server) {
             }
         );
 
-        socket.on("disconnect", () => {
+        socket.on("disconnect", async () => {
+            if (!socket.userId) return;
+
             onlineUsers.remove(socket.id);
+
+            io.emit(
+                CHAT_EVENTS.ONLINE_USERS,
+                onlineUsers.getAll()
+            );
 
             socket.broadcast.emit(
                 CHAT_EVENTS.USER_OFFLINE,
