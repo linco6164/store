@@ -31,11 +31,11 @@ export default function MessageInput({
     async function sendMessage() {
         if (!message.trim()) return;
 
-        await chatService.sendMessage(
+        socket.emit("sendMessage", {
             conversationId,
-            message.trim(),
-            []
-        );
+            text: message.trim(),
+            images: [],
+        });
 
         setMessage("");
         handleStopTyping();

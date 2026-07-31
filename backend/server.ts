@@ -14,6 +14,7 @@ import { listingRoutes } from "./modules/listing/index.js";
 import profileRoutes from "./modules/profile/profile.routes.js";
 import twoFactorRoutes from "./modules/profile/2fa.routes.js";
 import chatRoutes from "./routes/chat.js";
+import { authenticateSocket } from "./sockets/socketAuth.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 
@@ -29,6 +30,8 @@ const io = new Server(httpServer, {
         credentials: true,
     },
 });
+
+io.use(authenticateSocket);
 
 registerChatSocket(io);
 

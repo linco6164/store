@@ -2,7 +2,6 @@ import { Server } from "socket.io";
 
 import {
     AuthenticatedSocket,
-    SendMessagePayload,
     TypingPayload,
     SeenPayload,
 } from "../types/socket.js";
@@ -10,26 +9,22 @@ import {
 import onlineUsers from "./onlineUsers.js";
 import chatService from "../services/chat.service.js";
 import { CHAT_EVENTS } from "./events.js";
-import { authenticateSocket } from "./socketAuth.js";
 
 export default function registerChatSocket(io: Server) {
     io.on("connection", (socket: AuthenticatedSocket) => {
-        console.log(`Socket connected: ${socket.id}`);
+        console.log("Socket connected:", socket.id);
+        console.log("User:", socket.userId);
 
-        const userId = authenticateSocket(socket);
-
-        if (!userId) {
+        if (!socket.userId) {
             socket.disconnect(true);
             return;
         }
 
-        socket.userId = userId;
-
-        onlineUsers.add(userId, socket.id);
+        onlineUsers.add(socket.userId, socket.id);
 
         socket.broadcast.emit(
             CHAT_EVENTS.USER_ONLINE,
-            userId
+            socket.userId
         );
 
         socket.on(
@@ -48,14 +43,16 @@ export default function registerChatSocket(io: Server) {
 
         socket.on(
             CHAT_EVENTS.SEND_MESSAGE,
-            async (data: SendMessagePayload) => {
+            async (data: {
+                conversationId: string;
+                text: string;
+                images?: string[];
+            }) => {
                 try {
-                    if (!socket.userId) return;
-
                     const message =
                         await chatService.sendMessage(
                             data.conversationId,
-                            socket.userId,
+                            socket.userId!,
                             data.text,
                             data.images ?? []
                         );
@@ -73,8 +70,6 @@ export default function registerChatSocket(io: Server) {
         socket.on(
             CHAT_EVENTS.TYPING,
             (data: TypingPayload) => {
-                if (!socket.userId) return;
-
                 socket.to(data.conversationId).emit(
                     CHAT_EVENTS.TYPING,
                     socket.userId
@@ -85,8 +80,6 @@ export default function registerChatSocket(io: Server) {
         socket.on(
             CHAT_EVENTS.STOP_TYPING,
             (data: TypingPayload) => {
-                if (!socket.userId) return;
-
                 socket.to(data.conversationId).emit(
                     CHAT_EVENTS.STOP_TYPING,
                     socket.userId
@@ -97,29 +90,29 @@ export default function registerChatSocket(io: Server) {
         socket.on(
             CHAT_EVENTS.SEEN,
             async (data: SeenPayload) => {
-                if (!socket.userId) return;
+                try {
+                    await chatService.markAsSeen(
+                        data.conversationId,
+                        socket.userId!
+                    );
 
-                await chatService.markAsSeen(
-                    data.conversationId,
-                    socket.userId
-                );
-
-                io.to(data.conversationId).emit(
-                    CHAT_EVENTS.MESSAGES_SEEN,
-                    socket.userId
-                );
+                    io.to(data.conversationId).emit(
+                        CHAT_EVENTS.MESSAGES_SEEN,
+                        socket.userId
+                    );
+                } catch (error) {
+                    console.error(error);
+                }
             }
         );
 
         socket.on("disconnect", () => {
-            if (socket.userId) {
-                onlineUsers.remove(socket.id);
+            onlineUsers.remove(socket.id);
 
-                socket.broadcast.emit(
-                    CHAT_EVENTS.USER_OFFLINE,
-                    socket.userId
-                );
-            }
+            socket.broadcast.emit(
+                CHAT_EVENTS.USER_OFFLINE,
+                socket.userId
+            );
 
             console.log(
                 `Socket disconnected: ${socket.id}`

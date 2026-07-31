@@ -1,25 +1,28 @@
-import { Socket } from "socket.io";
 import jwt from "jsonwebtoken";
+import { AuthenticatedSocket } from "../types/socket.js";
 
-interface JwtPayload {
-    id: string;
-}
-
-export function authenticateSocket(socket: Socket): string | null {
+export function authenticateSocket(
+    socket: AuthenticatedSocket,
+    next: (err?: Error) => void
+) {
     try {
-        const token = socket.handshake.auth?.token;
+        const token = socket.handshake.auth.token;
 
         if (!token) {
-            return null;
+            return next(new Error("Unauthorized"));
         }
 
-        const decoded = jwt.verify(
+        const payload = jwt.verify(
             token,
             process.env.JWT_SECRET!
-        ) as JwtPayload;
+        ) as {
+            id: string;
+        };
 
-        return decoded.id;
+        socket.userId = payload.id;
+
+        next();
     } catch {
-        return null;
+        next(new Error("Unauthorized"));
     }
 }
