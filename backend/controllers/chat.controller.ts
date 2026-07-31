@@ -118,6 +118,9 @@ class ChatController {
         res: Response
     ) {
         try {
+            console.log("=== SEND MESSAGE ===");
+            console.log(req.body);
+
             const senderId = req.userId!;
 
             const {
