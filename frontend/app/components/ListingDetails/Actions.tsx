@@ -3,6 +3,7 @@
 import { Heart, MessageCircle, ShoppingBag, Share2 } from "lucide-react";
 
 import { Listing } from "@/app/types/listing";
+import ContactSellerButton from "../Chat/ContactSellerButton";
 
 type ActionsProps = {
     listing: Listing;
@@ -57,14 +58,9 @@ export default function Actions({
                     Cumpără acum
                 </button>
 
-                <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-3 rounded-2xl border px-5 py-4 font-semibold transition hover:bg-gray-50"
-                >
-                    <MessageCircle size={22} />
-
-                    Trimite mesaj
-                </button>
+                <ContactSellerButton
+                    listingId={listing._id}
+                />
 
                 <button
                     type="button"
