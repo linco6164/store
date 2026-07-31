@@ -6,10 +6,27 @@ const SOCKET_URL =
 export const socket: Socket = io(SOCKET_URL, {
     autoConnect: false,
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+});
+
+socket.on("connect", () => {
+    console.log("✅ Socket connected:", socket.id);
+});
+
+socket.on("disconnect", (reason) => {
+    console.log("❌ Socket disconnected:", reason);
+});
+
+socket.on("connect_error", (err) => {
+    console.error("❌ Socket error:", err.message);
 });
 
 export function connectSocket(token: string) {
-    if (socket.connected) return;
+    if (socket.connected) {
+        socket.disconnect();
+    }
 
     socket.auth = {
         token,
