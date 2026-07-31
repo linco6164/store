@@ -49,16 +49,6 @@ export default function ChatHeader({
                         height={52}
                         className="rounded-full object-cover"
                     />
-
-                    <div className="absolute bottom-0 right-0">
-                        <OnlineBadge
-                            online={onlineUsers.includes(
-                                otherUser._id
-                            )}
-                            size="sm"
-                        />
-                    </div>
-
                 </div>
 
                 <div>
