@@ -50,12 +50,14 @@ export default function ChatHeader({
                         className="rounded-full object-cover"
                     />
 
-                    <Circle
-                        size={12}
-                        fill="#22c55e"
-                        strokeWidth={0}
-                        className="absolute bottom-0 right-0"
-                    />
+                    <div className="absolute bottom-0 right-0">
+                        <OnlineBadge
+                            online={onlineUsers.includes(
+                                otherUser._id
+                            )}
+                            size="sm"
+                        />
+                    </div>
 
                 </div>
 
