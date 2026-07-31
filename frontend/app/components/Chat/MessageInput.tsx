@@ -5,6 +5,8 @@ import { SendHorizonal } from "lucide-react";
 
 import { socket } from "../../lib/socket";
 
+import { chatService } from "../../services/chat.service";
+
 interface MessageInputProps {
     conversationId: string;
 }
@@ -29,11 +31,11 @@ export default function MessageInput({
     async function sendMessage() {
         if (!message.trim()) return;
 
-        socket.emit("sendMessage", {
+        await chatService.sendMessage(
             conversationId,
-            text: message.trim(),
-            images: [],
-        });
+            message.trim(),
+            []
+        );
 
         setMessage("");
         handleStopTyping();
