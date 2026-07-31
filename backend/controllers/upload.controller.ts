@@ -11,7 +11,15 @@ export async function uploadImages(req: Request, res: Response) {
       });
     }
 
-    const folder = (req.body.folder || "listings").trim();
+    const allowedFolders = [
+      "chat",
+      "listings",
+      "avatars",
+    ];
+
+    const folder = allowedFolders.includes(req.body.folder)
+      ? req.body.folder
+      : "chat";
     const subfolder = req.body.subfolder;
 
     const urls = await Promise.all(

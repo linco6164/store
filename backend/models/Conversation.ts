@@ -12,6 +12,8 @@ export interface IConversation extends Document {
     createdAt: Date;
 
     updatedAt: Date;
+
+    unread: Map<string, number>;
 }
 
 const ConversationSchema = new Schema<IConversation>(
@@ -36,6 +38,12 @@ const ConversationSchema = new Schema<IConversation>(
 
         lastMessageAt: {
             type: Date,
+        },
+
+        unread: {
+            type: Map,
+            of: Number,
+            default: {},
         },
     },
     {

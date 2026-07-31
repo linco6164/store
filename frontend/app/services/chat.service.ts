@@ -44,7 +44,10 @@ export const chatService = {
         text: string,
         images: string[] = []
     ): Promise<Message> {
-        const { data } = await api.post<Message>(
+        const { data } = await api.post<{
+            success: boolean;
+            message: Message;
+        }>(
             "/chat/send",
             {
                 conversationId,
@@ -53,10 +56,56 @@ export const chatService = {
             }
         );
 
-        return data;
+        return data.message;
     },
 
-    async markAsSeen(conversationId: string): Promise<void> {
-        await api.patch(`/chat/${conversationId}/seen`);
+    async markAsSeen(
+        conversationId: string,
+        messageId: string
+    ): Promise<void> {
+        await api.patch(
+            `/chat/${conversationId}/seen`,
+            {
+                messageId,
+            }
+        );
+    },
+
+    async uploadImages(
+        files: File[],
+        folder = "chat",
+        subfolder?: string
+    ): Promise<string[]> {
+        const formData = new FormData();
+
+        files.forEach((file) =>
+            formData.append("images", file)
+        );
+
+        formData.append("folder", folder);
+
+        if (subfolder) {
+            formData.append(
+                "subfolder",
+                subfolder
+            );
+        }
+
+        const { data } = await api.post<{
+            success: boolean;
+            images: string[];
+        }>(
+            "/upload",
+            formData,
+            {
+                headers: {
+                    "Content-Type":
+                        "multipart/form-data",
+                },
+            }
+        );
+
+        return data.images;
     }
+
 };

@@ -17,9 +17,12 @@ export interface Message {
 
     seenBy: string[];
 
+    deliveredTo: string[];
+
     createdAt: string;
 
     updatedAt: string;
+
 }
 
 export interface Conversation {
@@ -37,6 +40,8 @@ export interface Conversation {
     lastMessage?: Message;
 
     lastMessageAt: string;
+        
+    unread?: Record<string, number>;
 
     createdAt: string;
 

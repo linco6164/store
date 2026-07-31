@@ -1,11 +1,14 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 
 import { Conversation } from "../../types/chat";
+import { useAuth } from "../../providers/AuthProvider";
 
-interface ConversationListProps {
+import ConversationItem from "./ConversationItem";
+
+interface Props {
     conversations: Conversation[];
     activeConversationId?: string;
 }
@@ -13,65 +16,108 @@ interface ConversationListProps {
 export default function ConversationList({
     conversations,
     activeConversationId,
-}: ConversationListProps) {
-    if (conversations.length === 0) {
-        return (
-            <div className="flex h-full items-center justify-center text-gray-500">
-                No conversations yet.
-            </div>
-        );
-    }
+}: Props) {
+    const { user } = useAuth();
+
+    const [search, setSearch] = useState("");
+
+    const filteredConversations = useMemo(() => {
+        if (!user) return [];
+
+        return conversations
+            .filter((conversation) => {
+                const otherUser =
+                    conversation.participants.find(
+                        (p) => p._id !== user._id
+                    );
+
+                if (!otherUser) return false;
+
+                return otherUser.username
+                    .toLowerCase()
+                    .includes(search.toLowerCase());
+            })
+            .sort((a, b) => {
+                return (
+                    new Date(
+                        b.lastMessageAt ??
+                            b.updatedAt
+                    ).getTime() -
+                    new Date(
+                        a.lastMessageAt ??
+                            a.updatedAt
+                    ).getTime()
+                );
+            });
+    }, [conversations, search, user]);
+
+    if (!user) return null;
 
     return (
-        <div className="divide-y">
-            {conversations.map((conversation) => {
-                const image =
-                    conversation.listing?.images?.[0] ??
-                    "/images/placeholder.png";
+        <aside className="flex h-full w-full flex-col border-r bg-white">
 
-                return (
-                    <Link
-                        key={conversation._id}
-                        href={`/messages/${conversation._id}`}
-                    >
-                        <div
-                            className={`flex cursor-pointer items-center gap-3 p-4 transition hover:bg-gray-50 ${
-                                activeConversationId === conversation._id
-                                    ? "bg-gray-100"
-                                    : ""
-                            }`}
-                        >
-                            <Image
-                                src={image}
-                                alt={conversation.listing?.title ?? "Listing"}
-                                width={60}
-                                height={60}
-                                className="h-14 w-14 rounded-lg object-cover"
+            {/* Header */}
+
+            <div className="border-b p-5">
+
+                <h2 className="text-xl font-bold">
+                    Mesaje
+                </h2>
+
+                <div className="relative mt-4">
+
+                    <Search
+                        size={18}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+
+                    <input
+                        value={search}
+                        onChange={(e) =>
+                            setSearch(
+                                e.target.value
+                            )
+                        }
+                        placeholder="Caută conversații..."
+                        className="w-full rounded-xl border bg-gray-50 py-2 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:bg-white"
+                    />
+
+                </div>
+
+            </div>
+
+            {/* Lista conversațiilor */}
+
+            <div className="flex-1 overflow-y-auto">
+
+                {filteredConversations.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-8 text-center text-sm text-gray-500">
+                        Nu există conversații.
+                    </div>
+                ) : (
+                    filteredConversations.map(
+                        (conversation) => (
+                            <ConversationItem
+                                key={
+                                    conversation._id
+                                }
+                                conversation={
+                                    conversation
+                                }
+                                currentUserId={
+                                    user._id
+                                }
+                                active={
+                                    conversation._id ===
+                                    activeConversationId
+                                }
                             />
+                        )
+                    )
+                )}
 
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="truncate font-semibold">
-                                        {conversation.listing?.title ??
-                                            "Conversation"}
-                                    </h3>
+            </div>
 
-                                    <span className="text-xs text-gray-400">
-                                        {new Date(
-                                            conversation.lastMessageAt
-                                        ).toLocaleDateString()}
-                                    </span>
-                                </div>
-
-                                <p className="truncate text-sm text-gray-500">
-                                    {conversation.lastMessage?.text ??
-                                        "No messages"}
-                                </p>
-                            </div>
-                        </div>
-                    </Link>
-                );
-            })}
-        </div>
+        </aside>
     );
 }

@@ -2,6 +2,8 @@ import "./globals.css";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./providers/AuthProvider";
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: {
@@ -18,6 +20,11 @@ export default function RootLayout({
           </AuthProvider>
         </GoogleOAuthProvider>
       </body>
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+      />
     </html>
   );
 }
