@@ -18,6 +18,7 @@ export default function OnlineBadge({
             ? "h-2.5 w-2.5"
             : "h-3.5 w-3.5";
 
+    // doar cerculeț
     if (size === "sm") {
         return (
             <span
@@ -34,22 +35,32 @@ export default function OnlineBadge({
 
     return (
         <div className="flex items-center gap-2">
-
             <span
                 className={clsx(
-                    "rounded-full bg-gray-400",
-                    dotSize
+                    "rounded-full",
+                    dotSize,
+                    online
+                        ? "bg-green-500"
+                        : "bg-gray-400"
                 )}
             />
 
-            <span className="text-sm text-gray-500">
-                {lastSeen
+            <span
+                className={clsx(
+                    "text-sm",
+                    online
+                        ? "text-green-600"
+                        : "text-gray-500"
+                )}
+            >
+                {online
+                    ? "Online"
+                    : lastSeen
                     ? `Ultima activitate ${formatLastSeen(
-                        lastSeen
-                    )}`
+                          lastSeen
+                      )}`
                     : "Offline"}
             </span>
-
         </div>
     );
 }
@@ -66,22 +77,17 @@ function formatLastSeen(
         diff / 60000
     );
 
-    if (minutes < 1)
-        return "acum";
+    if (minutes < 1) return "acum";
 
     if (minutes < 60)
         return `acum ${minutes} min`;
 
-    const hours = Math.floor(
-        minutes / 60
-    );
+    const hours = Math.floor(minutes / 60);
 
     if (hours < 24)
         return `acum ${hours} h`;
 
-    const days = Math.floor(
-        hours / 24
-    );
+    const days = Math.floor(hours / 24);
 
     return `acum ${days} zile`;
 }
