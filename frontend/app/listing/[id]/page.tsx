@@ -8,7 +8,6 @@ import ShippingCard from "../../components/ListingDetails/ShippingCard";
 import Actions from "../../components/ListingDetails/Actions";
 import ReportButton from "../../components/ListingDetails/ReportButton";
 import SimilarListings from "../../components/ListingDetails/SimilarListings";
-import ContactSellerButton from "../../components/Chat/ContactSellerButton";
 
 import { listingService } from "../../services/listing.service";
 
@@ -47,10 +46,6 @@ export default async function ListingPage({
                         <Actions listing={listing} />
 
                         <SellerCard listing={listing} />
-
-                        <ContactSellerButton
-                            listingId={listing._id}
-                        />
 
                         <ShippingCard />
 

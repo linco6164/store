@@ -26,6 +26,7 @@ export default function ChatWindow({
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        console.log("Registering socket listeners");
         loadMessages();
     }, [conversationId]);
 
@@ -33,14 +34,15 @@ export default function ChatWindow({
         socket.emit("joinConversation", conversationId);
 
         const onNewMessage = (message: Message) => {
-            const messageConversationId =
-                typeof message.conversation === "string"
-                    ? message.conversation
-                    : (message.conversation as any)._id;
+            console.log("NEW MESSAGE:", message);
+            console.log("Current conversation:", conversationId);
 
-            if (messageConversationId !== conversationId) {
+            if (message.conversation !== conversationId) {
+                console.log("IGNORED");
                 return;
             }
+
+            console.log("ADDED");
 
             setMessages((prev) => [...prev, message]);
         };
@@ -67,6 +69,7 @@ export default function ChatWindow({
         socket.on("messagesSeen", onMessagesSeen);
 
         return () => {
+             console.log("Removing socket listeners");
             socket.emit("leaveConversation", conversationId);
 
             socket.off("newMessage", onNewMessage);

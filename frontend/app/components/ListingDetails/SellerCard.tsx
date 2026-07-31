@@ -55,14 +55,6 @@ export default function SellerCard({
                     Vezi profilul
                 </Link>
 
-                <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 font-medium text-white transition hover:opacity-90"
-                >
-                    <MessageCircle size={20} />
-
-                    Trimite mesaj
-                </button>
             </div>
         </section>
     );
