@@ -11,6 +11,8 @@ import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import ChatHeader from "./ChatHeader";
 
+import { useAuth } from "../../providers/AuthProvider";
+
 interface ChatWindowProps {
     conversation: Conversation;
 }
@@ -22,6 +24,8 @@ export default function ChatWindow({
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [typingUser, setTypingUser] = useState<string | null>(null);
+
+    const { user } = useAuth();
 
     const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +132,7 @@ export default function ChatWindow({
                     <MessageBubble
                         key={message._id}
                         message={message}
+                        currentUserId={user!._id}
                     />
                 ))}
 
