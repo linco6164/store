@@ -18,20 +18,17 @@ export default function OnlineBadge({
             ? "h-2.5 w-2.5"
             : "h-3.5 w-3.5";
 
-    if (online) {
+    if (size === "sm") {
         return (
-            <div className="flex items-center gap-2">
-                <span
-                    className={clsx(
-                        "rounded-full bg-green-500",
-                        dotSize
-                    )}
-                />
-
-                <span className="text-sm font-medium text-green-600">
-                    Online
-                </span>
-            </div>
+            <span
+                className={clsx(
+                    "block rounded-full border-2 border-white",
+                    online
+                        ? "bg-green-500"
+                        : "bg-gray-400",
+                    dotSize
+                )}
+            />
         );
     }
 
@@ -48,8 +45,8 @@ export default function OnlineBadge({
             <span className="text-sm text-gray-500">
                 {lastSeen
                     ? `Ultima activitate ${formatLastSeen(
-                          lastSeen
-                      )}`
+                        lastSeen
+                    )}`
                     : "Offline"}
             </span>
 
