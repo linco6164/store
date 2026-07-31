@@ -27,7 +27,7 @@ export default function ImageUploader({
     }
 
     return (
-        <div className="w-full">
+        <div className="flex-shrink-0">
 
             <label className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:bg-gray-100">
 

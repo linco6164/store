@@ -1,25 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { SendHorizonal } from "lucide-react";
+import { useState } from "react";
+import { SendHorizonal, Smile } from "lucide-react";
 
 import { socket } from "../../lib/socket";
+import { chatService } from "../../services/chat.service";
 
 import { Message } from "../../types/chat";
 
-import { chatService } from "../../services/chat.service";
-
+import EmojiPicker from "./EmojiPicker";
 import ImageUploader from "./ImageUploader";
 import ReplyPreview from "./ReplyPreview";
 
-import EmojiPicker from "./EmojiPicker";
-import { Smile } from "lucide-react";
-
 interface MessageInputProps {
     conversationId: string;
-
     replyMessage: Message | null;
-
     onCancelReply: () => void;
 }
 
@@ -51,13 +46,14 @@ export default function MessageInput({
     function handleEmojiSelect(
         emoji: string
     ) {
-        setMessage(
-            (prev) => prev + emoji
-        );
+        setMessage((prev) => prev + emoji);
     }
 
     async function sendMessage() {
-        if (!message.trim() && images.length === 0) {
+        if (
+            !message.trim() &&
+            images.length === 0
+        ) {
             return;
         }
 
@@ -65,7 +61,11 @@ export default function MessageInput({
 
         if (images.length > 0) {
             uploadedImages =
-                await chatService.uploadImages(images);
+                await chatService.uploadImages(
+                    images,
+                    "chat",
+                    conversationId
+                );
         }
 
         socket.emit("sendMessage", {
@@ -83,7 +83,10 @@ export default function MessageInput({
     function handleKeyDown(
         e: React.KeyboardEvent<HTMLTextAreaElement>
     ) {
-        if (e.key === "Enter" && !e.shiftKey) {
+        if (
+            e.key === "Enter" &&
+            !e.shiftKey
+        ) {
             e.preventDefault();
             sendMessage();
         }
@@ -91,17 +94,41 @@ export default function MessageInput({
 
     return (
         <div className="border-t bg-white p-4">
-            <div className="flex items-end gap-3">
 
-                <div className="relative">
+            {replyMessage && (
+                <div className="mb-3">
+                    <ReplyPreview
+                        message={replyMessage}
+                        onCancel={
+                            onCancelReply
+                        }
+                    />
+                </div>
+            )}
+
+            {images.length > 0 && (
+                <div className="mb-3">
+                    <ImageUploader
+                        images={images}
+                        onChange={setImages}
+                    />
+                </div>
+            )}
+
+            <div className="flex items-end gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2">
+
+                {/* Emoji */}
+
+                <div className="relative flex-shrink-0">
 
                     <button
+                        type="button"
                         onClick={() =>
                             setEmojiOpen(
                                 (prev) => !prev
                             )
                         }
-                        className="rounded-lg p-2 transition hover:bg-gray-100"
+                        className="rounded-lg p-2 transition hover:bg-gray-200"
                     >
                         <Smile size={22} />
                     </button>
@@ -109,7 +136,9 @@ export default function MessageInput({
                     <EmojiPicker
                         open={emojiOpen}
                         onClose={() =>
-                            setEmojiOpen(false)
+                            setEmojiOpen(
+                                false
+                            )
                         }
                         onEmojiSelect={
                             handleEmojiSelect
@@ -118,42 +147,61 @@ export default function MessageInput({
 
                 </div>
 
-                <ImageUploader
-                    images={images}
-                    onChange={setImages}
-                />
+                {/* Upload */}
 
-                <ReplyPreview
-                    message={replyMessage}
-                    onCancel={onCancelReply}
-                />
+                <div className="flex-shrink-0">
+                    <ImageUploader
+                        images={images}
+                        onChange={setImages}
+                    />
+                </div>
+
+                {/* Text */}
 
                 <textarea
                     value={message}
                     onChange={(e) => {
-                        setMessage(e.target.value);
+                        setMessage(
+                            e.target.value
+                        );
 
-                        if (e.target.value) {
+                        if (
+                            e.target.value
+                        ) {
                             handleTyping();
                         } else {
                             handleStopTyping();
                         }
                     }}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Write a message..."
+                    onKeyDown={
+                        handleKeyDown
+                    }
                     rows={1}
-                    className="flex-1 resize-none rounded-xl border p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Scrie un mesaj..."
+                    style={{
+                        resize: "none",
+                    }}
+                    className="min-h-[24px] max-h-40 flex-1 overflow-y-auto bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-gray-400"
                 />
 
+                {/* Send */}
+
                 <button
+                    type="button"
                     onClick={sendMessage}
-                    disabled={!message.trim()}
-                    className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={
+                        !message.trim() &&
+                        images.length === 0
+                    }
+                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    <SendHorizonal size={20} />
+                    <SendHorizonal
+                        size={20}
+                    />
                 </button>
 
             </div>
+
         </div>
     );
 }
