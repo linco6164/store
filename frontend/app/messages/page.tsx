@@ -1,25 +1,23 @@
 "use client";
 
 import { useEffect } from "react";
-
 import { useQueryClient } from "@tanstack/react-query";
 
 import { socket } from "../lib/socket";
 import { CHAT_EVENTS } from "../lib/chat-events";
-
 import ChatLayout from "../components/Chat/ChatLayout";
+import RetryState from "../components/Feedback/RetryState";
 import ConversationSkeleton from "../components/Skeleton/ConversationSkeleton";
-
 import { Conversation } from "../types/chat";
-import  { useConversations }  from "../hooks/useConversations";
+import { useConversations } from "../hooks/useConversations";
 
 export default function MessagesPage() {
     const queryClient = useQueryClient();
-
     const {
         data: conversations = [],
         isLoading,
         isError,
+        refetch,
     } = useConversations();
 
     useEffect(() => {
@@ -30,36 +28,22 @@ export default function MessagesPage() {
                 ["conversations"],
                 (old = []) => {
                     const exists = old.find(
-                        (c) =>
-                            c._id === conversation._id
+                        (item) => item._id === conversation._id
                     );
 
-                    let updated: Conversation[];
+                    const updated = exists
+                        ? old.map((item) =>
+                              item._id === conversation._id
+                                  ? conversation
+                                  : item
+                          )
+                        : [conversation, ...old];
 
-                    if (exists) {
-                        updated = old.map((c) =>
-                            c._id === conversation._id
-                                ? conversation
-                                : c
-                        );
-                    } else {
-                        updated = [
-                            conversation,
-                            ...old,
-                        ];
-                    }
-
-                    updated.sort(
+                    return updated.sort(
                         (a, b) =>
-                            new Date(
-                                b.updatedAt
-                            ).getTime() -
-                            new Date(
-                                a.updatedAt
-                            ).getTime()
+                            new Date(b.updatedAt).getTime() -
+                            new Date(a.updatedAt).getTime()
                     );
-
-                    return updated;
                 }
             );
         }
@@ -77,23 +61,22 @@ export default function MessagesPage() {
         };
     }, [queryClient]);
 
-    if (isLoading) {
-        return <ConversationSkeleton />;
-    }
+    if (isLoading) return <ConversationSkeleton />;
 
     if (isError) {
         return (
-            <div className="flex h-[calc(100vh-64px)] items-center justify-center">
-                A apărut o eroare la încărcarea conversațiilor.
+            <div className="p-6">
+                <RetryState
+                    message="Conversațiile nu au putut fi încărcate."
+                    onRetry={() => void refetch()}
+                />
             </div>
         );
     }
 
     return (
         <div className="p-6">
-            <ChatLayout
-                conversations={conversations}
-            />
+            <ChatLayout conversations={conversations} />
         </div>
     );
 }

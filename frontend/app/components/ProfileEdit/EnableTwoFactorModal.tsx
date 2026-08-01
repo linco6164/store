@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import FullPageLoader from "../Feedback/FullPageLoader";
 
 interface EnableTwoFactorModalProps {
     open: boolean;
@@ -101,9 +102,10 @@ export default function EnableTwoFactorModal({
                         </p>
 
                         {loading ? (
-                            <div className="py-16 text-center">
-                                Loading...
-                            </div>
+                            <FullPageLoader
+                                compact
+                                label="Se generează codul QR…"
+                            />
                         ) : (
                             <>
                                 <div className="mt-6 flex justify-center">
