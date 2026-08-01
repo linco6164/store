@@ -11,7 +11,7 @@ import ChatLayout from "../components/Chat/ChatLayout";
 import ConversationSkeleton from "../components/Skeleton/ConversationSkeleton";
 
 import { Conversation } from "../types/chat";
-import { useConversations } from "../hooks/useConversations";
+import  { useConversations }  from "../hooks/useConversations";
 
 export default function MessagesPage() {
     const queryClient = useQueryClient();
