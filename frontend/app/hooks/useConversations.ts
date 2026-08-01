@@ -4,19 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { chatService } from "../services/chat.service";
 
-export function useConversation(
-    conversationId: string
-) {
+export function useConversations() {
     return useQuery({
-        queryKey: [
-            "conversation",
-            conversationId,
-        ],
+        queryKey: ["conversations"],
         queryFn: () =>
-            chatService.getConversation(
-                conversationId
-            ),
-        enabled: !!conversationId,
-        staleTime: 1000 * 60 * 5,
+            chatService.getConversations(),
     });
 }
