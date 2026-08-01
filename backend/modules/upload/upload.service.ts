@@ -17,7 +17,7 @@ const bucket = process.env.R2_BUCKET_NAME!;
 const publicUrl = process.env.R2_PUBLIC_URL!;
 
 class UploadService {
-    async uploadFiles(files: Express.Multer.File[]) {
+    async uploadFiles(files: Express.Multer.File[], folder = "listings") {
         const urls: string[] = [];
 
         for (const file of files) {
@@ -25,7 +25,7 @@ class UploadService {
 
             const fileName = `${crypto.randomUUID()}${extension}`;
 
-            const key = `listings/${fileName}`;
+            const key = `${folder}/${fileName}`;
 
             await r2.send(
                 new PutObjectCommand({

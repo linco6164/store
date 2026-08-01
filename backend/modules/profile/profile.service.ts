@@ -31,6 +31,21 @@ class ProfileService {
             listings,
         };
     }
+
+    async updateProfile(userId: string, payload: Record<string, unknown>) {
+        const allowedFields = ["username", "fullName", "phone", "bio", "avatar", "country", "city", "county", "postalCode", "instagram", "facebook", "website"] as const;
+        const updates = Object.fromEntries(allowedFields.filter((field) => typeof payload[field] === "string").map((field) => [field, payload[field]]));
+
+        if (updates.username) {
+            const existingUser = await User.findOne({ username: updates.username, _id: { $ne: userId } });
+            if (existingUser) throw new Error("USERNAME_TAKEN");
+        }
+
+        const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true });
+        if (!user) throw new Error("USER_NOT_FOUND");
+
+        return this.getProfile(userId);
+    }
 }
 
 export const profileService = new ProfileService();
