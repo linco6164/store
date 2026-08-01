@@ -2,14 +2,13 @@
 
 import { Suspense } from "react";
 import DiscordCallbackContent from "./DiscordCallbackContent";
+import FullPageLoader from "../../../components/Feedback/FullPageLoader";
 
 export default function DiscordCallbackPage() {
     return (
         <Suspense
             fallback={
-                <div className="flex h-screen items-center justify-center">
-                    Loading...
-                </div>
+                <FullPageLoader label="Se conectează contul Discord…" />
             }
         >
             <DiscordCallbackContent />

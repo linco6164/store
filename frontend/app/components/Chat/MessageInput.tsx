@@ -15,12 +15,14 @@ import ReplyPreview from "./ReplyPreview";
 interface MessageInputProps {
     conversationId: string;
     replyMessage: Message | null;
+    disabled?: boolean;
     onCancelReply: () => void;
 }
 
 export default function MessageInput({
     conversationId,
     replyMessage,
+    disabled = false,
     onCancelReply,
 }: MessageInputProps) {
     const [message, setMessage] = useState("");
@@ -51,6 +53,7 @@ export default function MessageInput({
 
     async function sendMessage() {
         if (
+            disabled ||
             !message.trim() &&
             images.length === 0
         ) {
@@ -115,7 +118,13 @@ export default function MessageInput({
                 </div>
             )}
 
-            <div className="flex items-end gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2">
+            <div
+                className={`flex items-end gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 ${
+                    disabled
+                        ? "pointer-events-none opacity-60"
+                        : ""
+                }`}
+            >
 
                 {/* Emoji */}
 
@@ -128,6 +137,7 @@ export default function MessageInput({
                                 (prev) => !prev
                             )
                         }
+                        disabled={disabled}
                         className="rounded-lg p-2 transition hover:bg-gray-200"
                     >
                         <Smile size={22} />
@@ -160,6 +170,7 @@ export default function MessageInput({
 
                 <textarea
                     value={message}
+                    disabled={disabled}
                     onChange={(e) => {
                         setMessage(
                             e.target.value
@@ -181,7 +192,7 @@ export default function MessageInput({
                     style={{
                         resize: "none",
                     }}
-                    className="min-h-[24px] max-h-40 flex-1 overflow-y-auto bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-gray-400"
+                    className="min-h-[24px] max-h-40 flex-1 overflow-y-auto bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-60"
                 />
 
                 {/* Send */}
@@ -190,6 +201,7 @@ export default function MessageInput({
                     type="button"
                     onClick={sendMessage}
                     disabled={
+                        disabled ||
                         !message.trim() &&
                         images.length === 0
                     }
