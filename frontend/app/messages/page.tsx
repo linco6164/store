@@ -1,62 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+
+import { useQueryClient } from "@tanstack/react-query";
+
 import { socket } from "../lib/socket";
-
-import ChatLayout from "../components/Chat/ChatLayout";
-
-import { chatService } from "../services/chat.service";
-import { Conversation, Message } from "../types/chat";
 import { CHAT_EVENTS } from "../lib/chat-events";
 
+import ChatLayout from "../components/Chat/ChatLayout";
+import ConversationSkeleton from "../components/Skeleton/ConversationSkeleton";
+
+import { Conversation } from "../types/chat";
+import { useConversations } from "../hooks/useConversations";
+
 export default function MessagesPage() {
-    const [conversations, setConversations] = useState<
-        Conversation[]
-    >([]);
+    const queryClient = useQueryClient();
 
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        loadConversations();
-    }, []);
+    const {
+        data: conversations = [],
+        isLoading,
+        isError,
+    } = useConversations();
 
     useEffect(() => {
         function onConversationUpdated(
             conversation: Conversation
         ) {
-            setConversations((prev) => {
-                const exists = prev.find(
-                    (c) =>
-                        c._id === conversation._id
-                );
-
-                let updated: Conversation[];
-
-                if (exists) {
-                    updated = prev.map((c) =>
-                        c._id === conversation._id
-                            ? conversation
-                            : c
+            queryClient.setQueryData<Conversation[]>(
+                ["conversations"],
+                (old = []) => {
+                    const exists = old.find(
+                        (c) =>
+                            c._id === conversation._id
                     );
-                } else {
-                    updated = [
-                        conversation,
-                        ...prev,
-                    ];
+
+                    let updated: Conversation[];
+
+                    if (exists) {
+                        updated = old.map((c) =>
+                            c._id === conversation._id
+                                ? conversation
+                                : c
+                        );
+                    } else {
+                        updated = [
+                            conversation,
+                            ...old,
+                        ];
+                    }
+
+                    updated.sort(
+                        (a, b) =>
+                            new Date(
+                                b.updatedAt
+                            ).getTime() -
+                            new Date(
+                                a.updatedAt
+                            ).getTime()
+                    );
+
+                    return updated;
                 }
-
-                updated.sort(
-                    (a, b) =>
-                        new Date(
-                            b.updatedAt
-                        ).getTime() -
-                        new Date(
-                            a.updatedAt
-                        ).getTime()
-                );
-
-                return updated;
-            });
+            );
         }
 
         socket.on(
@@ -70,25 +75,16 @@ export default function MessagesPage() {
                 onConversationUpdated
             );
         };
-    }, []);
+    }, [queryClient]);
 
-    async function loadConversations() {
-        try {
-            const data =
-                await chatService.getConversations();
-
-            setConversations(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+    if (isLoading) {
+        return <ConversationSkeleton />;
     }
 
-    if (loading) {
+    if (isError) {
         return (
             <div className="flex h-[calc(100vh-64px)] items-center justify-center">
-                Loading...
+                A apărut o eroare la încărcarea conversațiilor.
             </div>
         );
     }

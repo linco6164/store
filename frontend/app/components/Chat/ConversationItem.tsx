@@ -8,6 +8,9 @@ import { Conversation } from "../../types/chat";
 import OnlineBadge from "./OnlineBadge";
 import { useOnlineUsers } from "../../hooks/useOnlineUsers";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { chatService } from "../../services/chat.service";
+
 interface Props {
     conversation: Conversation;
     currentUserId: string;
@@ -33,12 +36,37 @@ export default function ConversationItem({
 
     const unread =
         conversation.unread?.[
-            currentUserId
+        currentUserId
         ] ?? 0;
+
+    const queryClient = useQueryClient();
+
+    async function prefetchConversation() {
+        await queryClient.prefetchQuery({
+            queryKey: ["conversation", conversation._id],
+            queryFn: () =>
+                chatService.getConversation(
+                    conversation._id
+                ),
+        });
+
+        await queryClient.prefetchQuery({
+            queryKey: [
+                "messages",
+                conversation._id,
+            ],
+            queryFn: () =>
+                chatService.getMessages(
+                    conversation._id
+                ),
+        });
+    }
 
     return (
         <Link
             href={`/messages/${conversation._id}`}
+            onMouseEnter={prefetchConversation}
+            onFocus={prefetchConversation}
             className={clsx(
                 "flex items-center gap-3 rounded-xl p-3 transition",
                 active
@@ -76,7 +104,7 @@ export default function ConversationItem({
                         className={clsx(
                             "truncate font-semibold",
                             unread > 0 &&
-                                "text-black"
+                            "text-black"
                         )}
                     >
                         {otherUser.username}
@@ -85,14 +113,14 @@ export default function ConversationItem({
                     <span className="text-xs text-gray-500">
                         {conversation.lastMessageAt
                             ? new Date(
-                                  conversation.lastMessageAt
-                              ).toLocaleTimeString(
-                                  "ro-RO",
-                                  {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                  }
-                              )
+                                conversation.lastMessageAt
+                            ).toLocaleTimeString(
+                                "ro-RO",
+                                {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                }
+                            )
                             : ""}
                     </span>
 
