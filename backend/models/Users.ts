@@ -38,6 +38,17 @@ const StoreUserSchema = new mongoose.Schema({
     default: "",
   },
 
+  fullName: { type: String, default: "" },
+  phone: { type: String, default: "" },
+  bio: { type: String, default: "" },
+  country: { type: String, default: "" },
+  city: { type: String, default: "" },
+  county: { type: String, default: "" },
+  postalCode: { type: String, default: "" },
+  instagram: { type: String, default: "" },
+  facebook: { type: String, default: "" },
+  website: { type: String, default: "" },
+
   lastSeen: {
     type: Date,
     default: Date.now,

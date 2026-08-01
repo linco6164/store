@@ -5,6 +5,7 @@ import { Camera } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 
 import { ProfileFormData } from "../../profile/edit/schema";
+import { uploadImages } from "../../services/upload.service";
 
 interface Props {
     form: UseFormReturn<ProfileFormData>;
@@ -35,7 +36,7 @@ export default function AvatarUploader({
              * form.setValue("avatar", url);
              */
 
-            const preview = URL.createObjectURL(file);
+            const [preview] = await uploadImages([file], "avatars");
 
             form.setValue("avatar", preview, {
                 shouldDirty: true,

@@ -14,8 +14,10 @@ class UploadController {
                 });
             }
 
-            const urls =
-                await uploadService.uploadFiles(files);
+            const folder = ["listings", "avatars", "chat"].includes(req.body.folder)
+                ? req.body.folder
+                : "listings";
+            const urls = await uploadService.uploadFiles(files, folder);
 
             return res.status(201).json({
                 success: true,

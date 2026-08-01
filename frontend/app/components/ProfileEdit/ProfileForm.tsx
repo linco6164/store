@@ -14,6 +14,7 @@ import SecuritySettings from "./SecuritySettings";
 import { profileSchema, ProfileFormData } from "../../profile/edit/schema";
 
 import { profileService } from "../../services/profile.service";
+import { toast } from "sonner";
 
 interface Props {
     user: {
@@ -58,10 +59,14 @@ export default function ProfileForm({
         try {
             await profileService.updateProfile(values);
 
+            toast.success("Profil actualizat.");
+
             // TODO:
             // toast.success("Profil actualizat")
         } catch (error) {
             console.error(error);
+
+            toast.error("Profilul nu a putut fi actualizat.");
 
             // toast.error(...)
         }

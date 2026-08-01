@@ -12,4 +12,6 @@ router.get(
     profileController.me
 );
 
+router.patch("/", auth, profileController.update);
+
 export default router;
