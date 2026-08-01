@@ -10,11 +10,13 @@ import MessageBubble from "./MessageBubble";
 interface Props {
     messages: Message[];
     currentUserId: string;
+    onReply?: (message: Message) => void;
 }
 
 export default function MessageGroup({
     messages,
     currentUserId,
+    onReply,
 }: Props) {
     return (
         <>
@@ -74,6 +76,7 @@ export default function MessageGroup({
                             showName={
                                 showName
                             }
+                            onReply={onReply}
                         />
 
                     </Fragment>

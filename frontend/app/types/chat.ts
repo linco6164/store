@@ -15,6 +15,13 @@ export interface Message {
 
     images: string[];
 
+    replyTo?: {
+        _id: string;
+        text: string;
+        images: string[];
+        sender: ChatUser;
+    };
+
     seenBy: string[];
 
     deliveredTo: string[];

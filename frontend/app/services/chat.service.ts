@@ -93,7 +93,7 @@ export const chatService = {
 
         const { data } = await api.post<{
             success: boolean;
-            images: string[];
+            urls: string[];
         }>(
             "/upload",
             formData,
@@ -105,7 +105,7 @@ export const chatService = {
             }
         );
 
-        return data.images;
+        return data.urls;
     }
 
 };

@@ -52,6 +52,7 @@ export default function registerChatSocket(io: Server) {
                 conversationId: string;
                 text: string;
                 images?: string[];
+                replyTo?: string;
             }) => {
                 try {
                     const message =
@@ -59,7 +60,8 @@ export default function registerChatSocket(io: Server) {
                             data.conversationId,
                             socket.userId!,
                             data.text,
-                            data.images ?? []
+                            data.images ?? [],
+                            data.replyTo
                         );
 
                     io.to(data.conversationId).emit(
