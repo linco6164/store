@@ -299,6 +299,7 @@ export default function ChatWindow({
                             <MessageGroup
                                 messages={messages}
                                 currentUserId={user!._id}
+                                onReply={setReplyMessage}
                             />
 
                             {typingUser && typingParticipant && (

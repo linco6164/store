@@ -100,6 +100,24 @@ export default function MessageBubble({
 
                     {/* Images */}
 
+                    {message.replyTo && (
+                        <div
+                            className={clsx(
+                                "mb-2 rounded-lg px-3 py-2 text-xs",
+                                isMine
+                                    ? "bg-blue-500/70 text-blue-50"
+                                    : "bg-gray-200 text-gray-600"
+                            )}
+                        >
+                            <p className="font-semibold">
+                                {message.replyTo.sender.username}
+                            </p>
+                            <p className="line-clamp-1">
+                                {message.replyTo.text || "Imagine"}
+                            </p>
+                        </div>
+                    )}
+
                     {message.images.length >
                         0 && (
                             <div className="mb-3 grid grid-cols-2 gap-2">

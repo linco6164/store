@@ -96,7 +96,8 @@ class ChatController {
 
             const messages =
                 await chatService.getMessages(
-                    conversationId
+                    conversationId,
+                    req.userId!
                 );
 
             return res.json({

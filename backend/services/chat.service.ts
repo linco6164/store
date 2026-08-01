@@ -123,8 +123,11 @@ class ChatService {
     }
 
     async getMessages(
-        conversationId: string
+        conversationId: string,
+        userId: string
     ) {
+        await this.getConversation(conversationId, userId);
+
         return Message.find({
             conversation: conversationId,
         })
@@ -132,6 +135,14 @@ class ChatService {
                 "sender",
                 "_id username avatar"
             )
+            .populate({
+                path: "replyTo",
+                select: "text images sender",
+                populate: {
+                    path: "sender",
+                    select: "_id username avatar",
+                },
+            })
             .sort({
                 createdAt: 1,
             });
@@ -141,8 +152,23 @@ class ChatService {
         conversationId: string,
         senderId: string,
         text: string,
-        images: string[] = []
+        images: string[] = [],
+        replyTo?: string
     ) {
+        const conversation = await Conversation.findById(conversationId);
+
+        if (!conversation) {
+            throw new Error("Conversation not found");
+        }
+
+        const isParticipant = conversation.participants.some(
+            (participant) => participant.toString() === senderId
+        );
+
+        if (!isParticipant) {
+            throw new Error("Access denied");
+        }
+
         const message =
             await Message.create({
                 conversation:
@@ -150,20 +176,10 @@ class ChatService {
                 sender: senderId,
                 text,
                 images,
+                replyTo,
                 deliveredTo: [senderId],
                 seenBy: [senderId],
             });
-
-        const conversation =
-            await Conversation.findById(
-                conversationId
-            );
-
-        if (!conversation) {
-            throw new Error(
-                "Conversation not found"
-            );
-        }
 
         const unread =
             conversation.unread ||
@@ -196,7 +212,7 @@ class ChatService {
         ).populate(
             "sender",
             "_id username avatar"
-        );
+        ).populate("replyTo", "text images sender");
     }
 
     async markAsDelivered(

@@ -75,6 +75,7 @@ export default function MessageInput({
             conversationId,
             text: message.trim(),
             images: uploadedImages,
+            replyTo: replyMessage?._id,
         });
 
         setMessage("");

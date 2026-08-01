@@ -9,6 +9,8 @@ export interface IMessage extends Document {
 
     images: string[];
 
+    replyTo?: Types.ObjectId;
+
     deliveredTo: Types.ObjectId[];
 
     seenBy: Types.ObjectId[];
@@ -43,6 +45,11 @@ const MessageSchema = new Schema<IMessage>(
                 type: String,
             },
         ],
+
+        replyTo: {
+            type: Schema.Types.ObjectId,
+            ref: "Message",
+        },
 
         deliveredTo: [
             {
