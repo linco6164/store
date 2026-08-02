@@ -86,19 +86,8 @@ export default function CategorySelect({
             description="Choose the category that best describes your listing."
             icon={<Grid2X2 size={22} />}
         >
-            <div className="mb-8">
 
-                <h2 className="text-2xl font-bold text-gray-900">
-                    Choose a category
-                </h2>
-
-                <p className="mt-2 text-gray-500">
-                    Select the category that best matches your listing.
-                </p>
-
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
 
                 {categories.map((category) => {
                     const Icon =

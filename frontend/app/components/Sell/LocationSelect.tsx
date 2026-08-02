@@ -23,29 +23,6 @@ export default function LocationSelect({
             icon={<MapPin size={22} />}
         >
 
-            <div className="mb-6 flex items-center gap-3">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100">
-                    <MapPin
-                        size={24}
-                        className="text-emerald-600"
-                    />
-                </div>
-
-                <div>
-
-                    <h2 className="text-2xl font-bold">
-                        Location
-                    </h2>
-
-                    <p className="text-gray-500">
-                        Select the city where the item is located.
-                    </p>
-
-                </div>
-
-            </div>
-
             <input
                 {...form.register("city")}
                 type="text"

@@ -47,18 +47,6 @@ export default function ConditionSelect({
             icon={<BadgeCheck size={22} />}
         >
 
-            <div className="mb-8">
-
-                <h2 className="text-2xl font-bold">
-                    Condition
-                </h2>
-
-                <p className="mt-2 text-gray-500">
-                    Tell buyers the current condition of your item.
-                </p>
-
-            </div>
-
             <div className="grid gap-4">
 
                 {conditions.map((condition) => {

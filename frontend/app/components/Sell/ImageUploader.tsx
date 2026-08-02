@@ -64,19 +64,6 @@ export default function ImageUploader({
             icon={<ImageIcon size={22} />}
         >
 
-            <div className="mb-8">
-
-                <h2 className="text-2xl font-bold">
-                    Photos
-                </h2>
-
-                <p className="mt-2 text-gray-500">
-                    Upload up to {MAX_IMAGES} photos.
-                    The first image becomes the cover.
-                </p>
-
-            </div>
-
             <UploadBox
                 onChange={handleChange}
             />

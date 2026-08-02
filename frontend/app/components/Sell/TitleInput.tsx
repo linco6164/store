@@ -26,27 +26,6 @@ export default function TitleInput({
     icon={<Package size={22} />}
 >
 
-            <div className="mb-6 flex items-center gap-3">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100">
-                    <Package
-                        size={24}
-                        className="text-emerald-600"
-                    />
-                </div>
-
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        Listing title
-                    </h2>
-
-                    <p className="text-gray-500">
-                        Choose a short and descriptive title.
-                    </p>
-                </div>
-
-            </div>
-
             <input
                 {...form.register("title")}
                 type="text"
