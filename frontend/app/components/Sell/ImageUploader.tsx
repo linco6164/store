@@ -1,72 +1,120 @@
 "use client";
 
-import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
-import { ListingForm } from "@/app/validators/listing.validator";
 
 import UploadBox from "./UploadBox";
 import ImagePreview from "./ImagePreview";
+
+import { ListingForm } from "@/app/validators/listing.validator";
+
+import FormSection from "./FormSection";
+import { ImageIcon } from "lucide-react";
 
 interface Props {
     form: UseFormReturn<ListingForm>;
 }
 
-export default function ImageUploader({ form }: Props) {
-    const [images, setImages] = useState<string[]>([]);
+const MAX_IMAGES = 10;
 
-    function handleFiles(files: FileList | null) {
-    if (!files) return;
+export default function ImageUploader({
+    form,
+}: Props) {
+    const images = form.watch("images") || [];
 
-    const selectedFiles = Array.from(files);
+    function handleChange(
+        e: React.ChangeEvent<HTMLInputElement>
+    ) {
+        const files = Array.from(
+            e.target.files || []
+        );
 
-    const urls = selectedFiles.map((file) =>
-        URL.createObjectURL(file)
-    );
+        if (!files.length) return;
 
-    setImages((prev) => [...prev, ...urls]);
+        const nextImages = [
+            ...images,
+            ...files,
+        ].slice(0, MAX_IMAGES);
 
-    form.setValue(
-        "images",
-        [
-            ...form.getValues("images"),
-            ...selectedFiles,
-        ],
-        {
-            shouldDirty: true,
-            shouldValidate: true,
-        }
-    );
-}
+        form.setValue(
+            "images",
+            nextImages,
+            {
+                shouldDirty: true,
+                shouldValidate: true,
+            }
+        );
+    }
 
     function removeImage(index: number) {
-        setImages((prev) => prev.filter((_, i) => i !== index));
+        form.setValue(
+            "images",
+            images.filter(
+                (_, i) => i !== index
+            ),
+            {
+                shouldDirty: true,
+            }
+        );
     }
 
     return (
-        <div>
+        <FormSection
+            title="Photos"
+            description="Upload up to 10 high-quality photos."
+            icon={<ImageIcon size={22} />}
+        >
 
-            <h2 className="mb-4 text-lg font-semibold">
-                Fotografii
-            </h2>
+            <div className="mb-8">
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                <h2 className="text-2xl font-bold">
+                    Photos
+                </h2>
 
-                <UploadBox onChange={handleFiles} />
-
-                {images.map((image, index) => (
-                    <ImagePreview
-                        key={image}
-                        url={image}
-                        onRemove={() => removeImage(index)}
-                    />
-                ))}
+                <p className="mt-2 text-gray-500">
+                    Upload up to {MAX_IMAGES} photos.
+                    The first image becomes the cover.
+                </p>
 
             </div>
 
-            <p className="mt-4 text-sm text-gray-500">
-                Adaugă până la 20 de imagini. Prima imagine va fi fotografia principală.
-            </p>
+            <UploadBox
+                onChange={handleChange}
+            />
 
-        </div>
+            {images.length > 0 && (
+
+                <div className="mt-8 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
+
+                    {images.map(
+                        (image, index) => (
+                            <ImagePreview
+                                key={`${image.name}-${index}`}
+                                file={image}
+                                index={index}
+                                isCover={index === 0}
+                                onDelete={() =>
+                                    removeImage(
+                                        index
+                                    )
+                                }
+                            />
+                        )
+                    )}
+
+                    {images.length <
+                        MAX_IMAGES && (
+                            <UploadBox
+                                compact
+                                onChange={
+                                    handleChange
+                                }
+                            />
+                        )}
+
+                </div>
+
+            )}
+
+        </FormSection>
     );
 }

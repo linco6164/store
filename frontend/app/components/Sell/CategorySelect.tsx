@@ -1,77 +1,144 @@
 "use client";
 
 import { UseFormReturn } from "react-hook-form";
+import {
+    Smartphone,
+    Shirt,
+    Sofa,
+    Car,
+    Laptop,
+    Gamepad2,
+    Baby,
+    Dumbbell,
+    Grid2X2,
+} from "lucide-react";
+
+import CategoryCard from "./CategoryCard";
 
 import { ListingForm } from "@/app/validators/listing.validator";
-import { categories } from "@/app/data/categories";
+
+import FormSection from "./FormSection";
 
 interface Props {
     form: UseFormReturn<ListingForm>;
 }
 
-export default function CategorySelect({ form }: Props) {
-    const {
-        setValue,
-        watch,
-        formState: { errors },
-    } = form;
+const categories = [
+    {
+        value: "electronics",
+        title: "Electronics",
+        description: "Phones, laptops, tablets and more.",
+        icon: Smartphone,
+    },
+    {
+        value: "fashion",
+        title: "Fashion",
+        description: "Clothes, shoes and accessories.",
+        icon: Shirt,
+    },
+    {
+        value: "home",
+        title: "Home",
+        description: "Furniture and home decor.",
+        icon: Sofa,
+    },
+    {
+        value: "auto",
+        title: "Auto",
+        description: "Cars, parts and accessories.",
+        icon: Car,
+    },
+    {
+        value: "computers",
+        title: "Computers",
+        description: "PCs, components and peripherals.",
+        icon: Laptop,
+    },
+    {
+        value: "gaming",
+        title: "Gaming",
+        description: "Consoles, games and accessories.",
+        icon: Gamepad2,
+    },
+    {
+        value: "kids",
+        title: "Kids",
+        description: "Everything for children.",
+        icon: Baby,
+    },
+    {
+        value: "sports",
+        title: "Sports",
+        description: "Fitness and outdoor equipment.",
+        icon: Dumbbell,
+    },
+];
 
-    const selected = watch("category");
+export default function CategorySelect({
+    form,
+}: Props) {
+    const selected =
+        form.watch("category");
 
     return (
-        <div className="space-y-3">
+        <FormSection
+            title="Category"
+            description="Choose the category that best describes your listing."
+            icon={<Grid2X2 size={22} />}
+        >
+            <div className="mb-8">
 
-            <label className="text-sm font-medium">
-                Categorie
-            </label>
+                <h2 className="text-2xl font-bold text-gray-900">
+                    Choose a category
+                </h2>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <p className="mt-2 text-gray-500">
+                    Select the category that best matches your listing.
+                </p>
+
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
 
                 {categories.map((category) => {
-
-                    const active = selected === category.id;
+                    const Icon =
+                        category.icon;
 
                     return (
-                        <button
-                            type="button"
-                            key={category.id}
-                            onClick={() =>
-                                setValue("category", category.id, {
-                                    shouldValidate: true,
-                                })
+                        <CategoryCard
+                            key={category.value}
+                            title={category.title}
+                            description={category.description}
+                            icon={<Icon size={28} />}
+                            selected={
+                                selected ===
+                                category.value
                             }
-                            className={`
-                                rounded-2xl
-                                border
-                                p-5
-                                transition
-
-                                ${
-                                    active
-                                        ? "border-emerald-500 bg-emerald-50"
-                                        : "border-gray-200 hover:border-emerald-300"
-                                }
-                            `}
-                        >
-                            <div className="text-3xl">
-                                {category.icon}
-                            </div>
-
-                            <div className="mt-2 text-sm font-medium">
-                                {category.name}
-                            </div>
-                        </button>
+                            onClick={() =>
+                                form.setValue(
+                                    "category",
+                                    category.value,
+                                    {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                    }
+                                )
+                            }
+                        />
                     );
                 })}
 
             </div>
 
-            {errors.category && (
-                <p className="text-sm text-red-500">
-                    {errors.category.message}
+            {form.formState.errors.category && (
+                <p className="mt-4 text-sm font-medium text-red-600">
+                    {
+                        form.formState.errors.category
+                            ?.message
+                    }
                 </p>
             )}
 
-        </div>
+        </FormSection>
     );
 }

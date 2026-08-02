@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion } from "framer-motion";
 
 import ImageUploader from "./ImageUploader";
 import TitleInput from "./TitleInput";
@@ -12,6 +13,10 @@ import CategorySelect from "./CategorySelect";
 import ConditionSelect from "./ConditionSelect";
 import LocationSelect from "./LocationSelect";
 import PreviewCard from "./PreviewCard";
+import PublishButton from "./PublishButton";
+import Stepper from "./Stepper";
+import StepHeader from "./StepHeader";
+import SaveDraftButton from "./SaveDraftButton";
 
 import {
     ListingForm,
@@ -39,72 +44,112 @@ export default function SellForm() {
 
     const preview = form.watch();
 
-    const onSubmit = async (values: ListingForm) => {
+    async function onSubmit(
+        values: ListingForm
+    ) {
         try {
             setLoading(true);
 
-            // Upload imagini în Cloudflare R2
-            const imageUrls = await uploadImages(values.images);
+            const imageUrls =
+                await uploadImages(
+                    values.images
+                );
 
-            // Creează anunțul
             await listingService.create({
                 ...values,
                 images: imageUrls,
             });
 
-            form.reset({
-                title: "",
-                category: "",
-                condition: "new",
-                price: 0,
-                city: "",
-                description: "",
-                images: [],
-            });
+            form.reset();
 
-            alert("Anunțul a fost publicat cu succes!");
-        } catch (error) {
-            console.error(error);
-            alert("Publicarea anunțului a eșuat.");
         } finally {
             setLoading(false);
         }
-    };
+    }
 
     return (
-        <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="grid gap-8 lg:grid-cols-[1fr_380px]"
+        <motion.form
+            initial={{
+                opacity: 0,
+                y: 20,
+            }}
+            animate={{
+                opacity: 1,
+                y: 0,
+            }}
+            onSubmit={form.handleSubmit(
+                onSubmit
+            )}
+            className="mx-auto max-w-7xl"
         >
-            <div className="space-y-8">
-                <ImageUploader form={form} />
+            <StepHeader />
 
-                <TitleInput form={form} />
+            <Stepper
+                currentStep={1}
+                totalSteps={6}
+            />
 
-                <CategorySelect form={form} />
+            <div className="mt-10 grid gap-10 xl:grid-cols-[1fr_420px]">
 
-                <ConditionSelect form={form} />
+                <div className="space-y-8">
 
-                <PriceInput form={form} />
+                    <ImageUploader
+                        form={form}
+                    />
 
-                <DescriptionInput form={form} />
+                    <TitleInput
+                        form={form}
+                    />
 
-                <LocationSelect form={form} />
+                    <CategorySelect
+                        form={form}
+                    />
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full rounded-xl bg-black px-6 py-4 text-lg font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    {loading
-                        ? "Se publică..."
-                        : "Publică anunțul"}
-                </button>
+                    <ConditionSelect
+                        form={form}
+                    />
+
+                    <PriceInput
+                        form={form}
+                    />
+
+                    <DescriptionInput
+                        form={form}
+                    />
+
+                    <LocationSelect
+                        form={form}
+                    />
+
+                    <div className="flex flex-col gap-4 sm:flex-row">
+
+                        <SaveDraftButton
+                            onClick={() => {
+                                // TODO:
+                                // Salvare draft
+                            }}
+                        />
+
+                        <div className="flex-1">
+                            <PublishButton
+                                loading={loading}
+                            />
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div className="sticky top-24 h-fit">
+
+                    <PreviewCard
+                        listing={preview}
+                    />
+
+                </div>
+
             </div>
 
-            <div>
-                <PreviewCard listing={preview} />
-            </div>
-        </form>
+        </motion.form>
     );
 }
