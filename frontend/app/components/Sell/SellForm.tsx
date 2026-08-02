@@ -78,13 +78,11 @@ export default function SellForm() {
 
                     <ImageUploader form={form} />
 
-                    <div className="grid gap-8 lg:grid-cols-2">
+                    <CategorySelect form={form} />
 
-                        <CategorySelect form={form} />
+                    <ConditionSelect form={form} />
 
-                        <ConditionSelect form={form} />
 
-                    </div>
 
                     <TitleInput form={form} />
 
