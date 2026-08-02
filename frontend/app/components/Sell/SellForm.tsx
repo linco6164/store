@@ -72,7 +72,7 @@ export default function SellForm() {
         >
             <StepHeader />
 
-            <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
 
                 <div className="space-y-8">
 
@@ -112,7 +112,7 @@ export default function SellForm() {
 
                 </div>
 
-                <aside className="sticky top-24 self-start w-full max-w-[340px] justify-self-end">
+                <aside className="sticky top-24 self-start w-full max-w-[360px] justify-self-end">
 
                     <PreviewCard
                         listing={preview}
