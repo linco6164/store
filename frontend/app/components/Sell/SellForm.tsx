@@ -68,7 +68,7 @@ export default function SellForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
             onSubmit={form.handleSubmit(onSubmit)}
-            className="mx-auto max-w-7xl"
+            className="mx-auto max-w-[1700px]"
         >
             <StepHeader />
 
