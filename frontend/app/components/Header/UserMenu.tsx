@@ -12,7 +12,7 @@ import {
     ChevronDown,
 } from "lucide-react";
 
-import type { User } from "@/app/types/user";
+import type { CurrentUser } from "@/app/hooks/useCurrentUser";
 
 import Dropdown from "../ui/Dropdown";
 import DropdownItem from "../ui/DropdownItem";
@@ -20,7 +20,7 @@ import DropdownItem from "../ui/DropdownItem";
 import { useAuth } from "@/app/hooks/useAuth";
 
 interface Props {
-    user: User;
+    user: CurrentUser;
 }
 
 export default function UserMenu({
