@@ -68,13 +68,13 @@ export default function SellForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
             onSubmit={form.handleSubmit(onSubmit)}
-            className="mx-auto max-w-7xl"
+            className="w-full"
         >
             <StepHeader />
 
             <div className="flex flex-col xl:flex-row gap-8 items-start">
 
-                <div className="space-y-8">
+                <div className="min-w-0 flex-1 space-y-8">
 
                     <ImageUploader form={form} />
 
@@ -113,18 +113,21 @@ export default function SellForm() {
                 </div>
 
                 <aside
-                 className="
-                    w-full
-                    xl:w-[360px]
-                    xl:sticky
-                    xl:top-24
-                    shrink-0
-                 "
+                    className="
+        hidden
+        xl:block
+        w-[340px]
+        shrink-0
+    "
                 >
 
-                    <PreviewCard
-                        listing={preview}
-                    />
+                    <div className="sticky top-24">
+
+                        <PreviewCard
+                            listing={preview}
+                        />
+
+                    </div>
 
                 </aside>
 
