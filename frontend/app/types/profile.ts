@@ -1,13 +1,8 @@
 import { Listing } from "./listing";
+import { User } from "./user";
 
 export interface Profile {
-    user: {
-        _id: string;
-        username: string;
-        email: string;
-        avatar: string;
-        createdAt: string;
-    };
+    user: User;
 
     stats: {
         listings: number;
