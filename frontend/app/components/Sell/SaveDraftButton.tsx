@@ -18,7 +18,7 @@ export default function SaveDraftButton({
             onClick={onClick}
             className="
                 flex
-                h-14
+                h-12
                 items-center
                 justify-center
                 gap-3

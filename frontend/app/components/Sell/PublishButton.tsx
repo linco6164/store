@@ -19,7 +19,7 @@ export default function PublishButton({
                 group
                 relative
                 flex
-                h-14
+                h-12
                 w-full
                 items-center
                 justify-center
@@ -30,7 +30,7 @@ export default function PublishButton({
                 from-emerald-600
                 to-teal-600
                 px-6
-                text-lg
+                text-base
                 font-semibold
                 text-white
                 shadow-lg

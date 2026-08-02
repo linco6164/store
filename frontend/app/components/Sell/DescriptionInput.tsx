@@ -51,7 +51,7 @@ export default function DescriptionInput({
 
             <textarea
                 {...form.register("description")}
-                rows={8}
+                rows={6}
                 maxLength={MAX_LENGTH}
                 placeholder="Example: The phone is in excellent condition, purchased in 2025, always used with a case and screen protector..."
                 className={`

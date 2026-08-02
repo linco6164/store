@@ -85,7 +85,7 @@ export default function ConditionSelect({
                                 justify-between
                                 rounded-2xl
                                 border
-                                p-5
+                                p-4
                                 text-left
                                 transition-all
                                 duration-200

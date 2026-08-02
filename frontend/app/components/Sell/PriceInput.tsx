@@ -58,13 +58,13 @@ export default function PriceInput({
                         valueAsNumber: true,
                     })}
                     className={`
-                        h-16
+                        h-14
                         w-full
                         rounded-2xl
                         border
                         px-6
                         pr-20
-                        text-2xl
+                        text-xl
                         font-semibold
                         outline-none
                         transition-all

@@ -63,11 +63,11 @@ export default function PreviewCard({
 
                 </div>
 
-                <div className="space-y-5 p-6">
+                <div className="space-y-5 p-5">
 
                     <div>
 
-                        <h2 className="line-clamp-2 text-xl font-bold text-gray-900">
+                        <h2 className="line-clamp-2 text-lg font-bold text-gray-900">
 
                             {listing.title ||
                                 "Your listing title"}
@@ -81,7 +81,7 @@ export default function PreviewCard({
                                 className="text-emerald-600"
                             />
 
-                            <span className="text-3xl font-black text-emerald-600">
+                            <span className="text-2xl font-black text-emerald-600">
 
                                 {listing.price
                                     ? `${listing.price} Lei`

@@ -5,26 +5,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 
-import ImageUploader from "./ImageUploader";
-import TitleInput from "./TitleInput";
-import PriceInput from "./PriceInput";
-import DescriptionInput from "./DescriptionInput";
-import CategorySelect from "./CategorySelect";
-import ConditionSelect from "./ConditionSelect";
-import LocationSelect from "./LocationSelect";
-import PreviewCard from "./PreviewCard";
-import PublishButton from "./PublishButton";
-import Stepper from "./Stepper";
-import StepHeader from "./StepHeader";
-import SaveDraftButton from "./SaveDraftButton";
+import {
+    ImageUploader,
+    TitleInput,
+    PriceInput,
+    DescriptionInput,
+    CategorySelect,
+    ConditionSelect,
+    LocationSelect,
+    PreviewCard,
+    PublishButton,
+    StepHeader,
+    SaveDraftButton,
+} from "@/app/components/Sell";
 
 import {
     ListingForm,
     listingSchema,
 } from "@/app/validators/listing.validator";
 
-import { uploadImages } from "../../services/upload.service";
-import { listingService } from "../../services/listing.service";
+import { uploadImages } from "@/app/services/upload.service";
+import { listingService } from "@/app/services/listing.service";
 
 export default function SellForm() {
     const [loading, setLoading] = useState(false);
@@ -44,16 +45,11 @@ export default function SellForm() {
 
     const preview = form.watch();
 
-    async function onSubmit(
-        values: ListingForm
-    ) {
+    async function onSubmit(values: ListingForm) {
         try {
             setLoading(true);
 
-            const imageUrls =
-                await uploadImages(
-                    values.images
-                );
+            const imageUrls = await uploadImages(values.images);
 
             await listingService.create({
                 ...values,
@@ -61,7 +57,6 @@ export default function SellForm() {
             });
 
             form.reset();
-
         } finally {
             setLoading(false);
         }
@@ -69,87 +64,65 @@ export default function SellForm() {
 
     return (
         <motion.form
-            initial={{
-                opacity: 0,
-                y: 20,
-            }}
-            animate={{
-                opacity: 1,
-                y: 0,
-            }}
-            onSubmit={form.handleSubmit(
-                onSubmit
-            )}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            onSubmit={form.handleSubmit(onSubmit)}
             className="mx-auto max-w-7xl"
         >
             <StepHeader />
 
-            <Stepper
-                currentStep={1}
-                totalSteps={6}
-            />
-
-            <div className="mt-10 grid gap-10 xl:grid-cols-[1fr_420px]">
+            <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
 
                 <div className="space-y-8">
 
-                    <ImageUploader
-                        form={form}
-                    />
+                    <ImageUploader form={form} />
 
-                    <TitleInput
-                        form={form}
-                    />
+                    <div className="grid gap-8 lg:grid-cols-2">
 
-                    <CategorySelect
-                        form={form}
-                    />
+                        <CategorySelect form={form} />
 
-                    <ConditionSelect
-                        form={form}
-                    />
+                        <ConditionSelect form={form} />
 
-                    <PriceInput
-                        form={form}
-                    />
+                    </div>
 
-                    <DescriptionInput
-                        form={form}
-                    />
+                    <TitleInput form={form} />
 
-                    <LocationSelect
-                        form={form}
-                    />
+                    <DescriptionInput form={form} />
 
-                    <div className="flex flex-col gap-4 sm:flex-row">
+                    <div className="grid gap-8 lg:grid-cols-2">
+
+                        <PriceInput form={form} />
+
+                        <LocationSelect form={form} />
+
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-4 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
 
                         <SaveDraftButton
                             onClick={() => {
                                 // TODO:
-                                // Salvare draft
                             }}
                         />
 
-                        <div className="flex-1">
-                            <PublishButton
-                                loading={loading}
-                            />
-                        </div>
+                        <PublishButton
+                            loading={loading}
+                        />
 
                     </div>
 
                 </div>
 
-                <div className="sticky top-24 h-fit">
+                <aside className="sticky top-24 self-start">
 
                     <PreviewCard
                         listing={preview}
                     />
 
-                </div>
+                </aside>
 
             </div>
-
         </motion.form>
     );
 }

@@ -51,7 +51,7 @@ export default function LocationSelect({
                 type="text"
                 placeholder="Example: Bucharest"
                 className={`
-                    h-14
+                    h-12
                     w-full
                     rounded-2xl
                     border
