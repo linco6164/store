@@ -68,11 +68,11 @@ export default function SellForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
             onSubmit={form.handleSubmit(onSubmit)}
-            className="mx-auto max-w-[1700px]"
+            className="mx-auto max-w-7xl"
         >
             <StepHeader />
 
-            <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="flex flex-col xl:flex-row gap-8 items-start">
 
                 <div className="space-y-8">
 
@@ -114,13 +114,11 @@ export default function SellForm() {
 
                 <aside
                  className="
-                    hidden 
-                    xl:block 
-                    sticky 
-                    top-28 
-                    self-start 
-                    w-full 
-                    max-w-[360px]
+                    w-full
+                    xl:w-[360px]
+                    xl:sticky
+                    xl:top-24
+                    shrink-0
                  "
                 >
 
