@@ -1,142 +1,176 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Heart, MessageCircle, Package, Star } from "lucide-react";
-import Dropdown from "../Dropdown";
+import {
+    Bell,
+    Package,
+    Heart,
+    MessageCircle,
+    UserPlus,
+} from "lucide-react";
 
-const notifications = [
-  {
-    id: 1,
-    type: "favorite",
-    title: "Produs adăugat la favorite",
-    description: "Un utilizator a adăugat produsul tău la favorite.",
-    time: "2 min",
-    unread: true,
-  },
-  {
-    id: 2,
-    type: "message",
-    title: "Mesaj nou",
-    description: "Ai primit un mesaj nou.",
-    time: "10 min",
-    unread: true,
-  },
-  {
-    id: 3,
-    type: "shipping",
-    title: "Comandă expediată",
-    description: "Expedierea a fost preluată de curier.",
-    time: "1 h",
-    unread: false,
-  },
-];
+import Dropdown from "../ui/Dropdown";
+import HeaderIconButton from "./HeaderIconButton";
+import EmptyState from "../ui/EmptyState";
 
-function NotificationIcon({ type }: { type: string }) {
-  switch (type) {
-    case "favorite":
-      return <Heart size={18} className="text-red-500" />;
-
-    case "message":
-      return <MessageCircle size={18} className="text-emerald-600" />;
-
-    case "shipping":
-      return <Package size={18} className="text-blue-600" />;
-
-    case "review":
-      return <Star size={18} className="text-yellow-500" />;
-
-    default:
-      return <Bell size={18} />;
-  }
+interface NotificationItem {
+    id: string;
+    title: string;
+    description: string;
+    time: string;
+    unread: boolean;
+    type:
+        | "listing"
+        | "favorite"
+        | "message"
+        | "follow";
 }
 
-export default function NotificationsDropdown() {
-  const unread = notifications.filter(n => n.unread).length;
+interface Props {
+    notifications?: NotificationItem[];
+}
 
-  return (
-    <Dropdown
-      width="w-96"
-      trigger={
-        <div className="relative flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-gray-100">
-          <Bell size={22} />
+function NotificationIcon({
+    type,
+}: {
+    type: NotificationItem["type"];
+}) {
+    switch (type) {
+        case "listing":
+            return (
+                <Package
+                    size={18}
+                    className="text-blue-600"
+                />
+            );
 
-          {unread > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
-              {unread}
-            </span>
-          )}
-        </div>
-      }
-    >
-      <div>
+        case "favorite":
+            return (
+                <Heart
+                    size={18}
+                    className="text-red-500"
+                />
+            );
 
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h3 className="font-semibold">
-            Notificări
-          </h3>
+        case "message":
+            return (
+                <MessageCircle
+                    size={18}
+                    className="text-emerald-600"
+                />
+            );
 
-          <button className="text-xs text-emerald-600 hover:underline">
-            Marchează toate ca citite
-          </button>
-        </div>
+        case "follow":
+            return (
+                <UserPlus
+                    size={18}
+                    className="text-violet-600"
+                />
+            );
 
-        {notifications.length === 0 ? (
-          <div className="p-6 text-center text-sm text-gray-500">
-            Nu ai notificări.
-          </div>
-        ) : (
-          <div className="max-h-[420px] overflow-y-auto">
+        default:
+            return (
+                <Bell
+                    size={18}
+                    className="text-gray-500"
+                />
+            );
+    }
+}
 
-            {notifications.map((notification) => (
-              <Link
-                key={notification.id}
-                href="/notifications"
-                className={`flex gap-3 border-b px-4 py-3 transition hover:bg-gray-50 ${
-                  notification.unread ? "bg-blue-50/40" : ""
-                }`}
-              >
-                <div className="mt-1">
-                  <NotificationIcon type={notification.type} />
-                </div>
+export default function NotificationsDropdown({
+    notifications = [],
+}: Props) {
+    const unread =
+        notifications.filter(
+            (n) => n.unread
+        ).length;
 
-                <div className="min-w-0 flex-1">
-
-                  <div className="flex items-center justify-between">
-
-                    <h4 className="text-sm font-semibold">
-                      {notification.title}
-                    </h4>
-
-                    <span className="text-xs text-gray-400">
-                      {notification.time}
-                    </span>
-
-                  </div>
-
-                  <p className="mt-1 text-sm text-gray-500">
-                    {notification.description}
-                  </p>
-
-                </div>
-
-                {notification.unread && (
-                  <div className="mt-2 h-2.5 w-2.5 rounded-full bg-blue-600" />
-                )}
-
-              </Link>
-            ))}
-
-          </div>
-        )}
-
-        <Link
-          href="/notifications"
-          className="block border-t px-4 py-3 text-center text-sm font-medium text-emerald-600 hover:bg-gray-50"
+    return (
+        <Dropdown
+            width="lg"
+            trigger={
+                <HeaderIconButton
+                    icon={<Bell size={21} />}
+                    tooltip="Notificări"
+                    count={unread}
+                />
+            }
         >
-          Vezi toate notificările
-        </Link>
+            <div className="border-b px-5 py-4">
+                <h3 className="text-lg font-semibold">
+                    Notificări
+                </h3>
+            </div>
 
-      </div>
-    </Dropdown>
-  );
+            {notifications.length === 0 ? (
+                <div className="p-6">
+                    <EmptyState
+                        icon={<Bell size={34} />}
+                        title="Nu ai notificări"
+                        description="Când se întâmplă ceva important, vei vedea aici."
+                    />
+                </div>
+            ) : (
+                <>
+                    <div className="max-h-[420px] overflow-y-auto">
+                        {notifications.map(
+                            (notification) => (
+                                <Link
+                                    key={
+                                        notification.id
+                                    }
+                                    href="/notifications"
+                                    className="flex gap-4 border-b px-5 py-4 transition hover:bg-gray-50"
+                                >
+                                    <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                                        <NotificationIcon
+                                            type={
+                                                notification.type
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-semibold">
+                                                {
+                                                    notification.title
+                                                }
+                                            </p>
+
+                                            <span className="text-xs text-gray-400">
+                                                {
+                                                    notification.time
+                                                }
+                                            </span>
+                                        </div>
+
+                                        <p className="mt-1 text-sm text-gray-500">
+                                            {
+                                                notification.description
+                                            }
+                                        </p>
+                                    </div>
+
+                                    {notification.unread && (
+                                        <span className="mt-2 h-2.5 w-2.5 rounded-full bg-blue-600" />
+                                    )}
+                                </Link>
+                            )
+                        )}
+                    </div>
+
+                    <div className="border-t p-3">
+                        <Link
+                            href="/notifications"
+                            className="block rounded-xl py-2 text-center text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+                        >
+                            Vezi toate notificările
+                        </Link>
+                    </div>
+                </>
+            )}
+        </Dropdown>
+    );
 }

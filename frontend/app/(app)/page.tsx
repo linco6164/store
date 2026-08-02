@@ -1,26 +1,47 @@
 "use client";
 
-import Hero from "../components/Home/Hero";
-import Categories from "../components/Home/Categories";
-import ListingGrid from "../components/Listing/ListingGrid";
-import { useListings } from "../hooks/useListings";
+import {
+    Hero,
+    StatsSection,
+    CategorySection,
+    FeaturedListings,
+    PopularCategories,
+    NewListings,
+    PromoBanner,
+    Newsletter,
+} from "../components/Home";
+
+import { useListings } from "@/app/hooks/useListings";
 
 export default function HomePage() {
-    const { listings, loading } = useListings();
+    const {
+        listings,
+        loading,
+    } = useListings();
 
     return (
-        <main className="mx-auto max-w-7xl px-4 py-10">
+        <>
             <Hero />
 
-            <Categories />
+            <StatsSection />
 
-            {loading ? (
-                <div className="mt-10 text-center text-gray-500">
-                    Se încarcă anunțurile...
-                </div>
-            ) : (
-                <ListingGrid listings={listings} />
-            )}
-        </main>
+            <CategorySection />
+
+            <FeaturedListings
+                listings={listings.slice(0, 8)}
+                loading={loading}
+            />
+
+            <PopularCategories />
+
+            <NewListings
+                listings={listings.slice(8, 16)}
+                loading={loading}
+            />
+
+            <PromoBanner />
+
+            <Newsletter />
+        </>
     );
 }
