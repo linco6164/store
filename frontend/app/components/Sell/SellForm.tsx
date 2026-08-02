@@ -114,7 +114,7 @@ export default function SellForm() {
 
                 </div>
 
-                <aside className="sticky top-24 self-start">
+                <aside className="sticky top-24 self-start w-full max-w-[340px] justify-self-end">
 
                     <PreviewCard
                         listing={preview}
