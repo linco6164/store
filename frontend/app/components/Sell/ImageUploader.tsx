@@ -83,7 +83,7 @@ export default function ImageUploader({
 
             {images.length > 0 && (
 
-                <div className="mt-8 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
+                <div className="mt-6 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
 
                     {images.map(
                         (image, index) => (

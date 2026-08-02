@@ -16,12 +16,12 @@ export default function FormSection({
     children,
 }: FormSectionProps) {
     return (
-        <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+        <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
 
-            <div className="mb-8 flex items-start gap-4">
+            <div className="mb-5 flex items-start gap-4">
 
                 {icon && (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
                         {icon}
                     </div>
                 )}

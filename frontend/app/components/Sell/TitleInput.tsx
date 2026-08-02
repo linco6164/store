@@ -53,12 +53,12 @@ export default function TitleInput({
                 maxLength={MAX_LENGTH}
                 placeholder="Example: iPhone 15 Pro Max 256GB"
                 className={`
-                    h-14
+                    h-12
                     w-full
                     rounded-2xl
                     border
                     px-5
-                    text-lg
+                    text-base
                     outline-none
                     transition-all
 

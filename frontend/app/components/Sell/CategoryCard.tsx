@@ -31,7 +31,7 @@ export default function CategoryCard({
             }}
             onClick={onClick}
             className={cn(
-                "relative w-full overflow-hidden rounded-3xl border p-6 text-left transition-all duration-300",
+                "relative w-full overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300",
 
                 selected
                     ? "border-emerald-500 bg-emerald-50 shadow-xl"
@@ -44,7 +44,7 @@ export default function CategoryCard({
                 </div>
             )}
 
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-md">
+            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-md">
                 {icon}
             </div>
 

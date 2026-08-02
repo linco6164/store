@@ -1,13 +1,17 @@
-import SellForm from "../components/Sell/SellForm";
+"use client";
+
+import { SellForm } from "@/app/components/Sell";
 
 export default function SellPage() {
     return (
-        <main className="mx-auto max-w-5xl px-4 py-8">
-            <h1 className="mb-8 text-3xl font-bold">
-                Publică un anunț
-            </h1>
+        <main className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-100">
 
-            <SellForm />
+            <div className="mx-auto max-w-7xl px-4 py-10 lg:px-8">
+
+                <SellForm />
+
+            </div>
+
         </main>
     );
 }
