@@ -21,7 +21,17 @@ export default function PreviewCard({
         listing.images?.[0];
 
     return (
-        <div className="w-full overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xl">
+        <div
+            className="
+        w-full
+        overflow-hidden
+        rounded-3xl
+        border
+        border-gray-200
+        bg-white
+        shadow-lg
+    "
+        >
 
             <div className="border-b px-6 py-5">
 

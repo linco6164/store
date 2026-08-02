@@ -72,9 +72,11 @@ export default function SellForm() {
         >
             <StepHeader />
 
-            <div className="flex flex-col xl:flex-row gap-8 items-start">
+            <div className="mt-10 grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,1fr)_350px]">
 
-                <div className="min-w-0 flex-1 space-y-8">
+                {/* LEFT */}
+
+                <div className="min-w-0 space-y-8">
 
                     <ImageUploader form={form} />
 
@@ -82,13 +84,11 @@ export default function SellForm() {
 
                     <ConditionSelect form={form} />
 
-
-
                     <TitleInput form={form} />
 
                     <DescriptionInput form={form} />
 
-                    <div className="grid gap-8 lg:grid-cols-2">
+                    <div className="grid gap-8 md:grid-cols-2">
 
                         <PriceInput form={form} />
 
@@ -96,7 +96,7 @@ export default function SellForm() {
 
                     </div>
 
-                    <div className="flex flex-col-reverse gap-4 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+                    <div className="flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row sm:justify-end">
 
                         <SaveDraftButton
                             onClick={() => {
@@ -112,16 +112,11 @@ export default function SellForm() {
 
                 </div>
 
-                <aside
-                    className="
-        hidden
-        xl:block
-        w-[340px]
-        shrink-0
-    "
-                >
+                {/* RIGHT */}
 
-                    <div className="sticky top-24">
+                <aside className="relative hidden xl:block">
+
+                    <div className="sticky top-28">
 
                         <PreviewCard
                             listing={preview}
