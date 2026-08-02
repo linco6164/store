@@ -1,51 +1,86 @@
 "use client";
 
+import { MapPin } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 
 import { ListingForm } from "@/app/validators/listing.validator";
-import { cities } from "@/app/data/cities";
+
+import FormSection from "./FormSection";
 
 interface Props {
     form: UseFormReturn<ListingForm>;
 }
 
-export default function LocationSelect({ form }: Props) {
-    const {
-        register,
-        formState: { errors },
-    } = form;
+export default function LocationSelect({
+    form,
+}: Props) {
+    const error = form.formState.errors.city;
 
     return (
-        <div className="space-y-2">
+        <FormSection
+            title="Location"
+            description="Select where the item is located."
+            icon={<MapPin size={22} />}
+        >
 
-            <label className="text-sm font-medium">
-                Oraș
-            </label>
+            <div className="mb-6 flex items-center gap-3">
 
-            <select
-                {...register("city")}
-                className="w-full rounded-xl border px-4 py-3 outline-none transition focus:border-emerald-500"
-            >
-                <option value="">
-                    Selectează orașul
-                </option>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100">
+                    <MapPin
+                        size={24}
+                        className="text-emerald-600"
+                    />
+                </div>
 
-                {cities.map((city) => (
-                    <option
-                        key={city}
-                        value={city}
-                    >
-                        {city}
-                    </option>
-                ))}
-            </select>
+                <div>
 
-            {errors.city && (
-                <p className="text-sm text-red-500">
-                    {errors.city.message}
+                    <h2 className="text-2xl font-bold">
+                        Location
+                    </h2>
+
+                    <p className="text-gray-500">
+                        Select the city where the item is located.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <input
+                {...form.register("city")}
+                type="text"
+                placeholder="Example: Bucharest"
+                className={`
+                    h-14
+                    w-full
+                    rounded-2xl
+                    border
+                    px-5
+                    text-lg
+                    outline-none
+                    transition-all
+
+                    ${error
+                        ? "border-red-500 focus:ring-4 focus:ring-red-100"
+                        : "border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                    }
+                `}
+            />
+
+            <div className="mt-4">
+
+                <p
+                    className={`text-sm ${error
+                            ? "text-red-600"
+                            : "text-gray-500"
+                        }`}
+                >
+                    {error?.message ||
+                        "This helps buyers find listings near them."}
                 </p>
-            )}
 
-        </div>
+            </div>
+
+        </FormSection>
     );
 }

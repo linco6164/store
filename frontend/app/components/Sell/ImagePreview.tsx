@@ -1,31 +1,66 @@
 "use client";
 
-import { X } from "lucide-react";
+import Image from "next/image";
+import { Trash2, Star } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface Props {
-    url: string;
-    onRemove: () => void;
+    file: File;
+    index: number;
+    isCover?: boolean;
+    onDelete: () => void;
 }
 
 export default function ImagePreview({
-    url,
-    onRemove,
+    file,
+    isCover = false,
+    onDelete,
 }: Props) {
     return (
-        <div className="relative aspect-square overflow-hidden rounded-2xl">
-            <img
-                src={url}
-                alt="Preview"
-                className="h-full w-full object-cover"
+        <motion.div
+            layout
+            initial={{
+                opacity: 0,
+                scale: .9,
+            }}
+            animate={{
+                opacity: 1,
+                scale: 1,
+            }}
+            exit={{
+                opacity: 0,
+                scale: .9,
+            }}
+            className="group relative overflow-hidden rounded-2xl"
+        >
+            <Image
+                src={URL.createObjectURL(file)}
+                alt={file.name}
+                width={500}
+                height={500}
+                className="aspect-square w-full object-cover transition duration-300 group-hover:scale-105"
             />
+
+            {isCover && (
+
+                <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow">
+
+                    <Star size={12} />
+
+                    Cover
+
+                </div>
+
+            )}
 
             <button
                 type="button"
-                onClick={onRemove}
-                className="absolute right-2 top-2 rounded-full bg-white p-1 shadow"
+                onClick={onDelete}
+                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow transition hover:bg-red-500 hover:text-white"
             >
-                <X size={18} />
+                <Trash2 size={18} />
             </button>
-        </div>
+
+        </motion.div>
     );
 }

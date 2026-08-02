@@ -1,31 +1,79 @@
 "use client";
 
-import { ImagePlus } from "lucide-react";
+import { UploadCloud, Plus } from "lucide-react";
 
 interface UploadBoxProps {
-    onChange: (files: FileList | null) => void;
+    multiple?: boolean;
+    onChange: (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => void;
+    compact?: boolean;
 }
 
-export default function UploadBox({ onChange }: UploadBoxProps) {
+export default function UploadBox({
+    multiple = true,
+    onChange,
+    compact = false,
+}: UploadBoxProps) {
+    if (compact) {
+        return (
+            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 transition-all duration-300 hover:border-emerald-500 hover:bg-emerald-50">
+
+                <Plus
+                    size={34}
+                    className="text-gray-500"
+                />
+
+                <span className="mt-2 text-sm text-gray-500">
+                    Add
+                </span>
+
+                <input
+                    hidden
+                    multiple={multiple}
+                    type="file"
+                    accept="image/*"
+                    onChange={onChange}
+                />
+
+            </label>
+        );
+    }
+
     return (
-        <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 transition hover:border-emerald-500 hover:bg-emerald-50">
-            <ImagePlus className="mb-3 h-10 w-10 text-gray-400" />
+        <label className="group flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 bg-gray-50 px-8 py-14 transition-all duration-300 hover:border-emerald-500 hover:bg-emerald-50">
 
-            <span className="font-medium">
-                Adaugă fotografii
-            </span>
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 transition group-hover:scale-110">
 
-            <span className="mt-1 text-sm text-gray-500">
-                JPG, PNG sau WEBP
-            </span>
+                <UploadCloud
+                    size={40}
+                    className="text-emerald-600"
+                />
+
+            </div>
+
+            <h3 className="mt-6 text-xl font-bold text-gray-900">
+                Upload your photos
+            </h3>
+
+            <p className="mt-2 text-center text-gray-500">
+                Drag & Drop images here
+                <br />
+                or click to browse
+            </p>
+
+            <div className="mt-6 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white">
+                Choose Images
+            </div>
 
             <input
+                hidden
+                multiple={multiple}
                 type="file"
-                multiple
                 accept="image/*"
-                className="hidden"
-                onChange={(e) => onChange(e.target.files)}
+                onChange={onChange}
             />
+
         </label>
     );
 }

@@ -1,69 +1,106 @@
 "use client";
 
 import { UseFormReturn } from "react-hook-form";
-import { Check } from "lucide-react";
+import { BadgeCheck, CheckCircle2 } from "lucide-react";
 
 import { ListingForm } from "@/app/validators/listing.validator";
-import { conditions } from "@/app/data/conditions";
+
+import FormSection from "./FormSection";
 
 interface Props {
     form: UseFormReturn<ListingForm>;
 }
 
-export default function ConditionSelect({ form }: Props) {
-    const {
-        watch,
-        setValue,
-        formState: { errors },
-    } = form;
+const conditions = [
+    {
+        value: "new",
+        title: "New",
+        description: "Unused item, in original packaging.",
+    },
+    {
+        value: "like_new",
+        title: "Like New",
+        description: "Almost no signs of use.",
+    },
+    {
+        value: "good",
+        title: "Good",
+        description: "Normal signs of use, fully functional.",
+    },
+    {
+        value: "fair",
+        title: "Fair",
+        description: "Visible wear but works correctly.",
+    },
+];
 
-    const selected = watch("condition");
+export default function ConditionSelect({
+    form,
+}: Props) {
+    const selected = form.watch("condition");
+    const error = form.formState.errors.condition;
 
     return (
-        <div className="space-y-3">
+        <FormSection
+            title="Condition"
+            description="Help buyers understand the condition of your item."
+            icon={<BadgeCheck size={22} />}
+        >
 
-            <label className="text-sm font-medium">
-                Starea produsului
-            </label>
+            <div className="mb-8">
 
-            <div className="space-y-3">
+                <h2 className="text-2xl font-bold">
+                    Condition
+                </h2>
+
+                <p className="mt-2 text-gray-500">
+                    Tell buyers the current condition of your item.
+                </p>
+
+            </div>
+
+            <div className="grid gap-4">
 
                 {conditions.map((condition) => {
-
-                    const active = selected === condition.value;
+                    const active =
+                        selected === condition.value;
 
                     return (
                         <button
                             key={condition.value}
                             type="button"
                             onClick={() =>
-                                setValue("condition", condition.value, {
-                                    shouldValidate: true,
-                                })
+                                form.setValue(
+                                    "condition",
+                                    condition.value as ListingForm["condition"],
+                                    {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                    }
+                                )
                             }
                             className={`
                                 flex
-                                w-full
-                                items-center
+                                items-start
                                 justify-between
                                 rounded-2xl
                                 border
                                 p-5
                                 text-left
-                                transition
+                                transition-all
+                                duration-200
 
-                                ${
-                                    active
-                                        ? "border-emerald-500 bg-emerald-50"
-                                        : "hover:border-emerald-300"
+                                ${active
+                                    ? "border-emerald-500 bg-emerald-50"
+                                    : "border-gray-200 hover:border-emerald-300 hover:bg-gray-50"
                                 }
                             `}
                         >
                             <div>
 
-                                <p className="font-semibold">
+                                <h3 className="font-semibold text-gray-900">
                                     {condition.title}
-                                </p>
+                                </h3>
 
                                 <p className="mt-1 text-sm text-gray-500">
                                     {condition.description}
@@ -72,25 +109,24 @@ export default function ConditionSelect({ form }: Props) {
                             </div>
 
                             {active && (
-                                <Check
+                                <CheckCircle2
+                                    size={22}
                                     className="text-emerald-600"
-                                    size={24}
                                 />
                             )}
 
                         </button>
                     );
-
                 })}
 
             </div>
 
-            {errors.condition && (
-                <p className="text-sm text-red-500">
-                    {errors.condition.message}
+            {error && (
+                <p className="mt-4 text-sm text-red-600">
+                    {error.message}
                 </p>
             )}
 
-        </div>
+        </FormSection>
     );
 }
