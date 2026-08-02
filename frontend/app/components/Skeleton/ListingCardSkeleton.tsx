@@ -2,54 +2,22 @@
 
 import Skeleton from "./Skeleton";
 
-interface ListingCardSkeletonProps {
-    count?: number;
-}
-
-export default function ListingCardSkeleton({
-    count = 8,
-}: ListingCardSkeletonProps) {
+export default function ListingCardSkeleton() {
     return (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: count }).map(
-                (_, index) => (
-                    <div
-                        key={index}
-                        className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
-                    >
-                        {/* Imagine */}
+        <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
 
-                        <Skeleton className="aspect-square w-full rounded-none" />
+            <Skeleton className="aspect-[4/5] w-full" />
 
-                        <div className="space-y-3 p-4">
+            <div className="space-y-3 p-4">
 
-                            {/* Titlu */}
+                <Skeleton className="h-5 w-3/4" />
 
-                            <Skeleton className="h-5 w-4/5" />
+                <Skeleton className="h-4 w-1/2" />
 
-                            {/* Preț */}
+                <Skeleton className="h-4 w-1/3" />
 
-                            <Skeleton className="h-6 w-24" />
+            </div>
 
-                            {/* Locație */}
-
-                            <Skeleton className="h-4 w-20" />
-
-                            {/* Footer */}
-
-                            <div className="flex items-center justify-between pt-2">
-
-                                <Skeleton className="h-8 w-24 rounded-full" />
-
-                                <Skeleton className="h-8 w-8 rounded-full" />
-
-                            </div>
-
-                        </div>
-
-                    </div>
-                )
-            )}
         </div>
     );
 }
