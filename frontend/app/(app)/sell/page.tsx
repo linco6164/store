@@ -3,6 +3,8 @@
 import { SellForm } from "@/app/components/Sell";
 import Header from "../../components/Header";
 
+import type { Metadata } from "next";
+
 export default function SellPage() {
     return (
         <>
@@ -20,3 +22,9 @@ export default function SellPage() {
         </>
     );
 }
+
+export const metadata: Metadata = {
+    title: "Sell",
+    description:
+        "Create a new listing on Nexora Marketplace.",
+};
