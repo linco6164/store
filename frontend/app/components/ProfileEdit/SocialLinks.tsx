@@ -1,7 +1,7 @@
 "use client";
 
 import { UseFormReturn } from "react-hook-form";
-import { ProfileFormData } from "../../profile/edit/schema";
+import { ProfileFormData } from "../../(app)/profile/edit/schema";
 
 interface Props {
     form: UseFormReturn<ProfileFormData>;

@@ -3,13 +3,13 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { socket } from "../lib/socket";
-import { CHAT_EVENTS } from "../lib/chat-events";
-import ChatLayout from "../components/Chat/ChatLayout";
-import RetryState from "../components/Feedback/RetryState";
-import ConversationSkeleton from "../components/Skeleton/ConversationSkeleton";
-import { Conversation } from "../types/chat";
-import { useConversations } from "../hooks/useConversations";
+import { socket } from "../../lib/socket";
+import { CHAT_EVENTS } from "../../lib/chat-events";
+import ChatLayout from "../../components/Chat/ChatLayout";
+import RetryState from "../../components/Feedback/RetryState";
+import ConversationSkeleton from "../../components/Skeleton/ConversationSkeleton";
+import { Conversation } from "../../types/chat";
+import { useConversations } from "../../hooks/useConversations";
 
 export default function MessagesPage() {
     const queryClient = useQueryClient();

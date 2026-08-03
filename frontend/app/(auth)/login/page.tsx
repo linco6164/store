@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useRouter } from "next/navigation"
 import { GoogleLogin } from "@react-oauth/google";
-import { loadFacebookSDK } from "../lib/facebook";
-import { api } from "../lib/api";
-import { ENDPOINTS } from "../lib/endpoints";
+import { loadFacebookSDK } from "../../lib/facebook";
+import { api } from "../../lib/api";
+import { ENDPOINTS } from "../../lib/endpoints";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import AuthService from "@/app/services/auth.service";

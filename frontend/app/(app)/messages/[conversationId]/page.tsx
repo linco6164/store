@@ -2,11 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 
-import ChatLayout from "../../components/Chat/ChatLayout";
-import RetryState from "../../components/Feedback/RetryState";
-import ConversationSkeleton from "../../components/Skeleton/ConversationSkeleton";
-import { chatService } from "../../services/chat.service";
-import { Conversation } from "../../types/chat";
+import ChatLayout from "../../../components/Chat/ChatLayout";
+import RetryState from "../../../components/Feedback/RetryState";
+import ConversationSkeleton from "../../../components/Skeleton/ConversationSkeleton";
+import { chatService } from "../../../services/chat.service";
+import { Conversation } from "../../../types/chat";
 
 interface Props {
     params: Promise<{
