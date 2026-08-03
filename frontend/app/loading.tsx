@@ -1,3 +1,4 @@
+import GridSkeleton from "./components/Skeleton/GridSkeleton";
 import ListingCardSkeleton from "./components/Skeleton/ListingCardSkeleton";
 
 export default function Loading() {
@@ -29,7 +30,7 @@ export default function Loading() {
 
             {/* Listings */}
 
-            <ListingCardSkeleton count={12} />
+            <GridSkeleton count={12} />
 
         </main>
     );
