@@ -47,7 +47,6 @@ export default function SellForm() {
     const preview = form.watch();
 
     async function onSubmit(values: ListingForm) {
-        const loadingToast = notify.loading("Publishing your listing...");
         try {
             setLoading(true);
 
@@ -64,7 +63,7 @@ export default function SellForm() {
                     error: "Failed to publish your listing.",
                 }
             );
-            
+
             form.reset();
         }   finally {
             setLoading(false);
