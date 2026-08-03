@@ -8,7 +8,6 @@ import type { Metadata } from "next";
 export default function SellPage() {
     return (
         <>
-            <Header />
 
             <main className="min-h-screen bg-gray-50">
 
