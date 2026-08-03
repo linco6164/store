@@ -1,7 +1,7 @@
 "use client";
 
 import { SellForm } from "@/app/components/Sell";
-import Header from "../components/Header";
+import Header from "../../components/Header";
 
 export default function SellPage() {
     return (

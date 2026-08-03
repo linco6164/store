@@ -11,7 +11,7 @@ import DangerZone from "./DangerZone";
 import SocialLinks from "./SocialLinks";
 import SecuritySettings from "./SecuritySettings";
 
-import { profileSchema, ProfileFormData } from "../../profile/edit/schema";
+import { profileSchema, ProfileFormData } from "../../(app)/profile/edit/schema";
 
 import { profileService } from "../../services/profile.service";
 import { toast } from "sonner";

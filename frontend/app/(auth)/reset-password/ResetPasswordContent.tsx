@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { api } from "../lib/api";
+import { api } from "../../lib/api";
 
 export default function ResetPasswordContent() {
   const params = useSearchParams();

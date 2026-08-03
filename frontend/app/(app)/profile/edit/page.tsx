@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import ProfileForm from "../../components/ProfileEdit/ProfileForm";
-import RetryState from "../../components/Feedback/RetryState";
+import ProfileForm from "../../../components/ProfileEdit/ProfileForm";
+import RetryState from "../../../components/Feedback/RetryState";
 import EditProfileSkeleton from "./loading";
-import { profileService } from "../../services/profile.service";
-import { Profile } from "../../types/profile";
+import { profileService } from "../../../services/profile.service";
+import { Profile } from "../../../types/profile";
 
 export default function EditProfilePage() {
     const [profile, setProfile] = useState<Profile | null>(null);

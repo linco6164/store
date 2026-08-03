@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-import ProfileHeader from "../components/Profile/ProfileHeader";
-import ProfileStats from "../components/Profile/ProfileStats";
-import ProfileTabs, { ProfileTab } from "../components/Profile/ProfileTabs";
-import MyListings from "../components/Profile/MyListings";
-import FavoriteListings from "../components/Profile/FavoriteListings";
-import SoldListings from "../components/Profile/SoldListings";
-import RetryState from "../components/Feedback/RetryState";
+import ProfileHeader from "../../components/Profile/ProfileHeader";
+import ProfileStats from "../../components/Profile/ProfileStats";
+import ProfileTabs, { ProfileTab } from "../../components/Profile/ProfileTabs";
+import MyListings from "../../components/Profile/MyListings";
+import FavoriteListings from "../../components/Profile/FavoriteListings";
+import SoldListings from "../../components/Profile/SoldListings";
+import RetryState from "../../components/Feedback/RetryState";
 import ProfileSkeleton from "./loading";
 import { profileService } from "@/app/services/profile.service";
 import { Profile } from "@/app/types/profile";

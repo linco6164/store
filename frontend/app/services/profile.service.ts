@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { ENDPOINTS } from "../lib/endpoints";
 
 import { Profile } from "../types/profile";
-import { ProfileFormData } from "../profile/edit/schema";
+import { ProfileFormData } from "../(app)/profile/edit/schema";
 
 interface ApiResponse<T> {
     success: boolean;

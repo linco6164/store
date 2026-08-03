@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import ResetPasswordContent from "./ResetPasswordContent";
-import FullPageLoader from "../components/Feedback/FullPageLoader";
+import ForgotPasswordContent from "./ForgotPasswordContent";
+import FullPageLoader from "../../components/Feedback/FullPageLoader";
 
 export default function ResetPasswordPage() {
     return (
@@ -11,7 +11,7 @@ export default function ResetPasswordPage() {
                 <FullPageLoader label="Se pregătește formularul…" />
             }
         >
-            <ResetPasswordContent />
+            <ForgotPasswordContent />
         </Suspense>
     );
 }

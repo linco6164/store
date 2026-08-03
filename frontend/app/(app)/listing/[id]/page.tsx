@@ -1,15 +1,15 @@
 import { notFound } from "next/navigation";
 
-import Gallery from "../../components/ListingDetails/Gallery";
-import ProductInfo from "../../components/ListingDetails/ProductInfo";
-import Description from "../../components/ListingDetails/Description";
-import SellerCard from "../../components/ListingDetails/SellerCard";
-import ShippingCard from "../../components/ListingDetails/ShippingCard";
-import Actions from "../../components/ListingDetails/Actions";
-import ReportButton from "../../components/ListingDetails/ReportButton";
-import SimilarListings from "../../components/ListingDetails/SimilarListings";
+import Gallery from "../../../components/ListingDetails/Gallery";
+import ProductInfo from "../../../components/ListingDetails/ProductInfo";
+import Description from "../../../components/ListingDetails/Description";
+import SellerCard from "../../../components/ListingDetails/SellerCard";
+import ShippingCard from "../../../components/ListingDetails/ShippingCard";
+import Actions from "../../../components/ListingDetails/Actions";
+import ReportButton from "../../../components/ListingDetails/ReportButton";
+import SimilarListings from "../../../components/ListingDetails/SimilarListings";
 
-import { listingService } from "../../services/listing.service";
+import { listingService } from "../../../services/listing.service";
 
 type PageProps = {
     params: Promise<{
