@@ -22,9 +22,3 @@ export default function SellPage() {
         </>
     );
 }
-
-export const metadata: Metadata = {
-    title: "Sell",
-    description:
-        "Create a new listing on Nexora Marketplace.",
-};
