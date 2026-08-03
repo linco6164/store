@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
+import { notify } from "@/app/lib/notify";
 
 import {
     ImageUploader,
@@ -46,18 +47,26 @@ export default function SellForm() {
     const preview = form.watch();
 
     async function onSubmit(values: ListingForm) {
+        const loadingToast = notify.loading("Publishing your listing...");
         try {
             setLoading(true);
 
             const imageUrls = await uploadImages(values.images);
 
-            await listingService.create({
-                ...values,
-                images: imageUrls,
-            });
-
+            await notify.promise(
+                listingService.create({
+                    ...values,
+                    images: imageUrls,
+                }),
+                {
+                    loading: "Publishing your listing...",
+                    success: "Your listing has been published!",
+                    error: "Failed to publish your listing.",
+                }
+            );
+            
             form.reset();
-        } finally {
+        }   finally {
             setLoading(false);
         }
     }
@@ -100,7 +109,10 @@ export default function SellForm() {
 
                         <SaveDraftButton
                             onClick={() => {
-                                // TODO:
+                                notify.success(
+                                    "Your listing has been saved as a draft.",
+                                    "You can edit it later from your dashboard.",
+                                );
                             }}
                         />
 
