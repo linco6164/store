@@ -151,27 +151,34 @@ class ListingController {
         }
     }
 
-    async toggleSold(req: Request<ListingParams>, res: Response) {
-        try {
-            const listing =
-                await listingService.toggleSold(
-                    req.params.id,
-                    req.body.sold
-                );
+    async updateStatus(
+    req: Request<ListingParams>,
+    res: Response
+) {
+    try {
 
-            return res.json({
-                success: true,
-                data: listing,
-            });
-        } catch (error) {
-            console.error(error);
+        const listing =
+            await listingService.updateStatus(
+                req.params.id,
+                req.body.status
+            );
 
-            return res.status(500).json({
-                success: false,
-                message: "Failed to update listing.",
-            });
-        }
+        return res.json({
+            success: true,
+            data: listing,
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update listing status.",
+        });
+
     }
+}
 }
 
 export const listingController =

@@ -13,7 +13,9 @@ export class ListingService {
     }
 
     async findAll() {
-        return ListingModel.find()
+        return ListingModel.find({
+            status: "active",
+        })
             .populate("seller", "username avatar")
             .sort({
                 createdAt: -1,
@@ -23,7 +25,7 @@ export class ListingService {
     async findById(id: string) {
         return ListingModel.findById(id).populate(
             "seller",
-            "username avatar"
+            "username avatar verified rating"
         );
     }
 
@@ -58,21 +60,20 @@ export class ListingService {
         );
     }
 
-    async toggleSold(
+    async updateStatus(
         id: string,
-        sold: boolean
+        status: ListingDocument["status"]
     ) {
         return ListingModel.findByIdAndUpdate(
             id,
             {
-                sold,
+                status,
             },
             {
                 new: true,
             }
         );
     }
-
     async search(
         filters: {
             category?: string;
@@ -113,6 +114,25 @@ export class ListingService {
 
         return ListingModel.find(query)
             .populate("seller", "username avatar")
+            .sort({
+                createdAt: -1,
+            });
+    }
+
+    async findSimilar(
+        id: string,
+        category: string
+    ) {
+        return ListingModel.find({
+            _id: { $ne: id },
+            category,
+            status: "active",
+        })
+            .populate(
+                "seller",
+                "username avatar"
+            )
+            .limit(8)
             .sort({
                 createdAt: -1,
             });

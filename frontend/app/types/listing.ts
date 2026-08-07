@@ -10,17 +10,43 @@ export type ListingCondition =
 
 export interface Listing {
     _id: string;
+
     title: string;
-    price: number;
-    city: string;
     description: string;
+
     category: string;
+    subcategory?: string;
+
     condition: ListingCondition;
-    images: string[];
+
+    price: number;
     currency: "RON";
+
+    negotiable: boolean;
+
+    city: string;
+
+    images: string[];
+
+    brand?: string;
+    color?: string;
+    size?: string;
+
+    shipping: boolean;
+
     favorite: boolean;
+
+    favorites: number;
+
+    views: number;
+
+    status:
+        | "active"
+        | "reserved"
+        | "sold"
+        | "hidden";
+
     createdAt: string;
-    views?: number;
 
     seller: {
         _id: string;
