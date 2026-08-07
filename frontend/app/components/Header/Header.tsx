@@ -3,7 +3,7 @@
 import { Container } from "../layout";
 
 import Logo from "./Logo";
-import SearchBar from "./SearchBar";
+import SearchBar from "../Search/SearchBar";
 import UserActions from "./UserActions";
 
 export default function Header() {

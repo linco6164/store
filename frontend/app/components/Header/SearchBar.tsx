@@ -1,18 +1,80 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 
-import { Search, X } from "lucide-react";
+import {
+    Search,
+    X,
+} from "lucide-react";
+
+import {
+    useRouter,
+    useSearchParams,
+} from "next/navigation";
+
 import { cn } from "@/app/lib/cn";
 
+const recentSearches = [
+    "Nike Air Force",
+    "iPhone 15",
+    "PlayStation 5",
+];
+
 export default function SearchBar() {
-    const [query, setQuery] = useState("");
+    const router = useRouter();
+    const searchParams =
+        useSearchParams();
+
+    const wrapperRef =
+        useRef<HTMLDivElement>(null);
 
     const [focused, setFocused] =
         useState(false);
 
-    const wrapperRef =
-        useRef<HTMLDivElement>(null);
+    const [query, setQuery] =
+        useState(
+            searchParams.get("search") ??
+                ""
+        );
+
+    useEffect(() => {
+        const timeout =
+            setTimeout(() => {
+                const params =
+                    new URLSearchParams(
+                        searchParams.toString()
+                    );
+
+                if (query.trim()) {
+                    params.set(
+                        "search",
+                        query
+                    );
+                } else {
+                    params.delete(
+                        "search"
+                    );
+                }
+
+                router.replace(
+                    `?${params.toString()}`,
+                    {
+                        scroll: false,
+                    }
+                );
+            }, 400);
+
+        return () =>
+            clearTimeout(timeout);
+    }, [
+        query,
+        router,
+        searchParams,
+    ]);
 
     useEffect(() => {
         function handleClick(
@@ -47,10 +109,9 @@ export default function SearchBar() {
         >
             <div
                 className={cn(
-                    "flex h-12 items-center rounded-2xl border bg-gray-50 transition-all",
-
+                    "flex h-12 items-center rounded-2xl border bg-gray-50 transition-all duration-200",
                     focused
-                        ? "border-blue-500 bg-white shadow-lg ring-4 ring-blue-100"
+                        ? "border-emerald-500 bg-white shadow-lg ring-4 ring-emerald-100"
                         : "border-gray-200 hover:border-gray-300"
                 )}
             >
@@ -69,16 +130,17 @@ export default function SearchBar() {
                             e.target.value
                         )
                     }
-                    placeholder="Search products..."
+                    placeholder="Search listings..."
                     className="h-full flex-1 bg-transparent px-3 text-[15px] outline-none placeholder:text-gray-400"
                 />
 
-                {query.length > 0 && (
+                {query && (
                     <button
+                        type="button"
                         onClick={() =>
                             setQuery("")
                         }
-                        className="mr-3 rounded-lg p-1 hover:bg-gray-100"
+                        className="mr-3 rounded-lg p-1 transition hover:bg-gray-100"
                     >
                         <X size={18} />
                     </button>
@@ -86,25 +148,46 @@ export default function SearchBar() {
             </div>
 
             {focused && (
-                <div className="absolute mt-3 w-full rounded-2xl border bg-white p-4 shadow-2xl">
+                <div className="absolute left-0 right-0 z-50 mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
 
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                        Recent Searches
-                    </p>
+                    <div className="border-b px-5 py-3">
 
-                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
 
-                        <button className="flex w-full rounded-xl px-3 py-2 text-left transition hover:bg-gray-100">
-                            Nike Air Force
-                        </button>
+                            Recent Searches
 
-                        <button className="flex w-full rounded-xl px-3 py-2 text-left transition hover:bg-gray-100">
-                            iPhone 15
-                        </button>
+                        </p>
 
-                        <button className="flex w-full rounded-xl px-3 py-2 text-left transition hover:bg-gray-100">
-                            Playstation 5
-                        </button>
+                    </div>
+
+                    <div className="p-2">
+
+                        {recentSearches.map(
+                            (item) => (
+                                <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() => {
+                                        setQuery(
+                                            item
+                                        );
+                                        setFocused(
+                                            false
+                                        );
+                                    }}
+                                    className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition hover:bg-gray-100"
+                                >
+                                    <Search
+                                        size={
+                                            16
+                                        }
+                                        className="mr-3 text-gray-400"
+                                    />
+
+                                    {item}
+                                </button>
+                            )
+                        )}
 
                     </div>
 
