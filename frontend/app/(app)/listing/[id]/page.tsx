@@ -1,15 +1,16 @@
 import { notFound } from "next/navigation";
 
-import Gallery from "../../../components/ListingDetails/Gallery";
-import ProductInfo from "../../../components/ListingDetails/ProductInfo";
-import Description from "../../../components/ListingDetails/Description";
-import SellerCard from "../../../components/ListingDetails/SellerCard";
-import ShippingCard from "../../../components/ListingDetails/ShippingCard";
-import Actions from "../../../components/ListingDetails/Actions";
-import ReportButton from "../../../components/ListingDetails/ReportButton";
-import SimilarListings from "../../../components/ListingDetails/SimilarListings";
+import {
+    ProductGallery,
+    ProductHeader,
+    ProductTags,
+    ProductDescription,
+    ProductDetails,
+    StickySidebar,
+    SimilarListings,
+} from "@/app/components/ProductInfo";
 
-import { listingService } from "../../../services/listing.service";
+import { listingService } from "@/app/services/listing.service";
 
 type PageProps = {
     params: Promise<{
@@ -27,31 +28,92 @@ export default async function ListingPage({
         const listings = await listingService.getAll();
 
         return (
-            <main className="mx-auto max-w-7xl px-4 py-8">
-                <div className="grid gap-8 lg:grid-cols-3">
-                    <div className="space-y-6 lg:col-span-2">
-                        <Gallery listing={listing} />
+            <main className="bg-gray-50">
 
-                        <ProductInfo listing={listing} />
+                <div className="mx-auto max-w-screen-2xl px-6 py-10">
 
-                        <Description listing={listing} />
+                    <ProductHeader
+                        title={listing.title}
+                        category={listing.category}
+                        condition={listing.condition}
+                        city={listing.city}
+                        createdAt={listing.createdAt}
+                        views={listing.views}
+                    />
 
-                        <SimilarListings
-                            listings={listings}
-                            currentListingId={listing._id}
+                    <div className="mt-6">
+
+                        <ProductTags
+                            category={listing.category}
+                            condition={listing.condition}
+                            negotiable={listing.negotiable}
+                            shipping={listing.shipping}
                         />
+
                     </div>
 
-                    <aside className="space-y-6">
-                        <Actions listing={listing} />
+                    <div className="mt-8 grid gap-10 xl:grid-cols-[minmax(0,1fr)_380px]">
 
-                        <SellerCard listing={listing} />
+                        {/* LEFT */}
 
-                        <ShippingCard />
+                        <div className="space-y-8">
 
-                        <ReportButton listing={listing} />
-                    </aside>
+                            <ProductGallery
+                                images={listing.images}
+                                title={listing.title}
+                            />
+
+                            <ProductDescription
+                                description={
+                                    listing.description
+                                }
+                            />
+
+                            <ProductDetails
+                                specifications={{
+                                    category:
+                                        listing.category,
+                                    condition:
+                                        listing.condition,
+                                    brand:
+                                        listing.brand,
+                                    color:
+                                        listing.color,
+                                }}
+                            />
+
+                        </div>
+
+                        {/* RIGHT */}
+
+                        <StickySidebar
+                            listingId={listing._id}
+                            price={listing.price}
+                            city={listing.city}
+                            createdAt={listing.createdAt}
+                            favorite={false}
+                            seller={{
+                                _id:
+                                    listing.seller._id,
+                                username:
+                                    listing.seller.username,
+                                avatar:
+                                    listing.seller.avatar,
+                            }}
+                        />
+
+                    </div>
+
+                    <SimilarListings
+                        listings={listings.filter(
+                            (item) =>
+                                item._id !==
+                                listing._id
+                        )}
+                    />
+
                 </div>
+
             </main>
         );
     } catch {

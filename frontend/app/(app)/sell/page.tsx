@@ -1,9 +1,6 @@
 "use client";
 
 import { SellForm } from "@/app/components/Sell";
-import Header from "../../components/Header";
-
-import type { Metadata } from "next";
 
 export default function SellPage() {
     return (
