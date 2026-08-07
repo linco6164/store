@@ -17,15 +17,15 @@ class ProfileService {
             })
             .populate("seller", "username avatar");
 
-        const sold = listings.filter(
-            (listing) => listing.sold
-        ).length;
+        const soldListings = listings.filter(
+            listing => listing.status === "sold"
+        );
 
         return {
             user,
             stats: {
                 listings: listings.length,
-                sold,
+                sold: soldListings.length,
                 favorites: 0,
             },
             listings,
