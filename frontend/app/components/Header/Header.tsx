@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+
 import { Container } from "../layout";
 
 import Logo from "./Logo";
@@ -17,7 +19,9 @@ export default function Header() {
                     <Logo />
 
                     <div className="flex-1">
-                        <SearchBar />
+                        <Suspense fallback={null}>
+                            <SearchBar />
+                        </Suspense>
                     </div>
 
                     <UserActions />
