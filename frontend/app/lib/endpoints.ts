@@ -21,6 +21,7 @@ export const ENDPOINTS = {
         GET_ALL: "/listings",
         GET_ONE: (id: string) => `/listings/${id}`,
         CREATE: "/listings",
+        SEARCH: "/listings/search",
         UPDATE: (id: string) => `/listings/${id}`,
         DELETE: (id: string) => `/listings/${id}`,
     },
