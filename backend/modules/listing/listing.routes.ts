@@ -15,7 +15,7 @@ router.get("/:id", listingController.findById);
 
 router.patch("/:id", listingController.update);
 
-router.patch("/:id/sold", listingController.toggleSold);
+router.patch("/:id/status", listingController.updateStatus);
 
 router.delete("/:id", listingController.delete);
 
