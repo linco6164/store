@@ -48,4 +48,19 @@ export const ENDPOINTS = {
         TOGGLE: (listingId: string) =>
             `/favorites/${listingId}/toggle`,
     },
+
+    NOTIFICATIONS: {
+        ALL: "/notifications",
+        UNREAD_COUNT:
+            "/notifications/unread-count",
+
+        READ: (id: string) =>
+            `/notifications/${id}/read`,
+
+        READ_ALL:
+            "/notifications/read-all",
+
+        DELETE: (id: string) =>
+            `/notifications/${id}`,
+    },
 };
