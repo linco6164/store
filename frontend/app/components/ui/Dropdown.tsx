@@ -7,7 +7,11 @@ import {
     useState,
 } from "react";
 
-import { AnimatePresence, motion } from "framer-motion";
+import {
+    AnimatePresence,
+    motion,
+} from "framer-motion";
+
 import clsx from "clsx";
 
 interface DropdownProps {
@@ -29,36 +33,54 @@ export default function Dropdown({
     align = "right",
     width = "md",
 }: DropdownProps) {
-    const [open, setOpen] =
-        useState(false);
+    const [open, setOpen] = useState(false);
 
     const ref =
         useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        function handleClick(
-            e: MouseEvent
+        function handleClickOutside(
+            event: MouseEvent
         ) {
             if (
                 ref.current &&
                 !ref.current.contains(
-                    e.target as Node
+                    event.target as Node
                 )
             ) {
                 setOpen(false);
             }
         }
 
+        function handleEscape(
+            event: KeyboardEvent
+        ) {
+            if (event.key === "Escape") {
+                setOpen(false);
+            }
+        }
+
         document.addEventListener(
             "mousedown",
-            handleClick
+            handleClickOutside
         );
 
-        return () =>
+        document.addEventListener(
+            "keydown",
+            handleEscape
+        );
+
+        return () => {
             document.removeEventListener(
                 "mousedown",
-                handleClick
+                handleClickOutside
             );
+
+            document.removeEventListener(
+                "keydown",
+                handleEscape
+            );
+        };
     }, []);
 
     return (
@@ -68,20 +90,22 @@ export default function Dropdown({
         >
             <div
                 onClick={() =>
-                    setOpen((prev) => !prev)
+                    setOpen(
+                        (previous) => !previous
+                    )
                 }
+                aria-expanded={open}
             >
                 {trigger}
             </div>
 
             <AnimatePresence>
-
                 {open && (
                     <motion.div
                         initial={{
                             opacity: 0,
-                            y: 8,
-                            scale: 0.98,
+                            y: -6,
+                            scale: 0.97,
                         }}
                         animate={{
                             opacity: 1,
@@ -90,17 +114,22 @@ export default function Dropdown({
                         }}
                         exit={{
                             opacity: 0,
-                            y: 8,
+                            y: -4,
                             scale: 0.98,
                         }}
                         transition={{
-                            duration: 0.18,
+                            duration: 0.16,
+                            ease: [
+                                0.22,
+                                1,
+                                0.36,
+                                1,
+                            ],
                         }}
                         className={clsx(
-                            "absolute z-50 mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl",
-
+                            "absolute top-full z-[100] mt-3 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.18)]",
+                            "backdrop-blur-xl",
                             widths[width],
-
                             align === "right"
                                 ? "right-0"
                                 : "left-0"
@@ -109,9 +138,7 @@ export default function Dropdown({
                         {children}
                     </motion.div>
                 )}
-
             </AnimatePresence>
-
         </div>
     );
 }
