@@ -3,8 +3,10 @@
 import Link from "next/link";
 
 import { useAuth } from "@/app/hooks/useAuth";
+import { useFavorites } from "@/app/hooks/useFavorites";
 
 import FavoritesButton from "./FavoritesButton";
+import FavoritesDropdown from "./FavoritesDropdown";
 import MessagesButton from "./MessagesButton";
 import NotificationsButton from "./NotificationsButton";
 import SellButton from "./SellButton";
@@ -14,6 +16,12 @@ import Skeleton from "../ui/Skeleton";
 
 export default function UserActions() {
     const { user, loading } = useAuth();
+
+    const {
+        favorites,
+        loading: favoritesLoading,
+        reload: reloadFavorites,
+    } = useFavorites();
 
     if (loading) {
         return (
@@ -49,25 +57,28 @@ export default function UserActions() {
 
     return (
         <div className="flex items-center gap-2">
-
-            <FavoritesButton
-                count={0}
+            <FavoritesDropdown
+                favorites={favorites}
+                loading={favoritesLoading}
+                onReload={reloadFavorites}
+                trigger={
+                    <FavoritesButton
+                        count={
+                            favorites.length > 0
+                                ? favorites.length
+                                : undefined
+                        }
+                    />
+                }
             />
 
-            <MessagesButton
-                count={0}
-            />
+            <MessagesButton count={0} />
 
-            <NotificationsButton
-                count={0}
-            />
+            <NotificationsButton count={0} />
 
             <SellButton />
 
-            <UserMenu
-                user={user}
-            />
-
+            <UserMenu user={user} />
         </div>
     );
 }
