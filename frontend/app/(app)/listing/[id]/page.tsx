@@ -91,7 +91,6 @@ export default async function ListingPage({
                             price={listing.price}
                             city={listing.city}
                             createdAt={listing.createdAt}
-                            favorite={false}
                             seller={{
                                 _id:
                                     listing.seller._id,
