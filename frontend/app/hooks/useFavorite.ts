@@ -1,99 +1,65 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useState,
+} from "react";
 
-import { favoriteService } from "@/app/services/favorite.service";
+import {
+    favoriteService,
+    FavoriteListing,
+} from "@/app/services/favorite.service";
 
-interface UseFavoriteResult {
-    favorite: boolean;
+interface UseFavoritesResult {
+    favorites: FavoriteListing[];
     loading: boolean;
-    toggling: boolean;
-    toggle: () => Promise<void>;
+    error: boolean;
+    reload: () => Promise<void>;
 }
 
-export function useFavorite(
-    listingId: string,
-    initialFavorite = false
-): UseFavoriteResult {
-    const [favorite, setFavorite] =
-        useState(initialFavorite);
+export function useFavorites(): UseFavoritesResult {
+    const [favorites, setFavorites] = useState<
+        FavoriteListing[]
+    >([]);
 
     const [loading, setLoading] =
         useState(true);
 
-    const [toggling, setToggling] =
+    const [error, setError] =
         useState(false);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        async function checkFavorite() {
+    const loadFavorites =
+        useCallback(async () => {
             try {
-                const result =
-                    await favoriteService.check(
-                        listingId
-                    );
+                setLoading(true);
+                setError(false);
 
-                if (!cancelled) {
-                    setFavorite(result);
-                }
-            } catch {
-                if (!cancelled) {
-                    setFavorite(false);
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        }
+                const data =
+                    await favoriteService.getAll();
 
-        void checkFavorite();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [listingId]);
-
-    const toggle = useCallback(async () => {
-        if (toggling) {
-            return;
-        }
-
-        // Optimistic UI
-        const previousState = favorite;
-
-        setFavorite(!previousState);
-        setToggling(true);
-
-        try {
-            const result =
-                await favoriteService.toggle(
-                    listingId
+                setFavorites(data);
+            } catch (error) {
+                console.error(
+                    "Failed to load favorites:",
+                    error
                 );
 
-            setFavorite(result.favorite);
-        } catch (error) {
-            console.error(
-                "Failed to toggle favorite:",
-                error
-            );
+                setFavorites([]);
+                setError(true);
+            } finally {
+                setLoading(false);
+            }
+        }, []);
 
-            // Rollback
-            setFavorite(previousState);
-        } finally {
-            setToggling(false);
-        }
-    }, [
-        favorite,
-        listingId,
-        toggling,
-    ]);
+    useEffect(() => {
+        void loadFavorites();
+    }, [loadFavorites]);
 
     return {
-        favorite,
+        favorites,
         loading,
-        toggling,
-        toggle,
+        error,
+        reload: loadFavorites,
     };
 }
