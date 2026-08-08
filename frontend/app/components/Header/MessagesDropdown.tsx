@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { MessageCircle, RefreshCw } from "lucide-react";
+import {
+    MessageCircle,
+    RefreshCw,
+} from "lucide-react";
 
 import Dropdown from "../ui/Dropdown";
 import EmptyState from "../ui/EmptyState";
 
 import { useConversations } from "@/app/hooks/useConversations";
 
-function formatMessageTime(
-    date?: string
-) {
+function formatMessageTime(date?: string) {
     if (!date) return "";
 
     const value = new Date(date);
@@ -25,44 +26,39 @@ function formatMessageTime(
     const diff =
         now.getTime() - value.getTime();
 
-    const minutes = Math.floor(
-        diff / 60000
-    );
+    const minutes = Math.floor(diff / 60000);
 
-    if (minutes < 1) {
-        return "acum";
-    }
+    if (minutes < 1) return "acum";
 
     if (minutes < 60) {
         return `${minutes} min`;
     }
 
-    const hours = Math.floor(
-        minutes / 60
-    );
+    const hours = Math.floor(minutes / 60);
 
     if (hours < 24) {
         return `${hours}h`;
     }
 
-    const days = Math.floor(
-        hours / 24
-    );
+    const days = Math.floor(hours / 24);
 
     if (days < 7) {
         return `${days}z`;
     }
 
-    return value.toLocaleDateString(
-        "ro-RO",
-        {
-            day: "2-digit",
-            month: "2-digit",
-        }
-    );
+    return value.toLocaleDateString("ro-RO", {
+        day: "2-digit",
+        month: "2-digit",
+    });
 }
 
-export default function MessagesDropdown() {
+interface Props {
+    trigger: React.ReactNode;
+}
+
+export default function MessagesDropdown({
+    trigger,
+}: Props) {
     const {
         data: conversations = [],
         isLoading,
@@ -70,47 +66,10 @@ export default function MessagesDropdown() {
         refetch,
     } = useConversations();
 
-    const unreadCount =
-        conversations.reduce(
-            (total, conversation) => {
-                const unread =
-                    conversation.unread ?? {};
-
-                const count = Object.values(
-                    unread
-                ).reduce(
-                    (sum, value) =>
-                        sum + Number(value || 0),
-                    0
-                );
-
-                return total + count;
-            },
-            0
-        );
-
     return (
         <Dropdown
             width="lg"
-            trigger={
-                <button
-                    type="button"
-                    className="relative"
-                    aria-label="Mesaje"
-                >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900">
-                        <MessageCircle size={21} />
-                    </div>
-
-                    {unreadCount > 0 && (
-                        <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                            {unreadCount > 99
-                                ? "99+"
-                                : unreadCount}
-                        </span>
-                    )}
-                </button>
-            }
+            trigger={trigger}
         >
             {/* Header */}
             <div className="border-b border-gray-100 px-5 py-4">
@@ -128,9 +87,7 @@ export default function MessagesDropdown() {
                     {isError && (
                         <button
                             type="button"
-                            onClick={() =>
-                                void refetch()
-                            }
+                            onClick={() => void refetch()}
                             className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
                             title="Reîncearcă"
                         >
@@ -143,22 +100,20 @@ export default function MessagesDropdown() {
             {/* Loading */}
             {isLoading && (
                 <div className="space-y-3 p-4">
-                    {[1, 2, 3].map(
-                        (item) => (
-                            <div
-                                key={item}
-                                className="flex animate-pulse items-center gap-4 rounded-xl p-2"
-                            >
-                                <div className="h-12 w-12 shrink-0 rounded-full bg-gray-200" />
+                    {[1, 2, 3].map((item) => (
+                        <div
+                            key={item}
+                            className="flex animate-pulse items-center gap-4 rounded-xl p-2"
+                        >
+                            <div className="h-12 w-12 shrink-0 rounded-full bg-gray-200" />
 
-                                <div className="min-w-0 flex-1 space-y-2">
-                                    <div className="h-4 w-32 rounded bg-gray-200" />
+                            <div className="min-w-0 flex-1 space-y-2">
+                                <div className="h-4 w-32 rounded bg-gray-200" />
 
-                                    <div className="h-4 w-48 rounded bg-gray-200" />
-                                </div>
+                                <div className="h-4 w-48 rounded bg-gray-200" />
                             </div>
-                        )
-                    )}
+                        </div>
+                    ))}
                 </div>
             )}
 
@@ -166,15 +121,12 @@ export default function MessagesDropdown() {
             {!isLoading && isError && (
                 <div className="p-6 text-center">
                     <p className="text-sm font-medium text-gray-700">
-                        Mesajele nu au putut fi
-                        încărcate.
+                        Mesajele nu au putut fi încărcate.
                     </p>
 
                     <button
                         type="button"
-                        onClick={() =>
-                            void refetch()
-                        }
+                        onClick={() => void refetch()}
                         className="mt-3 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
                     >
                         Încearcă din nou
@@ -189,9 +141,7 @@ export default function MessagesDropdown() {
                     <div className="p-6">
                         <EmptyState
                             icon={
-                                <MessageCircle
-                                    size={34}
-                                />
+                                <MessageCircle size={34} />
                             }
                             title="Nu ai mesaje"
                             description="Conversațiile tale vor apărea aici."
@@ -207,6 +157,16 @@ export default function MessagesDropdown() {
                         <div className="max-h-[420px] overflow-y-auto">
                             {conversations.map(
                                 (conversation) => {
+                                    /*
+                                     * Într-o conversație avem doi participanți.
+                                     * Pentru dropdown afișăm participantul care
+                                     * nu este utilizatorul curent dacă API-ul
+                                     * îl furnizează primul/ultimul.
+                                     *
+                                     * Pentru moment folosim primul participant,
+                                     * deoarece acesta este formatul existent
+                                     * în Conversation.
+                                     */
                                     const participant =
                                         conversation.participants?.[0];
 
@@ -216,13 +176,10 @@ export default function MessagesDropdown() {
 
                                     const unread =
                                         Object.values(
-                                            conversation.unread ??
-                                                {}
+                                            conversation.unread ?? {}
                                         ).some(
                                             (value) =>
-                                                Number(
-                                                    value
-                                                ) > 0
+                                                Number(value) > 0
                                         );
 
                                     return (
@@ -233,22 +190,15 @@ export default function MessagesDropdown() {
                                             href={`/messages/${conversation._id}`}
                                             className="group flex items-center gap-3 border-b border-gray-100 px-5 py-4 transition hover:bg-gray-50"
                                         >
-                                            {/* Avatar */}
                                             <div className="relative shrink-0">
                                                 <Image
-                                                    src={
-                                                        image
-                                                    }
+                                                    src={image}
                                                     alt={
                                                         participant?.username ||
                                                         "User"
                                                     }
-                                                    width={
-                                                        48
-                                                    }
-                                                    height={
-                                                        48
-                                                    }
+                                                    width={48}
+                                                    height={48}
                                                     className="rounded-full object-cover"
                                                 />
 
@@ -257,15 +207,14 @@ export default function MessagesDropdown() {
                                                 )}
                                             </div>
 
-                                            {/* Content */}
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center justify-between gap-3">
                                                     <p
-                                                        className={`truncate ${
+                                                        className={
                                                             unread
-                                                                ? "font-bold text-gray-900"
-                                                                : "font-semibold text-gray-800"
-                                                        }`}
+                                                                ? "truncate font-bold text-gray-900"
+                                                                : "truncate font-semibold text-gray-800"
+                                                        }
                                                     >
                                                         {participant?.username ||
                                                             "Utilizator"}
@@ -289,15 +238,13 @@ export default function MessagesDropdown() {
                                                 )}
 
                                                 <p
-                                                    className={`mt-1 truncate text-sm ${
+                                                    className={
                                                         unread
-                                                            ? "font-medium text-gray-700"
-                                                            : "text-gray-500"
-                                                    }`}
+                                                            ? "mt-1 truncate text-sm font-medium text-gray-700"
+                                                            : "mt-1 truncate text-sm text-gray-500"
+                                                    }
                                                 >
-                                                    {conversation
-                                                        .lastMessage
-                                                        ?.text ||
+                                                    {conversation.lastMessage?.text ||
                                                         "Începe conversația"}
                                                 </p>
                                             </div>
