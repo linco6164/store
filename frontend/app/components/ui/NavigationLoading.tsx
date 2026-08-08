@@ -2,44 +2,68 @@
 
 import {
     useEffect,
+    useRef,
     useState,
 } from "react";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { LoaderCircle } from "lucide-react";
+import {
+    AnimatePresence,
+    motion,
+} from "framer-motion";
+
+import {
+    LoaderCircle,
+} from "lucide-react";
+
+import {
+    usePathname,
+    useSearchParams,
+} from "next/navigation";
 
 export default function NavigationLoading() {
+    const pathname =
+        usePathname();
+
+    const searchParams =
+        useSearchParams();
+
     const [loading, setLoading] =
         useState(false);
 
+    const previousUrl =
+        useRef<string | null>(null);
+
+    const navigationStarted =
+        useRef(false);
+
+    /*
+     * URL-ul curent.
+     */
+    const currentUrl =
+        `${pathname}?${searchParams.toString()}`;
+
+    /*
+     * Oprim loader-ul când Next.js
+     * a terminat navigarea.
+     */
     useEffect(() => {
-        let navigationTimer: number | undefined;
+        if (
+            navigationStarted.current
+        ) {
+            navigationStarted.current =
+                false;
 
-        const startLoading = () => {
-            window.clearTimeout(
-                navigationTimer
-            );
+            setLoading(false);
+        }
 
-            setLoading(true);
-        };
+        previousUrl.current =
+            currentUrl;
+    }, [currentUrl]);
 
-        const stopLoading = () => {
-            window.clearTimeout(
-                navigationTimer
-            );
-
-            navigationTimer = window.setTimeout(
-                () => {
-                    setLoading(false);
-                },
-                120
-            );
-        };
-
+    useEffect(() => {
         /*
-         * Intercept internal links.
+         * Click pe Link intern.
          */
-
         const handleClick = (
             event: MouseEvent
         ) => {
@@ -83,6 +107,9 @@ export default function NavigationLoading() {
                 window.location.href
             );
 
+            /*
+             * Nu interceptăm linkurile externe.
+             */
             if (
                 url.origin !==
                 window.location.origin
@@ -90,6 +117,10 @@ export default function NavigationLoading() {
                 return;
             }
 
+            /*
+             * Dacă este aceeași pagină,
+             * nu afișăm loader.
+             */
             if (
                 url.pathname ===
                     window.location.pathname &&
@@ -99,40 +130,64 @@ export default function NavigationLoading() {
                 return;
             }
 
-            startLoading();
+            navigationStarted.current =
+                true;
+
+            setLoading(true);
         };
 
         /*
-         * Browser Back / Forward.
+         * Back / Forward.
          */
-
         const handlePopState = () => {
-            startLoading();
+            navigationStarted.current =
+                true;
+
+            setLoading(true);
         };
 
         /*
-         * When the page is restored from bfcache.
+         * Router.push / replaceState.
+         *
+         * Nu interceptăm navigarea în sine,
+         * ci lăsăm usePathname() să oprească
+         * loader-ul când URL-ul s-a schimbat.
          */
+        const originalPushState =
+            window.history.pushState;
 
-        const handlePageShow = (
-            event: PageTransitionEvent
-        ) => {
-            if (event.persisted) {
-                startLoading();
+        const originalReplaceState =
+            window.history.replaceState;
 
-                requestAnimationFrame(() => {
-                    stopLoading();
-                });
-            }
-        };
+        window.history.pushState =
+            function (
+                ...args
+            ) {
+                navigationStarted.current =
+                    true;
 
-        /*
-         * When leaving the document.
-         */
+                setLoading(true);
 
-        const handlePageHide = () => {
-            startLoading();
-        };
+                return originalPushState.apply(
+                    window.history,
+                    args
+                );
+            };
+
+        window.history.replaceState =
+            function (
+                ...args
+            ) {
+                navigationStarted.current =
+                    true;
+
+                setLoading(true);
+
+                return originalReplaceState.apply(
+                    window.history,
+                    args
+                );
+            };
 
         document.addEventListener(
             "click",
@@ -145,21 +200,7 @@ export default function NavigationLoading() {
             handlePopState
         );
 
-        window.addEventListener(
-            "pageshow",
-            handlePageShow
-        );
-
-        window.addEventListener(
-            "pagehide",
-            handlePageHide
-        );
-
         return () => {
-            window.clearTimeout(
-                navigationTimer
-            );
-
             document.removeEventListener(
                 "click",
                 handleClick,
@@ -171,14 +212,38 @@ export default function NavigationLoading() {
                 handlePopState
             );
 
+            window.history.pushState =
+                originalPushState;
+
+            window.history.replaceState =
+                originalReplaceState;
+        };
+    }, []);
+
+    /*
+     * Back/Forward + bfcache.
+     */
+    useEffect(() => {
+        const handlePageShow = (
+            event: PageTransitionEvent
+        ) => {
+            if (event.persisted) {
+                navigationStarted.current =
+                    false;
+
+                setLoading(false);
+            }
+        };
+
+        window.addEventListener(
+            "pageshow",
+            handlePageShow
+        );
+
+        return () => {
             window.removeEventListener(
                 "pageshow",
                 handlePageShow
-            );
-
-            window.removeEventListener(
-                "pagehide",
-                handlePageHide
             );
         };
     }, []);
@@ -197,9 +262,13 @@ export default function NavigationLoading() {
                         opacity: 0,
                     }}
                     transition={{
-                        duration: 0.16,
+                        duration: 0.15,
                     }}
-                    className="pointer-events-none fixed inset-0 z-[9999] flex items-start justify-center bg-white/35 pt-20 backdrop-blur-[2px]"
+                    /*
+                     * ACUM BLOCHĂM INTERACȚIUNEA
+                     * cât timp se face navigarea.
+                     */
+                    className="fixed inset-0 z-[9999] flex cursor-wait items-start justify-center bg-white/45 pt-20 backdrop-blur-[2px]"
                 >
                     <motion.div
                         initial={{
@@ -216,6 +285,9 @@ export default function NavigationLoading() {
                             opacity: 0,
                             y: -8,
                             scale: 0.96,
+                        }}
+                        transition={{
+                            duration: 0.16,
                         }}
                         className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-xl"
                     >
