@@ -1,12 +1,19 @@
 import { Response } from "express";
 
 import { AuthRequest } from "../../middleware/auth.js";
-
 import { favoriteService } from "./favorite.service.js";
 
-type FavoriteParams = {
-    listingId: string;
-};
+function getListingId(
+    req: AuthRequest
+): string | null {
+    const { listingId } = req.params;
+
+    if (typeof listingId !== "string") {
+        return null;
+    }
+
+    return listingId;
+}
 
 class FavoriteController {
     async getFavorites(
@@ -42,7 +49,7 @@ class FavoriteController {
     }
 
     async checkFavorite(
-        req: AuthRequest<FavoriteParams>,
+        req: AuthRequest,
         res: Response
     ) {
         try {
@@ -53,10 +60,21 @@ class FavoriteController {
                 });
             }
 
+            const listingId =
+                getListingId(req);
+
+            if (!listingId) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Invalid listing ID.",
+                });
+            }
+
             const favorite =
                 await favoriteService.isFavorite(
                     req.userId,
-                    req.params.listingId
+                    listingId
                 );
 
             return res.json({
@@ -75,7 +93,7 @@ class FavoriteController {
     }
 
     async addFavorite(
-        req: AuthRequest<FavoriteParams>,
+        req: AuthRequest,
         res: Response
     ) {
         try {
@@ -86,10 +104,21 @@ class FavoriteController {
                 });
             }
 
+            const listingId =
+                getListingId(req);
+
+            if (!listingId) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Invalid listing ID.",
+                });
+            }
+
             const favorite =
                 await favoriteService.addFavorite(
                     req.userId,
-                    req.params.listingId
+                    listingId
                 );
 
             return res.status(201).json({
@@ -108,7 +137,7 @@ class FavoriteController {
     }
 
     async removeFavorite(
-        req: AuthRequest<FavoriteParams>,
+        req: AuthRequest,
         res: Response
     ) {
         try {
@@ -119,9 +148,20 @@ class FavoriteController {
                 });
             }
 
+            const listingId =
+                getListingId(req);
+
+            if (!listingId) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Invalid listing ID.",
+                });
+            }
+
             await favoriteService.removeFavorite(
                 req.userId,
-                req.params.listingId
+                listingId
             );
 
             return res.json({
@@ -141,7 +181,7 @@ class FavoriteController {
     }
 
     async toggleFavorite(
-        req: AuthRequest<FavoriteParams>,
+        req: AuthRequest,
         res: Response
     ) {
         try {
@@ -152,10 +192,21 @@ class FavoriteController {
                 });
             }
 
+            const listingId =
+                getListingId(req);
+
+            if (!listingId) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Invalid listing ID.",
+                });
+            }
+
             const favorite =
                 await favoriteService.toggleFavorite(
                     req.userId,
-                    req.params.listingId
+                    listingId
                 );
 
             return res.json({
