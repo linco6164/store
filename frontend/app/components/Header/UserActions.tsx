@@ -4,10 +4,14 @@ import Link from "next/link";
 
 import { useAuth } from "@/app/hooks/useAuth";
 import { useFavorites } from "@/app/hooks/useFavorites";
+import { useConversations } from "@/app/hooks/useConversations";
 
 import FavoritesButton from "./FavoritesButton";
 import FavoritesDropdown from "./FavoritesDropdown";
+
 import MessagesButton from "./MessagesButton";
+import MessagesDropdown from "./MessagesDropdown";
+
 import NotificationsButton from "./NotificationsButton";
 import SellButton from "./SellButton";
 import UserMenu from "./UserMenu";
@@ -15,7 +19,10 @@ import UserMenu from "./UserMenu";
 import Skeleton from "../ui/Skeleton";
 
 export default function UserActions() {
-    const { user, loading } = useAuth();
+    const {
+        user,
+        loading,
+    } = useAuth();
 
     const {
         favorites,
@@ -23,13 +30,39 @@ export default function UserActions() {
         reload: reloadFavorites,
     } = useFavorites();
 
+    const {
+        data: conversations = [],
+    } = useConversations();
+
+    const unreadMessages =
+        conversations.reduce(
+            (total, conversation) => {
+                const unread =
+                    conversation.unread ?? {};
+
+                const count =
+                    Object.values(unread).reduce(
+                        (sum, value) =>
+                            sum + Number(value || 0),
+                        0
+                    );
+
+                return total + count;
+            },
+            0
+        );
+
     if (loading) {
         return (
             <div className="flex items-center gap-3">
                 <Skeleton className="h-11 w-11 rounded-2xl" />
+
                 <Skeleton className="h-11 w-11 rounded-2xl" />
+
                 <Skeleton className="h-11 w-11 rounded-2xl" />
+
                 <Skeleton className="h-11 w-32 rounded-2xl" />
+
                 <Skeleton className="h-11 w-11 rounded-full" />
             </div>
         );
@@ -57,6 +90,9 @@ export default function UserActions() {
 
     return (
         <div className="flex items-center gap-2">
+
+            {/* Favorites */}
+
             <FavoritesDropdown
                 favorites={favorites}
                 loading={favoritesLoading}
@@ -72,13 +108,34 @@ export default function UserActions() {
                 }
             />
 
-            <MessagesButton count={0} />
+            {/* Messages */}
 
-            <NotificationsButton count={0} />
+            <MessagesDropdown
+                trigger={
+                    <MessagesButton
+                        count={
+                            unreadMessages > 0
+                                ? unreadMessages
+                                : undefined
+                        }
+                    />
+                }
+            />
+
+            {/* Notifications */}
+
+            <NotificationsButton
+                count={0}
+            />
+
+            {/* Sell */}
 
             <SellButton />
 
+            {/* Account */}
+
             <UserMenu user={user} />
+
         </div>
     );
 }
