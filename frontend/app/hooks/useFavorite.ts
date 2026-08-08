@@ -2,64 +2,59 @@
 
 import {
     useCallback,
-    useEffect,
     useState,
 } from "react";
 
-import {
-    favoriteService,
-    FavoriteListing,
-} from "@/app/services/favorite.service";
+import { favoriteService } from "@/app/services/favorite.service";
 
-interface UseFavoritesResult {
-    favorites: FavoriteListing[];
+interface UseFavoriteResult {
+    favorite: boolean;
     loading: boolean;
-    error: boolean;
-    reload: () => Promise<void>;
+    toggling: boolean;
+    toggle: () => Promise<void>;
 }
 
-export function useFavorites(): UseFavoritesResult {
-    const [favorites, setFavorites] = useState<
-        FavoriteListing[]
-    >([]);
+export default function useFavorite(
+    listingId: string,
+    initialFavorite = false
+): UseFavoriteResult {
+    const [favorite, setFavorite] =
+        useState(initialFavorite);
 
     const [loading, setLoading] =
-        useState(true);
-
-    const [error, setError] =
         useState(false);
 
-    const loadFavorites =
-        useCallback(async () => {
-            try {
-                setLoading(true);
-                setError(false);
+    const [toggling, setToggling] =
+        useState(false);
 
-                const data =
-                    await favoriteService.getAll();
+    const toggle = useCallback(async () => {
+        if (toggling) {
+            return;
+        }
 
-                setFavorites(data);
-            } catch (error) {
-                console.error(
-                    "Failed to load favorites:",
-                    error
+        try {
+            setToggling(true);
+
+            const result =
+                await favoriteService.toggle(
+                    listingId
                 );
 
-                setFavorites([]);
-                setError(true);
-            } finally {
-                setLoading(false);
-            }
-        }, []);
-
-    useEffect(() => {
-        void loadFavorites();
-    }, [loadFavorites]);
+            setFavorite(result.favorite);
+        } catch (error) {
+            console.error(
+                "Failed to toggle favorite:",
+                error
+            );
+        } finally {
+            setToggling(false);
+        }
+    }, [listingId, toggling]);
 
     return {
-        favorites,
+        favorite,
         loading,
-        error,
-        reload: loadFavorites,
+        toggling,
+        toggle,
     };
 }
