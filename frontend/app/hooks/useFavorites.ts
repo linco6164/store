@@ -53,6 +53,22 @@ export function useFavorites(): UseFavoritesResult {
 
     useEffect(() => {
         void loadFavorites();
+
+        function handleFavoritesChanged() {
+            void loadFavorites();
+        }
+
+        window.addEventListener(
+            "favorites:changed",
+            handleFavoritesChanged
+        );
+
+        return () => {
+            window.removeEventListener(
+                "favorites:changed",
+                handleFavoritesChanged
+            );
+        };
     }, [loadFavorites]);
 
     return {
