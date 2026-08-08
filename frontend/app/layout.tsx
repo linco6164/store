@@ -2,6 +2,7 @@ import "./globals.css";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./providers/AuthProvider";
 import QueryProvider from "./providers/QueryProviders";
+import NavigationLoading from "@/app/components/ui/NavigationLoading";
 
 import type { Metadata } from "next";
 
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <NavigationLoading />
         <QueryProvider>
           <GoogleOAuthProvider
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
