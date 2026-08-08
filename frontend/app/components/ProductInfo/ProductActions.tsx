@@ -1,21 +1,52 @@
 "use client";
 
-import { Heart, Share2, Flag, Link2 } from "lucide-react";
-import { notify } from "@/app/lib/notify";
+import {
+    Heart,
+    Share2,
+    Flag,
+    Link2,
+} from "lucide-react";
 
+import { notify } from "@/app/lib/notify";
 import Button from "@/app/components/ui/Button";
+import { useFavorite } from "@/app/hooks/useFavorite";
 
 interface Props {
     listingId: string;
-    favorite?: boolean;
-    onFavorite?(): void;
 }
 
 export default function ProductActions({
     listingId,
-    favorite = false,
-    onFavorite,
 }: Props) {
+    const {
+        favorite,
+        loading,
+        toggling,
+        toggle,
+    } = useFavorite(listingId);
+
+    async function handleFavorite() {
+        try {
+            await toggle();
+
+            notify.success(
+                favorite
+                    ? "Removed from favorites"
+                    : "Saved to favorites",
+                favorite
+                    ? "Listing removed from your favorites."
+                    : "Listing added to your favorites."
+            );
+        } catch (error) {
+            console.error(error);
+
+            notify.error(
+                "Something went wrong",
+                "The listing could not be updated."
+            );
+        }
+    }
+
     async function handleShare() {
         if (navigator.share) {
             await navigator.share({
@@ -56,7 +87,6 @@ export default function ProductActions({
 
     return (
         <div className="space-y-3">
-
             <Button
                 variant={
                     favorite
@@ -65,14 +95,23 @@ export default function ProductActions({
                 }
                 size="lg"
                 className="w-full"
-                onClick={onFavorite}
+                onClick={handleFavorite}
+                disabled={loading || toggling}
             >
-                <Heart size={20} />
+                <Heart
+                    size={20}
+                    className={
+                        favorite
+                            ? "fill-current"
+                            : ""
+                    }
+                />
 
-                {favorite
-                    ? "Saved"
-                    : "Save Listing"}
-
+                {toggling
+                    ? "Saving..."
+                    : favorite
+                      ? "Saved"
+                      : "Save Listing"}
             </Button>
 
             <Button
@@ -84,7 +123,6 @@ export default function ProductActions({
                 <Share2 size={20} />
 
                 Share
-
             </Button>
 
             <Button
@@ -96,7 +134,6 @@ export default function ProductActions({
                 <Link2 size={20} />
 
                 Copy Link
-
             </Button>
 
             <Button
@@ -108,9 +145,7 @@ export default function ProductActions({
                 <Flag size={20} />
 
                 Report Listing
-
             </Button>
-
         </div>
     );
 }

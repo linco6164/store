@@ -3,7 +3,7 @@
 import { Heart } from "lucide-react";
 import { motion } from "framer-motion";
 
-import { useFavorite } from "@/app/hooks/useFavorites";
+import { useFavorite } from "@/app/hooks/useFavorite";
 import { cn } from "@/app/lib/cn";
 
 interface ListingFavoriteProps {
