@@ -111,24 +111,6 @@ export default function UserMenu({
                 </div>
             </div>
 
-            {/* Quick actions */}
-            <div className="border-b border-gray-100 p-2">
-                <Link href="/sell">
-                    <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-900 text-white">
-                            <Plus size={18} />
-                        </div>
-
-                        <div>
-                            <p>Sell an item</p>
-                            <p className="text-xs font-normal text-gray-500">
-                                Create a new listing
-                            </p>
-                        </div>
-                    </div>
-                </Link>
-            </div>
-
             {/* Main navigation */}
             <div className="p-2">
                 <DropdownItem
@@ -143,27 +125,6 @@ export default function UserMenu({
                     icon={<Package size={18} />}
                 >
                     My Listings
-                </DropdownItem>
-
-                <DropdownItem
-                    href="/favorites"
-                    icon={<Heart size={18} />}
-                >
-                    Favorites
-                </DropdownItem>
-
-                <DropdownItem
-                    href="/messages"
-                    icon={<MessageCircle size={18} />}
-                >
-                    Messages
-                </DropdownItem>
-
-                <DropdownItem
-                    href="/notifications"
-                    icon={<Bell size={18} />}
-                >
-                    Notifications
                 </DropdownItem>
 
                 <DropdownItem
