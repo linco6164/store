@@ -43,7 +43,8 @@ export default function ListingCard({
                     />
 
                     <ListingFavorite
-                        favorite={listing.favorite}
+                        listingId={listing._id}
+                        size="sm"
                     />
 
                 </div>

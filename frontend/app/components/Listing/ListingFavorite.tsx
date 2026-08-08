@@ -1,57 +1,122 @@
 "use client";
 
-import { useState } from "react";
 import { Heart } from "lucide-react";
+import { motion } from "framer-motion";
+
+import { useFavorite } from "@/app/hooks/useFavorites";
 import { cn } from "@/app/lib/cn";
 
-interface Props {
-    favorite?: boolean;
-    onToggle?: (favorite: boolean) => void;
+interface ListingFavoriteProps {
+    listingId: string;
+    initialFavorite?: boolean;
+    size?: "sm" | "md" | "lg";
+    showLabel?: boolean;
+    className?: string;
 }
 
+const sizes = {
+    sm: {
+        button: "h-9 w-9",
+        icon: 17,
+    },
+    md: {
+        button: "h-11 w-11",
+        icon: 20,
+    },
+    lg: {
+        button: "h-12 px-4",
+        icon: 21,
+    },
+};
+
 export default function ListingFavorite({
-    favorite = false,
-    onToggle,
-}: Props) {
-    const [isFavorite, setIsFavorite] =
-        useState(favorite);
+    listingId,
+    initialFavorite = false,
+    size = "md",
+    showLabel = false,
+    className,
+}: ListingFavoriteProps) {
+    const {
+        favorite,
+        loading,
+        toggling,
+        toggle,
+    } = useFavorite(
+        listingId,
+        initialFavorite
+    );
 
-    function handleClick(
-        e: React.MouseEvent
+    const currentSize = sizes[size];
+
+    async function handleClick(
+        event: React.MouseEvent<HTMLButtonElement>
     ) {
-        e.preventDefault();
-        e.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
 
-        const next = !isFavorite;
-
-        setIsFavorite(next);
-
-        onToggle?.(next);
+        await toggle();
     }
 
     return (
-        <button
+        <motion.button
+            type="button"
             onClick={handleClick}
-            aria-label="Favorite"
+            disabled={loading || toggling}
+            whileTap={{
+                scale: 0.9,
+            }}
+            whileHover={{
+                scale: 1.04,
+            }}
+            aria-label={
+                favorite
+                    ? "Remove from favorites"
+                    : "Add to favorites"
+            }
+            aria-pressed={favorite}
             className={cn(
-                "absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/90 shadow-lg backdrop-blur-md transition-all duration-300",
-
-                "hover:scale-110 hover:bg-white",
-
-                isFavorite &&
-                    "bg-red-50"
+                "inline-flex items-center justify-center gap-2 rounded-full border bg-white shadow-sm transition-all duration-200",
+                favorite
+                    ? "border-red-100 text-red-500"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700",
+                (loading || toggling) &&
+                    "cursor-wait opacity-70",
+                currentSize.button,
+                className
             )}
         >
-            <Heart
-                size={20}
-                className={cn(
-                    "transition-all duration-300",
+            <motion.span
+                key={favorite ? "active" : "inactive"}
+                initial={{
+                    scale: 0.7,
+                    opacity: 0,
+                }}
+                animate={{
+                    scale: 1,
+                    opacity: 1,
+                }}
+                transition={{
+                    duration: 0.15,
+                }}
+            >
+                <Heart
+                    size={currentSize.icon}
+                    strokeWidth={2}
+                    className={cn(
+                        "transition-colors",
+                        favorite &&
+                            "fill-current"
+                    )}
+                />
+            </motion.span>
 
-                    isFavorite
-                        ? "fill-red-500 text-red-500 scale-110"
-                        : "text-gray-600"
-                )}
-            />
-        </button>
+            {showLabel && (
+                <span className="text-sm font-semibold">
+                    {favorite
+                        ? "Saved"
+                        : "Save"}
+                </span>
+            )}
+        </motion.button>
     );
 }
