@@ -16,6 +16,7 @@ import twoFactorRoutes from "./modules/profile/2fa.routes.js";
 import chatRoutes from "./routes/chat.js";
 import { authenticateSocket } from "./sockets/socketAuth.js";
 import favoriteRoutes from "./modules/favorite/favorite.routes.js";
+import notificationRoutes from "./modules/notification/notification.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 
@@ -53,6 +54,8 @@ app.use("/api/profile/2fa", twoFactorRoutes);
 app.use("/api/chat", chatRoutes);
 
 app.use("/api/favorites", favoriteRoutes);
+
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/", (_, res) => {
     res.send("API is running");

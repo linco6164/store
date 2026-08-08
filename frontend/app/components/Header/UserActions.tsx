@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useFavorites } from "@/app/hooks/useFavorites";
 import { useConversations } from "@/app/hooks/useConversations";
+import { useNotifications } from "@/app/hooks/useNotifications";
 
 import FavoritesButton from "./FavoritesButton";
 import FavoritesDropdown from "./FavoritesDropdown";
@@ -13,6 +14,8 @@ import MessagesButton from "./MessagesButton";
 import MessagesDropdown from "./MessagesDropdown";
 
 import NotificationsButton from "./NotificationsButton";
+import NotificationsDropdown from "./NotificationsDropdown";
+
 import SellButton from "./SellButton";
 import UserMenu from "./UserMenu";
 
@@ -33,6 +36,10 @@ export default function UserActions() {
     const {
         data: conversations = [],
     } = useConversations();
+
+    const {
+        unreadCount: notificationCount,
+    } = useNotifications();
 
     const unreadMessages =
         conversations.reduce(
@@ -56,13 +63,9 @@ export default function UserActions() {
         return (
             <div className="flex items-center gap-3">
                 <Skeleton className="h-11 w-11 rounded-2xl" />
-
                 <Skeleton className="h-11 w-11 rounded-2xl" />
-
                 <Skeleton className="h-11 w-11 rounded-2xl" />
-
                 <Skeleton className="h-11 w-32 rounded-2xl" />
-
                 <Skeleton className="h-11 w-11 rounded-full" />
             </div>
         );
@@ -124,8 +127,16 @@ export default function UserActions() {
 
             {/* Notifications */}
 
-            <NotificationsButton
-                count={0}
+            <NotificationsDropdown
+                trigger={
+                    <NotificationsButton
+                        count={
+                            notificationCount > 0
+                                ? notificationCount
+                                : undefined
+                        }
+                    />
+                }
             />
 
             {/* Sell */}
