@@ -17,9 +17,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Suspense>
-          <NavigationLoading />
-        </Suspense>
         <QueryProvider>
           <GoogleOAuthProvider
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
