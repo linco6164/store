@@ -22,7 +22,7 @@ export default function HeaderIconButton({
     onClick,
 }: HeaderIconButtonProps) {
     return (
-        <Tooltip content={tooltip}>
+        <Tooltip content={tooltip} position="bottom">
             <button
                 onClick={onClick}
                 className={cn(
