@@ -9,7 +9,7 @@ import {
 
 import { notify } from "@/app/lib/notify";
 import Button from "@/app/components/ui/Button";
-import { useFavorite } from "@/app/hooks/useFavorites";
+import  useFavorite  from "@/app/hooks/useFavorite";
 
 interface Props {
     listingId: string;
