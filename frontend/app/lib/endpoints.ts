@@ -27,7 +27,23 @@ export const ENDPOINTS = {
     },
 
     PROFILE: {
-    ME: "/profile",
-    CHANGE_PASSWORD: "/profile/password",
-},
+        ME: "/profile",
+        CHANGE_PASSWORD: "/profile/password",
+    },
+
+    FAVORITES: {
+        GET_ALL: "/favorites",
+
+        CHECK: (listingId: string) =>
+            `/favorites/check/${listingId}`,
+
+        ADD: (listingId: string) =>
+            `/favorites/${listingId}`,
+
+        REMOVE: (listingId: string) =>
+            `/favorites/${listingId}`,
+
+        TOGGLE: (listingId: string) =>
+            `/favorites/${listingId}/toggle`,
+    },
 };
