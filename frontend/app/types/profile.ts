@@ -12,3 +12,24 @@ export interface Profile {
 
     listings: Listing[];
 }
+
+export interface PublicProfile {
+    user: {
+        _id: string;
+        username: string;
+        fullName?: string;
+        avatar?: string;
+        bio?: string;
+        city?: string;
+        country?: string;
+        createdAt?: string;
+    };
+
+    stats: {
+        listings: number;
+        sold: number;
+        favorites: number;
+    };
+
+    listings: Listing[];
+}

@@ -28,6 +28,8 @@ export const ENDPOINTS = {
 
     PROFILE: {
         ME: "/profile",
+        PUBLIC: (userId: string) =>
+            `/profile/${userId}`,
         CHANGE_PASSWORD: "/profile/password",
     },
 

@@ -2,7 +2,10 @@ import { api } from "../lib/api";
 
 import { ENDPOINTS } from "../lib/endpoints";
 
-import { Profile } from "../types/profile";
+import {
+    Profile,
+    PublicProfile,
+} from "../types/profile";
 import { ProfileFormData } from "../(app)/profile/edit/schema";
 
 interface ApiResponse<T> {
@@ -20,6 +23,17 @@ export const profileService = {
         const { data } = await api.get<ApiResponse<Profile>>(
             ENDPOINTS.PROFILE.ME
         );
+
+        return data.data;
+    },
+
+    async getPublicProfile(
+        userId: string
+    ): Promise<PublicProfile> {
+        const { data } =
+            await api.get<ApiResponse<PublicProfile>>(
+                ENDPOINTS.PROFILE.PUBLIC(userId)
+            );
 
         return data.data;
     },
