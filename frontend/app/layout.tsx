@@ -7,6 +7,7 @@ import NavigationLoading from "@/app/components/ui/NavigationLoading";
 import type { Metadata } from "next";
 
 import { Toaster } from "sonner";
+import { Suspense } from "react";
 
 export default function RootLayout({
   children,
@@ -16,7 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <NavigationLoading />
+        <Suspense>
+          <NavigationLoading />
+        </Suspense>
         <QueryProvider>
           <GoogleOAuthProvider
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
