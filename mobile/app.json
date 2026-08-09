@@ -33,10 +33,6 @@
             {
               "scheme": "https",
               "host": "nx-store.com"
-            },
-            {
-              "scheme": "https",
-              "host": "www.nx-store.com"
             }
           ],
           "category": [
