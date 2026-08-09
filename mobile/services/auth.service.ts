@@ -105,6 +105,7 @@ export const authService = {
         return data.user;
     },
 
+
     async me(): Promise<AuthUser | null> {
         const token =
             await getToken();

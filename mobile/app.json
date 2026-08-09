@@ -24,7 +24,27 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.emanuel200.mobile"
+      "package": "com.emanuel200.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "nx-store.com"
+            },
+            {
+              "scheme": "https",
+              "host": "www.nx-store.com"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -44,7 +64,17 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "2067017487543159",
+          "clientToken": "515735f6af59ad6844484547bc80a92a",
+          "displayName": "Nexora Store",
+          "scheme": "fb2067017487543159"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

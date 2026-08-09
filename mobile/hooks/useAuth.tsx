@@ -8,7 +8,10 @@ import {
 
 import axios from "axios";
 
+import { Platform } from "react-native";
+
 import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { router } from "expo-router";
 
@@ -56,6 +59,14 @@ interface AuthContextValue {
         userId?: string;
     }>;
 
+    loginWithGoogle: (
+        idToken: string
+    ) => Promise<void>;
+
+    loginWithFacebook: (
+        accessToken: string
+    ) => Promise<void>;
+
     verifyTwoFactor: (
         data: VerifyTwoFactorData
     ) => Promise<void>;
@@ -87,7 +98,15 @@ export function AuthProvider({
     const [loading, setLoading] =
         useState(true);
 
-    async function getStoredToken() {
+    async function getStoredToken(): Promise<
+        string | null
+    > {
+        if (Platform.OS === "web") {
+            return AsyncStorage.getItem(
+                TOKEN_KEY
+            );
+        }
+
         return SecureStore.getItemAsync(
             TOKEN_KEY
         );
@@ -95,19 +114,35 @@ export function AuthProvider({
 
     async function saveToken(
         token: string
-    ) {
+    ): Promise<void> {
+        if (Platform.OS === "web") {
+            await AsyncStorage.setItem(
+                TOKEN_KEY,
+                token
+            );
+
+            return;
+        }
+
         await SecureStore.setItemAsync(
             TOKEN_KEY,
             token
         );
     }
 
-    async function removeStoredToken() {
+    async function removeStoredToken(): Promise<void> {
+        if (Platform.OS === "web") {
+            await AsyncStorage.removeItem(
+                TOKEN_KEY
+            );
+
+            return;
+        }
+
         await SecureStore.deleteItemAsync(
             TOKEN_KEY
         );
     }
-
     async function fetchCurrentUser(
         token: string
     ) {
@@ -273,6 +308,120 @@ export function AuthProvider({
     }
 
     /*
+     * GOOGLE LOGIN
+     *
+     * POST /auth/google
+     * { credential: idToken }
+     */
+    async function loginWithGoogle(
+        idToken: string
+    ) {
+        if (!API_URL) {
+            throw new Error(
+                "EXPO_PUBLIC_API_URL nu este configurat."
+            );
+        }
+
+        if (!idToken) {
+            throw new Error(
+                "Google nu a returnat ID token."
+            );
+        }
+
+        const response =
+            await axios.post(
+                `${API_URL}/auth/google`,
+                {
+                    credential: idToken,
+                },
+                {
+                    timeout: 30000,
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                }
+            );
+
+        const responseData =
+            response.data;
+
+        const token =
+            responseData?.token ??
+            responseData?.accessToken ??
+            responseData?.data?.token ??
+            responseData?.data?.accessToken;
+
+        if (!token) {
+            console.error(
+                "Google login response:",
+                responseData
+            );
+
+            throw new Error(
+                "Backend-ul nu a returnat tokenul după Google Login."
+            );
+        }
+
+        await saveToken(token);
+
+        const currentUser =
+            await fetchCurrentUser(
+                token
+            );
+
+        setUser(currentUser);
+    }
+
+    async function loginWithFacebook(
+        accessToken: string
+    ): Promise<void> {
+        if (!API_URL) {
+            throw new Error(
+                "EXPO_PUBLIC_API_URL nu este configurat."
+            );
+        }
+
+        if (!accessToken) {
+            throw new Error(
+                "Facebook nu a returnat access token."
+            );
+        }
+
+        const response = await axios.post(
+            `${API_URL}/auth/facebook`,
+            { accessToken },
+            {
+                timeout: 30000,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        const responseData = response.data;
+        const token =
+            responseData?.token ??
+            responseData?.accessToken ??
+            responseData?.data?.token ??
+            responseData?.data?.accessToken;
+
+        if (!token) {
+            console.error(
+                "Facebook login response:",
+                responseData
+            );
+            throw new Error(
+                "Backend-ul nu a returnat tokenul de autentificare Facebook."
+            );
+        }
+
+        await saveToken(token);
+        const currentUser = await fetchCurrentUser(token);
+        setUser(currentUser);
+    }
+
+    /*
      * 2FA LOGIN
      *
      * Backend:
@@ -334,6 +483,7 @@ export function AuthProvider({
 
         setUser(currentUser);
     }
+
 
     async function register(
         data: RegisterData
@@ -428,6 +578,8 @@ export function AuthProvider({
                 user,
                 loading,
                 login,
+                loginWithGoogle,
+                loginWithFacebook,
                 verifyTwoFactor,
                 register,
                 logout,
