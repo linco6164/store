@@ -32,11 +32,13 @@ export default function QueryProvider({
         <>
             <QueryClientProvider client={queryClient}>
                 {children}
+
+                {process.env.NODE_ENV === "development" && (
+                    <ReactQueryDevtools initialIsOpen={false} />
+                )}
             </QueryClientProvider>
 
-            {process.env.NODE_ENV === "development" && (
-                <ReactQueryDevtools initialIsOpen={false} />
-            )}
+
         </>
     );
 }
