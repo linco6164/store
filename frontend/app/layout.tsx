@@ -3,6 +3,7 @@ import "./globals.css";
 
 import { Toaster } from "sonner";
 import QueryProvider from "./providers/QueryProviders";
+import { AuthProvider } from "./providers/AuthProvider";
 
 export const metadata: Metadata = {
     title: "Nexora Store",
@@ -17,9 +18,11 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body>
-                <QueryProvider>
-                    {children}
-                </QueryProvider>
+                <AuthProvider>
+                    <QueryProvider>
+                        {children}
+                    </QueryProvider>
+                </AuthProvider>
 
                 <Toaster
                     position="top-right"
