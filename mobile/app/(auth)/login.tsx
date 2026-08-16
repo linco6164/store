@@ -47,6 +47,7 @@ import {
 } from "@/theme";
 
 if (Platform.OS !== "web") {
+    console.log("WEB_CLIENT_ID:", process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
     GoogleSignin.configure({
         webClientId:
             process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
@@ -104,750 +105,754 @@ export default function LoginScreen() {
             makeRedirectUri({
                 scheme: "mobile",
             }),
-});
+    });
 
-useEffect(() => {
-    if (
-        Platform.OS !== "web" ||
-        googleResponse?.type !== "success"
-    ) {
-        return;
-    }
-
-    const idToken =
-        googleResponse.params?.id_token;
-
-    if (!idToken) {
-        setError(
-            "Google nu a returnat ID token."
-        );
-        return;
-    }
-
-    handleGoogleIdToken(idToken);
-}, [googleResponse]);
-
-async function handleGoogleIdToken(
-    idToken: string
-) {
-    try {
-        setError("");
-        setGoogleLoading(true);
-
-        await loginWithGoogle(idToken);
-
-        router.replace("/(tabs)");
-    } catch (error: any) {
-        console.error(
-            "Google login error:",
-            error
-        );
-
-        const message =
-            error?.response?.data?.message;
-
-        setError(
-            Array.isArray(message)
-                ? message.join(", ")
-                : message ||
-                error?.message ||
-                "Autentificarea cu Google a eșuat."
-        );
-    } finally {
-        setGoogleLoading(false);
-    }
-}
-
-async function handleGoogleLogin() {
-    setError("");
-
-    try {
-        setGoogleLoading(true);
-
-        if (Platform.OS === "web") {
-            if (!googleRequest) {
-                throw new Error(
-                    "Google Login nu este încă pregătit."
-                );
-            }
-
-            await googlePromptAsync();
-            return;
-        }
-
-        await GoogleSignin.hasPlayServices({
-            showPlayServicesUpdateDialog:
-                true,
-        });
-
-        const result =
-            await GoogleSignin.signIn();
-
-        const idToken =
-            result.data?.idToken;
-
-        if (!idToken) {
-            throw new Error(
-                "Google nu a returnat ID token."
-            );
-        }
-
-        await loginWithGoogle(idToken);
-
-        router.replace("/(tabs)");
-    } catch (error: any) {
-        console.error(
-            "Google login error:",
-            error
-        );
-
+    useEffect(() => {
         if (
-            error?.code ===
-            "SIGN_IN_CANCELLED"
+            Platform.OS !== "web" ||
+            googleResponse?.type !== "success"
         ) {
             return;
         }
 
-        const message =
-            error?.response?.data?.message;
+        const idToken =
+            googleResponse.params?.id_token;
 
-        setError(
-            Array.isArray(message)
-                ? message.join(", ")
-                : message ||
-                error?.message ||
-                "Autentificarea cu Google a eșuat."
-        );
-    } finally {
-        setGoogleLoading(false);
-    }
-}
-
-async function handleFacebookLogin() {
-    if (Platform.OS === "web") {
-        setError(
-            "Facebook Login este disponibil momentan în aplicația mobilă."
-        );
-        return;
-    }
-
-    setError("");
-
-    try {
-        setFacebookLoading(true);
-
-        const result =
-            await LoginManager.logInWithPermissions([
-                "public_profile",
-                "email",
-            ]);
-
-        if (result.isCancelled) {
+        if (!idToken) {
+            setError(
+                "Google nu a returnat ID token."
+            );
             return;
         }
 
-        const accessTokenResult =
-            await AccessToken.getCurrentAccessToken();
+        handleGoogleIdToken(idToken);
+    }, [googleResponse]);
 
-        const accessToken =
-            accessTokenResult?.accessToken;
+    async function handleGoogleIdToken(
+        idToken: string
+    ) {
+        try {
+            setError("");
+            setGoogleLoading(true);
 
-        if (!accessToken) {
-            throw new Error(
-                "Facebook nu a returnat access token."
+            await loginWithGoogle(idToken);
+
+            router.replace("/(tabs)");
+        } catch (error: any) {
+            console.error(
+                "Google login error:",
+                error
             );
+
+            const message =
+                error?.response?.data?.message;
+
+            setError(
+                Array.isArray(message)
+                    ? message.join(", ")
+                    : message ||
+                    error?.message ||
+                    "Autentificarea cu Google a eșuat."
+            );
+        } finally {
+            setGoogleLoading(false);
         }
-
-        await loginWithFacebook(accessToken);
-
-        router.replace("/(tabs)");
-    } catch (error: any) {
-        console.error(
-            "Facebook login error:",
-            error
-        );
-
-        const message =
-            error?.response?.data?.message;
-
-        setError(
-            Array.isArray(message)
-                ? message.join(", ")
-                : message ||
-                error?.message ||
-                "Autentificarea cu Facebook a eșuat."
-        );
-    } finally {
-        setFacebookLoading(false);
-    }
-}
-
-async function handleLogin() {
-    setError("");
-
-    const normalizedEmail =
-        email
-            .trim()
-            .toLowerCase();
-
-    if (!normalizedEmail) {
-        setError(
-            "Introdu adresa de email."
-        );
-        return;
     }
 
-    if (!password) {
-        setError(
-            "Introdu parola."
-        );
-        return;
-    }
+    async function handleGoogleLogin() {
+        setError("");
 
-    try {
-        setLoading(true);
+        try {
+            setGoogleLoading(true);
 
-        const result = await login({
-            email: normalizedEmail,
-            password,
-        });
+            if (Platform.OS === "web") {
+                if (!googleRequest) {
+                    throw new Error(
+                        "Google Login nu este încă pregătit."
+                    );
+                }
 
-        if (result.requiresTwoFactor) {
-            router.push({
-                pathname:
-                    "/(auth)/two-factor",
-                params: {
-                    userId:
-                        result.userId!,
-                    email: normalizedEmail,
-                },
+                await googlePromptAsync();
+                return;
+            }
+
+            await GoogleSignin.hasPlayServices({
+                showPlayServicesUpdateDialog:
+                    true,
             });
 
+            const result =
+                await GoogleSignin.signIn();
+            console.log("========== GOOGLE RESULT ==========");
+            console.log(JSON.stringify(result, null, 2));
+            console.log("ID TOKEN:", result.data?.idToken);
+            console.log("===================================");
+
+            const idToken =
+                result.data?.idToken;
+
+            if (!idToken) {
+                throw new Error(
+                    "Google nu a returnat ID token."
+                );
+            }
+
+            await loginWithGoogle(idToken);
+
+            router.replace("/(tabs)");
+        } catch (error: any) {
+            console.error(
+                "Google login error:",
+                error
+            );
+
+            if (
+                error?.code ===
+                "SIGN_IN_CANCELLED"
+            ) {
+                return;
+            }
+
+            const message =
+                error?.response?.data?.message;
+
+            setError(
+                Array.isArray(message)
+                    ? message.join(", ")
+                    : message ||
+                    error?.message ||
+                    "Autentificarea cu Google a eșuat."
+            );
+        } finally {
+            setGoogleLoading(false);
+        }
+    }
+
+    async function handleFacebookLogin() {
+        if (Platform.OS === "web") {
+            setError(
+                "Facebook Login este disponibil momentan în aplicația mobilă."
+            );
             return;
         }
 
-        router.replace(
-            "/(tabs)"
-        );
-    } catch (error: any) {
-        console.error(
-            "Login error:",
-            error
-        );
+        setError("");
 
-        const message =
-            error?.response
-                ?.data?.message;
+        try {
+            setFacebookLoading(true);
 
-        setError(
-            Array.isArray(message)
-                ? message.join(
-                    ", "
-                )
-                : message ||
-                "Emailul sau parola sunt incorecte."
-        );
-    } finally {
-        setLoading(false);
-    }
-}
+            const result =
+                await LoginManager.logInWithPermissions([
+                    "public_profile",
+                    "email",
+                ]);
 
-const styles =
-    createStyles(theme);
-
-return (
-    <KeyboardAvoidingView
-        style={
-            styles.container
-        }
-        behavior={
-            Platform.OS === "ios"
-                ? "padding"
-                : undefined
-        }
-    >
-        <ScrollView
-            contentContainerStyle={
-                styles.content
+            if (result.isCancelled) {
+                return;
             }
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={
-                false
+
+            const accessTokenResult =
+                await AccessToken.getCurrentAccessToken();
+
+            const accessToken =
+                accessTokenResult?.accessToken;
+
+            if (!accessToken) {
+                throw new Error(
+                    "Facebook nu a returnat access token."
+                );
+            }
+
+            await loginWithFacebook(accessToken);
+
+            router.replace("/(tabs)");
+        } catch (error: any) {
+            console.error(
+                "Facebook login error:",
+                error
+            );
+
+            const message =
+                error?.response?.data?.message;
+
+            setError(
+                Array.isArray(message)
+                    ? message.join(", ")
+                    : message ||
+                    error?.message ||
+                    "Autentificarea cu Facebook a eșuat."
+            );
+        } finally {
+            setFacebookLoading(false);
+        }
+    }
+
+    async function handleLogin() {
+        setError("");
+
+        const normalizedEmail =
+            email
+                .trim()
+                .toLowerCase();
+
+        if (!normalizedEmail) {
+            setError(
+                "Introdu adresa de email."
+            );
+            return;
+        }
+
+        if (!password) {
+            setError(
+                "Introdu parola."
+            );
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const result = await login({
+                email: normalizedEmail,
+                password,
+            });
+
+            if (result.requiresTwoFactor) {
+                router.push({
+                    pathname:
+                        "/(auth)/two-factor",
+                    params: {
+                        userId:
+                            result.userId!,
+                        email: normalizedEmail,
+                    },
+                });
+
+                return;
+            }
+
+            router.replace(
+                "/(tabs)"
+            );
+        } catch (error: any) {
+            console.error(
+                "Login error:",
+                error
+            );
+
+            const message =
+                error?.response
+                    ?.data?.message;
+
+            setError(
+                Array.isArray(message)
+                    ? message.join(
+                        ", "
+                    )
+                    : message ||
+                    "Emailul sau parola sunt incorecte."
+            );
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const styles =
+        createStyles(theme);
+
+    return (
+        <KeyboardAvoidingView
+            style={
+                styles.container
+            }
+            behavior={
+                Platform.OS === "ios"
+                    ? "padding"
+                    : undefined
             }
         >
-            {/* Brand */}
-
-            <View
-                style={
-                    styles.brand
+            <ScrollView
+                contentContainerStyle={
+                    styles.content
+                }
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={
+                    false
                 }
             >
+                {/* Brand */}
+
                 <View
                     style={
-                        styles.logo
+                        styles.brand
                     }
                 >
-                    <Text
-                        style={
-                            styles.logoText
-                        }
-                    >
-                        N
-                    </Text>
-                </View>
-
-                <Text
-                    style={
-                        styles.brandName
-                    }
-                >
-                    Nexora
-                </Text>
-
-                <Text
-                    style={
-                        styles.subtitle
-                    }
-                >
-                    Cumpără. Vinde.
-                    Descoperă.
-                </Text>
-            </View>
-
-            {/* Card */}
-
-            <View
-                style={
-                    styles.card
-                }
-            >
-                <Text
-                    style={
-                        styles.title
-                    }
-                >
-                    Bine ai revenit
-                </Text>
-
-                <Text
-                    style={
-                        styles.description
-                    }
-                >
-                    Conectează-te la
-                    contul tău Nexora.
-                </Text>
-
-                {/* Error */}
-
-                {error ? (
                     <View
                         style={
-                            styles.errorBox
+                            styles.logo
                         }
                     >
-                        <Ionicons
-                            name="alert-circle-outline"
-                            size={19}
-                            color={
-                                theme
-                                    .colors
-                                    .danger
-                            }
-                        />
-
                         <Text
                             style={
-                                styles.errorText
+                                styles.logoText
                             }
                         >
-                            {error}
+                            N
                         </Text>
                     </View>
-                ) : null}
 
-                {/* Email */}
-
-                <View
-                    style={
-                        styles.field
-                    }
-                >
                     <Text
                         style={
-                            styles.label
+                            styles.brandName
                         }
                     >
-                        Email
+                        Nexora
                     </Text>
 
-                    <View
-                        style={[
-                            styles.inputWrapper,
-                            email.length >
-                            0 &&
-                            styles.inputWrapperFocused,
-                        ]}
+                    <Text
+                        style={
+                            styles.subtitle
+                        }
                     >
-                        <Ionicons
-                            name="mail-outline"
-                            size={20}
-                            color={
-                                theme
-                                    .colors
-                                    .textMuted
-                            }
-                        />
-
-                        <TextInput
-                            value={
-                                email
-                            }
-                            onChangeText={
-                                setEmail
-                            }
-                            placeholder="email@exemplu.ro"
-                            placeholderTextColor={
-                                theme
-                                    .colors
-                                    .textMuted
-                            }
-                            autoCapitalize="none"
-                            autoCorrect={
-                                false
-                            }
-                            keyboardType="email-address"
-                            textContentType="emailAddress"
-                            selectionColor={
-                                theme
-                                    .colors
-                                    .primary
-                            }
-                            style={
-                                styles.input
-                            }
-                        />
-                    </View>
+                        Cumpără. Vinde.
+                        Descoperă.
+                    </Text>
                 </View>
 
-                {/* Password */}
+                {/* Card */}
 
                 <View
                     style={
-                        styles.field
+                        styles.card
                     }
                 >
                     <Text
                         style={
-                            styles.label
+                            styles.title
                         }
                     >
-                        Parolă
+                        Bine ai revenit
                     </Text>
 
-                    <View
-                        style={[
-                            styles.inputWrapper,
-                            password.length >
-                            0 &&
-                            styles.inputWrapperFocused,
-                        ]}
+                    <Text
+                        style={
+                            styles.description
+                        }
                     >
-                        <Ionicons
-                            name="lock-closed-outline"
-                            size={20}
-                            color={
-                                theme
-                                    .colors
-                                    .textMuted
-                            }
-                        />
+                        Conectează-te la
+                        contul tău Nexora.
+                    </Text>
 
-                        <TextInput
-                            value={
-                                password
-                            }
-                            onChangeText={
-                                setPassword
-                            }
-                            placeholder="Introdu parola"
-                            placeholderTextColor={
-                                theme
-                                    .colors
-                                    .textMuted
-                            }
-                            secureTextEntry={
-                                !showPassword
-                            }
-                            autoCapitalize="none"
-                            autoCorrect={
-                                false
-                            }
-                            textContentType="password"
-                            selectionColor={
-                                theme
-                                    .colors
-                                    .primary
-                            }
+                    {/* Error */}
+
+                    {error ? (
+                        <View
                             style={
-                                styles.input
+                                styles.errorBox
                             }
-                        />
-
-                        <Pressable
-                            onPress={() =>
-                                setShowPassword(
-                                    (
-                                        value
-                                    ) =>
-                                        !value
-                                )
-                            }
-                            hitSlop={10}
                         >
                             <Ionicons
-                                name={
-                                    showPassword
-                                        ? "eye-off-outline"
-                                        : "eye-outline"
-                                }
-                                size={21}
+                                name="alert-circle-outline"
+                                size={19}
                                 color={
                                     theme
                                         .colors
-                                        .textSecondary
+                                        .danger
                                 }
                             />
-                        </Pressable>
-                    </View>
-                </View>
 
-                {/* Forgot password */}
+                            <Text
+                                style={
+                                    styles.errorText
+                                }
+                            >
+                                {error}
+                            </Text>
+                        </View>
+                    ) : null}
 
-                <Pressable
-                    onPress={() => {
-                        // TODO:
-                        // Forgot Password
-                    }}
-                    style={
-                        styles.forgotButton
-                    }
-                >
-                    <Text
+                    {/* Email */}
+
+                    <View
                         style={
-                            styles.forgotText
+                            styles.field
                         }
                     >
-                        Ai uitat
-                        parola?
-                    </Text>
-                </Pressable>
-
-                {/* Login */}
-
-                <Pressable
-                    onPress={
-                        handleLogin
-                    }
-                    disabled={
-                        loading
-                    }
-                    style={({
-                        pressed,
-                    }) => [
-                            styles.loginButton,
-
-                            pressed &&
-                            !loading &&
-                            styles.buttonPressed,
-
-                            loading &&
-                            styles.buttonDisabled,
-                        ]}
-                >
-                    {loading ? (
-                        <ActivityIndicator
-                            size="small"
-                            color={
-                                theme
-                                    .colors
-                                    .primaryText
-                            }
-                        />
-                    ) : (
                         <Text
                             style={
-                                styles.loginButtonText
+                                styles.label
                             }
                         >
-                            Conectare
+                            Email
                         </Text>
-                    )}
-                </Pressable>
 
-                {/* Google Login */}
+                        <View
+                            style={[
+                                styles.inputWrapper,
+                                email.length >
+                                0 &&
+                                styles.inputWrapperFocused,
+                            ]}
+                        >
+                            <Ionicons
+                                name="mail-outline"
+                                size={20}
+                                color={
+                                    theme
+                                        .colors
+                                        .textMuted
+                                }
+                            />
 
-                <View
-                    style={
-                        styles.orRow
-                    }
-                >
+                            <TextInput
+                                value={
+                                    email
+                                }
+                                onChangeText={
+                                    setEmail
+                                }
+                                placeholder="email@exemplu.ro"
+                                placeholderTextColor={
+                                    theme
+                                        .colors
+                                        .textMuted
+                                }
+                                autoCapitalize="none"
+                                autoCorrect={
+                                    false
+                                }
+                                keyboardType="email-address"
+                                textContentType="emailAddress"
+                                selectionColor={
+                                    theme
+                                        .colors
+                                        .primary
+                                }
+                                style={
+                                    styles.input
+                                }
+                            />
+                        </View>
+                    </View>
+
+                    {/* Password */}
+
                     <View
                         style={
-                            styles.orLine
-                        }
-                    />
-                    <Text
-                        style={
-                            styles.orText
+                            styles.field
                         }
                     >
-                        sau
-                    </Text>
+                        <Text
+                            style={
+                                styles.label
+                            }
+                        >
+                            Parolă
+                        </Text>
+
+                        <View
+                            style={[
+                                styles.inputWrapper,
+                                password.length >
+                                0 &&
+                                styles.inputWrapperFocused,
+                            ]}
+                        >
+                            <Ionicons
+                                name="lock-closed-outline"
+                                size={20}
+                                color={
+                                    theme
+                                        .colors
+                                        .textMuted
+                                }
+                            />
+
+                            <TextInput
+                                value={
+                                    password
+                                }
+                                onChangeText={
+                                    setPassword
+                                }
+                                placeholder="Introdu parola"
+                                placeholderTextColor={
+                                    theme
+                                        .colors
+                                        .textMuted
+                                }
+                                secureTextEntry={
+                                    !showPassword
+                                }
+                                autoCapitalize="none"
+                                autoCorrect={
+                                    false
+                                }
+                                textContentType="password"
+                                selectionColor={
+                                    theme
+                                        .colors
+                                        .primary
+                                }
+                                style={
+                                    styles.input
+                                }
+                            />
+
+                            <Pressable
+                                onPress={() =>
+                                    setShowPassword(
+                                        (
+                                            value
+                                        ) =>
+                                            !value
+                                    )
+                                }
+                                hitSlop={10}
+                            >
+                                <Ionicons
+                                    name={
+                                        showPassword
+                                            ? "eye-off-outline"
+                                            : "eye-outline"
+                                    }
+                                    size={21}
+                                    color={
+                                        theme
+                                            .colors
+                                            .textSecondary
+                                    }
+                                />
+                            </Pressable>
+                        </View>
+                    </View>
+
+                    {/* Forgot password */}
+
+                    <Pressable
+                        onPress={() => {
+                            // TODO:
+                            // Forgot Password
+                        }}
+                        style={
+                            styles.forgotButton
+                        }
+                    >
+                        <Text
+                            style={
+                                styles.forgotText
+                            }
+                        >
+                            Ai uitat
+                            parola?
+                        </Text>
+                    </Pressable>
+
+                    {/* Login */}
+
+                    <Pressable
+                        onPress={
+                            handleLogin
+                        }
+                        disabled={
+                            loading
+                        }
+                        style={({
+                            pressed,
+                        }) => [
+                                styles.loginButton,
+
+                                pressed &&
+                                !loading &&
+                                styles.buttonPressed,
+
+                                loading &&
+                                styles.buttonDisabled,
+                            ]}
+                    >
+                        {loading ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={
+                                    theme
+                                        .colors
+                                        .primaryText
+                                }
+                            />
+                        ) : (
+                            <Text
+                                style={
+                                    styles.loginButtonText
+                                }
+                            >
+                                Conectare
+                            </Text>
+                        )}
+                    </Pressable>
+
+                    {/* Google Login */}
+
                     <View
                         style={
-                            styles.orLine
+                            styles.orRow
                         }
-                    />
-                </View>
-
-                <Pressable
-                    onPress={
-                        handleGoogleLogin
-                    }
-                    disabled={
-                        loading ||
-                        googleLoading ||
-                        (Platform.OS === "web" &&
-                            !googleRequest)
-                    }
-                    style={({
-                        pressed,
-                    }) => [
-                            styles.googleButton,
-                            pressed &&
-                            !googleLoading &&
-                            styles.buttonPressed,
-                            (loading ||
-                                googleLoading) &&
-                            styles.buttonDisabled,
-                        ]}
-                >
-                    {googleLoading ? (
-                        <ActivityIndicator
-                            size="small"
-                            color={
-                                theme.colors.text
+                    >
+                        <View
+                            style={
+                                styles.orLine
                             }
                         />
-                    ) : (
-                        <>
-                            <Ionicons
-                                name="logo-google"
-                                size={20}
+                        <Text
+                            style={
+                                styles.orText
+                            }
+                        >
+                            sau
+                        </Text>
+                        <View
+                            style={
+                                styles.orLine
+                            }
+                        />
+                    </View>
+
+                    <Pressable
+                        onPress={
+                            handleGoogleLogin
+                        }
+                        disabled={
+                            loading ||
+                            googleLoading ||
+                            (Platform.OS === "web" &&
+                                !googleRequest)
+                        }
+                        style={({
+                            pressed,
+                        }) => [
+                                styles.googleButton,
+                                pressed &&
+                                !googleLoading &&
+                                styles.buttonPressed,
+                                (loading ||
+                                    googleLoading) &&
+                                styles.buttonDisabled,
+                            ]}
+                    >
+                        {googleLoading ? (
+                            <ActivityIndicator
+                                size="small"
                                 color={
                                     theme.colors.text
                                 }
                             />
-                            <Text
-                                style={
-                                    styles.googleButtonText
-                                }
-                            >
-                                Continuă cu Google
-                            </Text>
-                        </>
-                    )}
-                </Pressable>
+                        ) : (
+                            <>
+                                <Ionicons
+                                    name="logo-google"
+                                    size={20}
+                                    color={
+                                        theme.colors.text
+                                    }
+                                />
+                                <Text
+                                    style={
+                                        styles.googleButtonText
+                                    }
+                                >
+                                    Continuă cu Google
+                                </Text>
+                            </>
+                        )}
+                    </Pressable>
 
-                {/* Facebook Login */}
+                    {/* Facebook Login */}
 
-                <Pressable
-                    onPress={handleFacebookLogin}
-                    disabled={
-                        loading ||
-                        googleLoading ||
-                        facebookLoading
-                    }
-                    style={({ pressed }) => [
-                        styles.facebookButton,
-                        pressed &&
-                        !facebookLoading &&
-                        styles.buttonPressed,
-                        (loading ||
+                    <Pressable
+                        onPress={handleFacebookLogin}
+                        disabled={
+                            loading ||
                             googleLoading ||
-                            facebookLoading) &&
-                        styles.buttonDisabled,
-                    ]}
-                >
-                    {facebookLoading ? (
-                        <ActivityIndicator
-                            size="small"
-                            color={
-                                theme.colors.primaryText
-                            }
-                        />
-                    ) : (
-                        <>
-                            <Ionicons
-                                name="logo-facebook"
-                                size={20}
+                            facebookLoading
+                        }
+                        style={({ pressed }) => [
+                            styles.facebookButton,
+                            pressed &&
+                            !facebookLoading &&
+                            styles.buttonPressed,
+                            (loading ||
+                                googleLoading ||
+                                facebookLoading) &&
+                            styles.buttonDisabled,
+                        ]}
+                    >
+                        {facebookLoading ? (
+                            <ActivityIndicator
+                                size="small"
                                 color={
                                     theme.colors.primaryText
                                 }
                             />
-                            <Text
-                                style={
-                                    styles.facebookButtonText
-                                }
-                            >
-                                Continuă cu Facebook
-                            </Text>
-                        </>
-                    )}
-                </Pressable>
+                        ) : (
+                            <>
+                                <Ionicons
+                                    name="logo-facebook"
+                                    size={20}
+                                    color={
+                                        theme.colors.primaryText
+                                    }
+                                />
+                                <Text
+                                    style={
+                                        styles.facebookButtonText
+                                    }
+                                >
+                                    Continuă cu Facebook
+                                </Text>
+                            </>
+                        )}
+                    </Pressable>
 
-                {/* Register */}
+                    {/* Register */}
 
-                <View
+                    <View
+                        style={
+                            styles.registerRow
+                        }
+                    >
+                        <Text
+                            style={
+                                styles.registerText
+                            }
+                        >
+                            Nu ai încă un
+                            cont?
+                        </Text>
+
+                        <Link
+                            href="/(auth)/register"
+                            style={
+                                styles.registerLink
+                            }
+                        >
+                            Creează cont
+                        </Link>
+                    </View>
+                </View>
+
+                <Text
                     style={
-                        styles.registerRow
+                        styles.footer
                     }
                 >
-                    <Text
-                        style={
-                            styles.registerText
-                        }
-                    >
-                        Nu ai încă un
-                        cont?
-                    </Text>
-
-                    <Link
-                        href="/(auth)/register"
-                        style={
-                            styles.registerLink
-                        }
-                    >
-                        Creează cont
-                    </Link>
-                </View>
-            </View>
-
-            <Text
-                style={
-                    styles.footer
-                }
-            >
-                Continuând, ești de
-                acord cu termenii și
-                politica de
-                confidențialitate
-                Nexora.
-            </Text>
-        </ScrollView>
-    </KeyboardAvoidingView>
-);
+                    Continuând, ești de
+                    acord cu termenii și
+                    politica de
+                    confidențialitate
+                    Nexora.
+                </Text>
+            </ScrollView>
+        </KeyboardAvoidingView>
+    );
 }
 
 function createStyles(
