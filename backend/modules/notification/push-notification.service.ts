@@ -1,4 +1,4 @@
-import { PushTokenModel } from "./push-token.model";
+import { PushTokenModel } from "./push-token.model.js";
 
 interface ExpoPushMessage {
     to: string;
