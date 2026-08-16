@@ -176,6 +176,94 @@ class PushNotificationService {
     async clearBadge(): Promise<void> {
         await this.setBadgeCount(0);
     }
+
+    async registerTokenWithBackend(
+        token: string,
+        deviceType: "android" | "ios"
+    ): Promise<void> {
+        const API_URL =
+            process.env.EXPO_PUBLIC_API_URL;
+
+        if (!API_URL) {
+            throw new Error(
+                "EXPO_PUBLIC_API_URL nu este configurat."
+            );
+        }
+
+        const SecureStore =
+            await import("expo-secure-store");
+
+        const accessToken =
+            await SecureStore.getItemAsync(
+                "nexora_access_token"
+            );
+
+        if (!accessToken) {
+            console.warn(
+                "Nu există token de autentificare. Push token-ul nu poate fi înregistrat."
+            );
+            return;
+        }
+
+        const response =
+            await fetch(
+                `${API_URL}/notifications/push-token`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                    body: JSON.stringify({
+                        token,
+                        platform:
+                            deviceType,
+                    }),
+                }
+            );
+
+        if (!response.ok) {
+            const message =
+                await response.text();
+
+            throw new Error(
+                `Failed to register push token: ${response.status} ${message}`
+            );
+        }
+    }
+
+    async initialize(): Promise<
+        ExpoPushTokenResult | null
+    > {
+        try {
+            const device =
+                await this.registerDevice();
+
+            if (!device) {
+                return null;
+            }
+
+            await this.registerTokenWithBackend(
+                device.token,
+                device.deviceType
+            );
+
+            console.log(
+                "Nexora Push Token registered:",
+                device.token
+            );
+
+            return device;
+        } catch (error) {
+            console.error(
+                "Failed to initialize push notifications:",
+                error
+            );
+
+            return null;
+        }
+    }
 }
 
 export const pushNotificationService =

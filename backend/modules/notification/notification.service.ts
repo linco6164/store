@@ -11,6 +11,10 @@ import {
     PushPlatform,
 } from "./push-token.model.js";
 
+import {
+    pushNotificationService,
+} from "./push-notification.service.js";
+
 interface CreateNotificationData {
     user: string;
 
@@ -33,27 +37,78 @@ class NotificationService {
     async create(
         data: CreateNotificationData
     ) {
-        return NotificationModel.create({
-            ...data,
-            user: new mongoose.Types.ObjectId(
-                data.user
-            ),
-            actor: data.actor
-                ? new mongoose.Types.ObjectId(
-                    data.actor
-                )
-                : undefined,
-            listing: data.listing
-                ? new mongoose.Types.ObjectId(
-                    data.listing
-                )
-                : undefined,
-            conversation: data.conversation
-                ? new mongoose.Types.ObjectId(
-                    data.conversation
-                )
-                : undefined,
-        });
+        const notification =
+            await NotificationModel.create({
+                ...data,
+                user: new mongoose.Types.ObjectId(
+                    data.user
+                ),
+                actor: data.actor
+                    ? new mongoose.Types.ObjectId(
+                        data.actor
+                    )
+                    : undefined,
+                listing: data.listing
+                    ? new mongoose.Types.ObjectId(
+                        data.listing
+                    )
+                    : undefined,
+                conversation: data.conversation
+                    ? new mongoose.Types.ObjectId(
+                        data.conversation
+                    )
+                    : undefined,
+            });
+
+        try {
+            const unreadCount =
+                await NotificationModel.countDocuments({
+                    user: data.user,
+                    read: false,
+                });
+
+            await pushNotificationService.sendToUser(
+                data.user,
+                {
+                    title: data.title,
+                    body: data.message,
+
+                    badge: unreadCount,
+
+                    data: {
+                        notificationId:
+                            notification._id.toString(),
+
+                        type: data.type,
+
+                        ...(data.listing
+                            ? {
+                                listingId:
+                                    data.listing,
+                            }
+                            : {}),
+
+                        ...(data.conversation
+                            ? {
+                                conversationId:
+                                    data.conversation,
+                            }
+                            : {}),
+                    },
+                }
+            );
+        } catch (error) {
+            /*
+             * Push-ul nu trebuie să facă
+             * eșueze crearea notificării.
+             */
+            console.error(
+                "Failed to send push notification:",
+                error
+            );
+        }
+
+        return notification;
     }
 
     async getAll(userId: string) {

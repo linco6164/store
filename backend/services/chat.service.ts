@@ -3,6 +3,9 @@ import { Types } from "mongoose";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { ListingModel } from "../modules/listing/listing.model.js";
+import {
+    notificationService,
+} from "../modules/notification/notification.service.js";
 
 class ChatService {
     async startConversation(
@@ -155,18 +158,28 @@ class ChatService {
         images: string[] = [],
         replyTo?: string
     ) {
-        const conversation = await Conversation.findById(conversationId);
+        const conversation =
+            await Conversation.findById(
+                conversationId
+            );
 
         if (!conversation) {
-            throw new Error("Conversation not found");
+            throw new Error(
+                "Conversation not found"
+            );
         }
 
-        const isParticipant = conversation.participants.some(
-            (participant) => participant.toString() === senderId
-        );
+        const isParticipant =
+            conversation.participants.some(
+                (participant) =>
+                    participant.toString() ===
+                    senderId
+            );
 
         if (!isParticipant) {
-            throw new Error("Access denied");
+            throw new Error(
+                "Access denied"
+            );
         }
 
         const message =
@@ -185,6 +198,8 @@ class ChatService {
             conversation.unread ||
             new Map();
 
+        const recipients: string[] = [];
+
         conversation.participants.forEach(
             (participant: any) => {
                 const id =
@@ -193,26 +208,72 @@ class ChatService {
                 if (id !== senderId) {
                     unread.set(
                         id,
-                        (unread.get(id) ||
-                            0) + 1
+                        (unread.get(id) || 0) +
+                        1
                     );
+
+                    recipients.push(id);
                 }
             }
         );
 
-        conversation.lastMessage = text;
+        conversation.lastMessage =
+            text;
+
         conversation.lastMessageAt =
             new Date();
-        conversation.unread = unread;
+
+        conversation.unread =
+            unread;
 
         await conversation.save();
 
+        /*
+         * Trimitem notificarea după ce
+         * mesajul și conversația au fost
+         * salvate cu succes.
+         *
+         * Dacă notificarea eșuează,
+         * mesajul rămâne valid.
+         */
+        for (const recipientId of recipients) {
+            try {
+                await notificationService.create(
+                    {
+                        user: recipientId,
+                        type: "message",
+                        title: "Mesaj nou",
+                        message:
+                            text?.trim() ||
+                            "Ai primit un mesaj nou.",
+                        actor: senderId,
+                        conversation:
+                            conversationId,
+                        listing:
+                            conversation.listing
+                                ? conversation.listing.toString()
+                                : undefined,
+                    }
+                );
+            } catch (notificationError) {
+                console.error(
+                    "Failed to create message notification:",
+                    notificationError
+                );
+            }
+        }
+
         return Message.findById(
             message._id
-        ).populate(
-            "sender",
-            "_id username avatar"
-        ).populate("replyTo", "text images sender");
+        )
+            .populate(
+                "sender",
+                "_id username avatar"
+            )
+            .populate(
+                "replyTo",
+                "text images sender"
+            );
     }
 
     async markAsDelivered(

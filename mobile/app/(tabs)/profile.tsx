@@ -392,7 +392,7 @@ export default function ProfileScreen() {
                         icon="heart-outline"
                         title="Favorites"
                         subtitle="Produsele salvate"
-                        onPress={() => {}}
+                        onPress={() => router.push("/favorites")}
                         theme={theme}
                     />
 
