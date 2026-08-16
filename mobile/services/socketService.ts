@@ -1,15 +1,21 @@
 import { io, Socket } from "socket.io-client";
 import * as SecureStore from "expo-secure-store";
 
-const API_URL =
-    process.env.EXPO_PUBLIC_API_URL;
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+const TOKEN_KEY = "nexora_access_token";
 
 class SocketService {
     private socket: Socket | null = null;
+    private connecting: Promise<Socket> | null = null;
 
-    async connect() {
+    async connect(): Promise<Socket> {
         if (this.socket?.connected) {
             return this.socket;
+        }
+
+        if (this.connecting) {
+            return this.connecting;
         }
 
         if (!API_URL) {
@@ -20,7 +26,7 @@ class SocketService {
 
         const token =
             await SecureStore.getItemAsync(
-                "nexora_access_token"
+                TOKEN_KEY
             );
 
         if (!token) {
@@ -29,69 +35,102 @@ class SocketService {
             );
         }
 
-        this.socket = io(API_URL, {
-            transports: ["websocket"],
-            auth: {
-                token,
-            },
-            autoConnect: true,
-        });
-
-        return new Promise<Socket>(
+        this.connecting = new Promise<Socket>(
             (resolve, reject) => {
-                if (!this.socket) {
-                    reject(
-                        new Error(
-                            "Socket nu a putut fi creat."
-                        )
+                const socket = io(API_URL, {
+                    transports: ["websocket"],
+                    auth: {
+                        token,
+                    },
+                    autoConnect: false,
+                });
+
+                this.socket = socket;
+
+                const cleanup = () => {
+                    socket.off("connect", handleConnect);
+                    socket.off(
+                        "connect_error",
+                        handleConnectError
                     );
-                    return;
-                }
+                };
 
-                this.socket.once(
+                const handleConnect = () => {
+                    cleanup();
+
+                    console.log(
+                        "Socket connected:",
+                        socket.id
+                    );
+
+                    resolve(socket);
+                };
+
+                const handleConnectError = (
+                    error: Error
+                ) => {
+                    cleanup();
+
+                    console.error(
+                        "Socket connection error:",
+                        error
+                    );
+
+                    socket.disconnect();
+
+                    if (this.socket === socket) {
+                        this.socket = null;
+                    }
+
+                    reject(error);
+                };
+
+                socket.once(
                     "connect",
-                    () => {
-                        console.log(
-                            "Socket connected:",
-                            this.socket?.id
-                        );
-
-                        resolve(
-                            this.socket!
-                        );
-                    }
+                    handleConnect
                 );
 
-                this.socket.once(
+                socket.once(
                     "connect_error",
-                    (error) => {
-                        console.error(
-                            "Socket connection error:",
-                            error
-                        );
-
-                        reject(error);
-                    }
+                    handleConnectError
                 );
+
+                socket.connect();
             }
         );
+
+        try {
+            return await this.connecting;
+        } finally {
+            this.connecting = null;
+        }
     }
 
-    getSocket() {
+    getSocket(): Socket | null {
         return this.socket;
     }
 
-    async disconnect() {
-        if (this.socket) {
-            this.socket.disconnect();
-            this.socket = null;
+    isConnected(): boolean {
+        return this.socket?.connected ?? false;
+    }
+
+    async disconnect(): Promise<void> {
+        if (!this.socket) {
+            return;
         }
+
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+        this.socket = null;
+        this.connecting = null;
+
+        console.log("Socket disconnected");
     }
 
     async emit(
         event: string,
         ...args: unknown[]
-    ) {
+    ): Promise<void> {
         const socket =
             await this.connect();
 
@@ -104,7 +143,7 @@ class SocketService {
     async on(
         event: string,
         callback: (...args: any[]) => void
-    ) {
+    ): Promise<() => void> {
         const socket =
             await this.connect();
 
@@ -124,7 +163,7 @@ class SocketService {
     off(
         event: string,
         callback?: (...args: any[]) => void
-    ) {
+    ): void {
         this.socket?.off(
             event,
             callback

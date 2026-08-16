@@ -1,23 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
 
 import {
     Text,
     View,
-    type ColorValue,
 } from "react-native";
 
 import { useTheme } from "@/theme";
+
 import {
     useNotifications,
 } from "@/context/NotificationContext";
 
-
 export default function TabLayout() {
-    const { theme } = useTheme();
-    const { unreadCount } =
-        useNotifications();
+    const { theme } =
+        useTheme();
+
+    const {
+        unreadCount,
+    } = useNotifications();
 
     return (
         <Tabs
@@ -131,7 +132,10 @@ export default function TabLayout() {
                     }) => (
                         <NotificationBadge
                             color={color}
-                            count={unreadCount}
+                            count={
+                                unreadCount
+                            }
+                            badgeColor="#ef4444"
                         />
                     ),
                 }}
@@ -143,17 +147,21 @@ export default function TabLayout() {
 function NotificationBadge({
     color,
     count,
+    badgeColor,
 }: {
-    color: ColorValue;
+    color: string | import("react-native").ColorValue;
     count: number;
+    badgeColor: string;
 }) {
     return (
         <View
             style={{
                 width: 30,
                 height: 28,
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems:
+                    "center",
+                justifyContent:
+                    "center",
             }}
         >
             <Ionicons
@@ -165,24 +173,35 @@ function NotificationBadge({
             {count > 0 ? (
                 <View
                     style={{
-                        position: "absolute",
+                        position:
+                            "absolute",
                         top: -3,
                         right: -4,
+
                         minWidth: 16,
                         height: 16,
-                        paddingHorizontal: 4,
+
+                        paddingHorizontal:
+                            4,
+
                         borderRadius: 8,
+
                         backgroundColor:
-                            "#ef4444",
-                        alignItems: "center",
-                        justifyContent: "center",
+                            badgeColor,
+
+                        alignItems:
+                            "center",
+                        justifyContent:
+                            "center",
                     }}
                 >
                     <Text
                         style={{
-                            color: "#ffffff",
+                            color:
+                                "#ffffff",
                             fontSize: 9,
-                            fontWeight: "800",
+                            fontWeight:
+                                "800",
                         }}
                     >
                         {count > 99

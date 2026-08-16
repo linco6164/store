@@ -32,8 +32,7 @@ import {
 } from "@/theme";
 
 import {
-    notificationService,
-    NotificationItem,
+    type NotificationItem,
 } from "@/services/notificationService";
 
 import {
@@ -44,11 +43,18 @@ export default function NotificationsScreen() {
     const { theme } =
         useTheme();
 
-    const [notifications, setNotifications] =
-        useState<NotificationItem[]>([]);
+    const styles =
+        createStyles(theme);
 
-    const [loading, setLoading] =
-        useState(true);
+    const {
+        notifications,
+        unreadCount,
+        loading,
+        refresh,
+        markAsRead,
+        markAllAsRead,
+        remove,
+    } = useNotifications();
 
     const [refreshing, setRefreshing] =
         useState(false);
@@ -59,179 +65,194 @@ export default function NotificationsScreen() {
     const [error, setError] =
         useState("");
 
-    const styles =
-        createStyles(theme);
+    /**
+     * Initial refresh.
+     *
+     * NotificationContext already loads
+     * notifications after authentication,
+     * but refreshing here guarantees that
+     * this screen has the latest data.
+     */
+    useEffect(() => {
+        let mounted = true;
 
-    const {
-        refreshUnreadCount,
-        decrementUnread,
-        clearUnread,
-    } = useNotifications();
+        const load = async () => {
+            try {
+                setError("");
 
-    const loadNotifications =
-        useCallback(
-            async (
-                showLoader = true
-            ) => {
-                try {
-                    if (showLoader) {
-                        setLoading(true);
-                    }
+                await refresh();
+            } catch (error) {
+                console.error(
+                    "Failed to load notifications:",
+                    error
+                );
 
-                    setError("");
-
-                    const data =
-                        await notificationService.getAll();
-
-                    setNotifications(data);
-
-                    await refreshUnreadCount();
-                } catch (error) {
-                    console.error(
-                        "Failed to load notifications:",
-                        error
-                    );
-
+                if (mounted) {
                     setError(
                         "Nu am putut încărca notificările."
                     );
-                } finally {
-                    setLoading(false);
+                }
+            }
+        };
+
+        void load();
+
+        return () => {
+            mounted = false;
+        };
+    }, [refresh]);
+
+    /**
+     * Pull to refresh.
+     */
+    const handleRefresh =
+        useCallback(async () => {
+            try {
+                setRefreshing(true);
+                setError("");
+
+                await refresh();
+            } catch (error) {
+                console.error(
+                    "Failed to refresh notifications:",
+                    error
+                );
+
+                setError(
+                    "Nu am putut reîmprospăta notificările."
+                );
+            } finally {
+                setRefreshing(false);
+            }
+        }, [refresh]);
+
+    /**
+     * Mark all notifications as read.
+     */
+    const handleMarkAllAsRead =
+        useCallback(async () => {
+            if (
+                actionLoading ||
+                unreadCount === 0
+            ) {
+                return;
+            }
+
+            try {
+                setActionLoading(true);
+
+                await markAllAsRead();
+            } catch (error) {
+                console.error(
+                    "Failed to mark all notifications as read:",
+                    error
+                );
+
+                Alert.alert(
+                    "Eroare",
+                    "Notificările nu au putut fi marcate ca citite."
+                );
+            } finally {
+                setActionLoading(false);
+            }
+        }, [
+            actionLoading,
+            unreadCount,
+            markAllAsRead,
+        ]);
+
+    /**
+     * Delete notification.
+     */
+    const handleDelete =
+        useCallback(
+            async (
+                notificationId: string
+            ) => {
+                try {
+                    await remove(
+                        notificationId
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to delete notification:",
+                        error
+                    );
+
+                    Alert.alert(
+                        "Eroare",
+                        "Notificarea nu a putut fi ștearsă."
+                    );
                 }
             },
-            []
+            [remove]
         );
 
-    useEffect(() => {
-        loadNotifications();
-    }, [loadNotifications]);
+    /**
+     * Open notification target.
+     */
+    const handleNotificationPress =
+        useCallback(
+            async (
+                notification: NotificationItem
+            ) => {
+                if (
+                    !notification.read
+                ) {
+                    try {
+                        await markAsRead(
+                            notification._id
+                        );
+                    } catch (error) {
+                        console.error(
+                            "Failed to mark notification as read:",
+                            error
+                        );
+                    }
+                }
 
-    async function handleRefresh() {
-        try {
-            setRefreshing(true);
-            await loadNotifications(false);
-        } finally {
-            setRefreshing(false);
-        }
-    }
+                /**
+                 * Conversation notification.
+                 */
+                if (
+                    notification.conversation
+                ) {
+                    router.push({
+                        pathname:
+                            "/chat/[id]",
+                        params: {
+                            id: String(
+                                notification.conversation
+                            ),
+                        },
+                    });
 
-    const handleMarkAsRead = async (
-        notification: NotificationItem
-    ) => {
-        if (notification.read) {
-            return;
-        }
+                    return;
+                }
 
-        try {
-            await notificationService.markAsRead(
-                notification._id
-            );
+                /**
+                 * Listing notification.
+                 */
+                if (
+                    notification.listing?._id
+                ) {
+                    router.push({
+                        pathname:
+                            "/listing/[id]",
+                        params: {
+                            id: String(
+                                notification
+                                    .listing
+                                    ._id
+                            ),
+                        },
+                    });
 
-            setNotifications((current) =>
-                current.map((item) =>
-                    item._id === notification._id
-                        ? {
-                            ...item,
-                            read: true,
-                        }
-                        : item
-                )
-            );
-
-            decrementUnread();
-        } catch (error) {
-            console.error(
-                "Failed to mark notification as read:",
-                error
-            );
-        }
-    };
-
-    const handleMarkAllAsRead = async () => {
-        try {
-            await notificationService.markAllAsRead();
-
-            setNotifications((current) =>
-                current.map((item) => ({
-                    ...item,
-                    read: true,
-                }))
-            );
-
-            clearUnread();
-        } catch (error) {
-            console.error(
-                "Failed to mark all notifications as read:",
-                error
-            );
-        }
-    };
-
-    async function handleDelete(
-        notificationId: string
-    ) {
-        try {
-            setNotifications(
-                (current) =>
-                    current.filter(
-                        (item) =>
-                            item._id !==
-                            notificationId
-                    )
-            );
-
-            await notificationService.delete(
-                notificationId
-            );
-        } catch (error) {
-            console.error(
-                "Failed to delete notification:",
-                error
-            );
-
-            await loadNotifications(false);
-
-            Alert.alert(
-                "Eroare",
-                "Notificarea nu a putut fi ștearsă."
-            );
-        }
-    }
-
-    function handleNotificationPress(
-        notification: NotificationItem
-    ) {
-        void handleMarkAsRead(notification);
-
-        // Notificare legată de conversație
-        if (notification.conversation) {
-            router.push({
-                pathname: "/chat/[id]",
-                params: {
-                    id: notification.conversation,
-                },
-            });
-
-            return;
-        }
-
-        // Notificare legată de anunț
-        if (notification.listing?._id) {
-            router.push({
-                pathname: "/listing/[id]",
-                params: {
-                    id: notification.listing._id,
-                },
-            });
-
-            return;
-        }
-    }
-
-    const unreadCount =
-        notifications.filter(
-            (item) => !item.read
-        ).length;
+                    return;
+                }
+            },
+            [markAsRead]
+        );
 
     return (
         <SafeAreaView
@@ -313,7 +334,7 @@ export default function NotificationsScreen() {
                                     }
                                 >
                                     {unreadCount >
-                                        0
+                                    0
                                         ? `${unreadCount} unread`
                                         : "You're all caught up"}
                                 </Text>
@@ -321,7 +342,7 @@ export default function NotificationsScreen() {
                         </View>
 
                         {unreadCount >
-                            0 ? (
+                        0 ? (
                             <Pressable
                                 onPress={
                                     handleMarkAllAsRead
@@ -427,7 +448,7 @@ export default function NotificationsScreen() {
 
                             <Pressable
                                 onPress={() =>
-                                    loadNotifications()
+                                    refresh()
                                 }
                                 style={
                                     styles.retryButton
@@ -507,20 +528,20 @@ function NotificationRow({
                     backgroundColor:
                         item.read
                             ? theme
-                                .colors
-                                .surface
+                                  .colors
+                                  .surface
                             : theme
-                                .colors
-                                .primarySoft,
+                                  .colors
+                                  .primarySoft,
                     borderWidth: 1,
                     borderColor:
                         item.read
                             ? theme
-                                .colors
-                                .border
+                                  .colors
+                                  .border
                             : theme
-                                .colors
-                                .primary,
+                                  .colors
+                                  .primary,
                 },
 
                 pressed && {
@@ -540,11 +561,11 @@ function NotificationRow({
                     backgroundColor:
                         item.read
                             ? theme
-                                .colors
-                                .surfaceSecondary
+                                  .colors
+                                  .surfaceSecondary
                             : theme
-                                .colors
-                                .surface,
+                                  .colors
+                                  .surface,
                 }}
             >
                 <Ionicons
@@ -553,11 +574,11 @@ function NotificationRow({
                     color={
                         item.read
                             ? theme
-                                .colors
-                                .textSecondary
+                                  .colors
+                                  .textSecondary
                             : theme
-                                .colors
-                                .primary
+                                  .colors
+                                  .primary
                     }
                 />
             </View>

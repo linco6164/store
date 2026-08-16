@@ -15,6 +15,14 @@ import {
     pushNotificationService,
 } from "./push-notification.service.js";
 
+import {
+    getSocketIO,
+} from "../../sockets/socket.io.js";
+
+import {
+    emitNewNotification,
+} from "../../sockets/notification.socket.js";
+
 interface CreateNotificationData {
     user: string;
 
@@ -66,6 +74,21 @@ class NotificationService {
                     user: data.user,
                     read: false,
                 });
+            try {
+                const io = getSocketIO();
+
+                emitNewNotification(
+                    io,
+                    data.user,
+                    notification,
+                    unreadCount
+                );
+            } catch (error) {
+                console.error(
+                    "Failed to emit socket notification:",
+                    error
+                );
+            }
 
             await pushNotificationService.sendToUser(
                 data.user,
