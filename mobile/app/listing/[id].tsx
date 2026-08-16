@@ -27,6 +27,8 @@ import {
     listingService,
 } from "@/services/listingService";
 import { useTheme } from "@/theme";
+import { favoriteService } from "@/services/favoriteService";
+import { chatService } from "@/services/chatService";
 
 const { width: SCREEN_WIDTH } =
     Dimensions.get("window");
@@ -57,6 +59,40 @@ export default function ListingDetailsScreen() {
         currentImage,
         setCurrentImage,
     ] = useState(0);
+
+    const [favorite, setFavorite] = useState(false);
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
+    const [startingChat, setStartingChat] =
+        useState(false);
+
+    const handleMessageSeller = async () => {
+        if (!id || startingChat) {
+            return;
+        }
+
+        try {
+            setStartingChat(true);
+
+            const conversation =
+                await chatService.startConversation(
+                    id
+                );
+
+            router.push({
+                pathname: "/chat/[id]",
+                params: {
+                    id: conversation._id,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Failed to start conversation:",
+                error
+            );
+        } finally {
+            setStartingChat(false);
+        }
+    };
 
     const loadListing =
         useCallback(async () => {
@@ -95,6 +131,54 @@ export default function ListingDetailsScreen() {
     useEffect(() => {
         loadListing();
     }, [loadListing]);
+
+    useEffect(() => {
+        if (!id) return;
+
+        let mounted = true;
+
+        async function loadFavorite() {
+            try {
+                const isFavorite =
+                    await favoriteService.check(id);
+
+                if (mounted) {
+                    setFavorite(isFavorite);
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to check favorite:",
+                    error
+                );
+            }
+        }
+
+        loadFavorite();
+
+        return () => {
+            mounted = false;
+        };
+    }, [id]);
+
+    const handleFavorite = async () => {
+        if (!id || favoriteLoading) return;
+
+        try {
+            setFavoriteLoading(true);
+
+            const result =
+                await favoriteService.toggle(id);
+
+            setFavorite(result.favorite);
+        } catch (error) {
+            console.error(
+                "Failed to toggle favorite:",
+                error
+            );
+        } finally {
+            setFavoriteLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -262,17 +346,21 @@ export default function ListingDetailsScreen() {
                         </Pressable>
 
                         <Pressable
-                            style={
-                                styles.circleButton
-                            }
+                            style={styles.circleButton}
+                            onPress={handleFavorite}
+                            disabled={favoriteLoading}
                         >
                             <Ionicons
-                                name="heart-outline"
+                                name={
+                                    favorite
+                                        ? "heart"
+                                        : "heart-outline"
+                                }
                                 size={20}
                                 color={
-                                    theme
-                                        .colors
-                                        .text
+                                    favorite
+                                        ? "#ef4444"
+                                        : theme.colors.text
                                 }
                             />
                         </Pressable>
@@ -331,7 +419,7 @@ export default function ListingDetailsScreen() {
                         )}
 
                         {images.length >
-                        1 ? (
+                            1 ? (
                             <View
                                 style={
                                     styles.imageCounter
@@ -356,7 +444,7 @@ export default function ListingDetailsScreen() {
                     {/* THUMBNAILS */}
 
                     {images.length >
-                    1 ? (
+                        1 ? (
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={
@@ -381,8 +469,8 @@ export default function ListingDetailsScreen() {
                                         style={[
                                             styles.thumbnail,
                                             index ===
-                                                currentImage &&
-                                                styles.activeThumbnail,
+                                            currentImage &&
+                                            styles.activeThumbnail,
                                         ]}
                                     >
                                         <Image
@@ -667,7 +755,7 @@ export default function ListingDetailsScreen() {
                                     {listing
                                         .seller
                                         .rating !==
-                                    undefined ? (
+                                        undefined ? (
                                         <View
                                             style={
                                                 styles.rating
@@ -730,26 +818,33 @@ export default function ListingDetailsScreen() {
                     }
                 >
                     <Pressable
-                        style={
-                            styles.messageButton
-                        }
-                        onPress={() => {}}
+                        style={[
+                            styles.messageButton,
+                            startingChat &&
+                            styles.messageButtonDisabled,
+                        ]}
+                        onPress={handleMessageSeller}
+                        disabled={startingChat}
                     >
-                        <Ionicons
-                            name="chatbubble-outline"
-                            size={19}
-                            color={
-                                theme.colors
-                                    .text
-                            }
-                        />
+                        {startingChat ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={theme.colors.primary}
+                            />
+                        ) : (
+                            <Ionicons
+                                name="chatbubble-outline"
+                                size={20}
+                                color={theme.colors.primary}
+                            />
+                        )}
 
                         <Text
-                            style={
-                                styles.messageButtonText
-                            }
+                            style={styles.messageButtonText}
                         >
-                            Message
+                            {startingChat
+                                ? "Se deschide..."
+                                : "Message"}
                         </Text>
                     </Pressable>
 
@@ -757,7 +852,7 @@ export default function ListingDetailsScreen() {
                         style={
                             styles.buyButton
                         }
-                        onPress={() => {}}
+                        onPress={() => { }}
                     >
                         <Text
                             style={
@@ -861,6 +956,10 @@ function createStyles(
     return StyleSheet.create({
         container: {
             flex: 1,
+        },
+
+        messageButtonDisabled: {
+            opacity: 0.6,
         },
 
         topBar: {

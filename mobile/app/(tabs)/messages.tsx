@@ -1,620 +1,626 @@
-import { useMemo, useState } from "react";
-
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+import {
+    ActivityIndicator,
     FlatList,
     Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
-    TextInput,
     View,
 } from "react-native";
 
+import { Image } from "expo-image";
+
+import { SafeScreen } from "@/components/SafeScreen";
 import {
-    Ionicons,
-} from "@expo/vector-icons";
-
-import {
-    useTheme,
-} from "@/theme";
-
-type Conversation = {
-    id: string;
-    name: string;
-    message: string;
-    time: string;
-    unread: number;
-    online: boolean;
-};
-
-const conversations: Conversation[] = [
-    {
-        id: "1",
-        name: "Andrei",
-        message:
-            "Mai este disponibil produsul?",
-        time: "10:42",
-        unread: 2,
-        online: true,
-    },
-    {
-        id: "2",
-        name: "Maria",
-        message:
-            "Perfect, îl iau. Mulțumesc!",
-        time: "09:18",
-        unread: 0,
-        online: false,
-    },
-    {
-        id: "3",
-        name: "Alex",
-        message:
-            "Putem negocia puțin prețul?",
-        time: "Ieri",
-        unread: 1,
-        online: true,
-    },
-    {
-        id: "4",
-        name: "Ioana",
-        message:
-            "Când poți face livrarea?",
-        time: "Ieri",
-        unread: 0,
-        online: false,
-    },
-];
+    ChatUser,
+    Conversation,
+    chatService,
+} from "@/services/chatService";
+import { useTheme } from "@/theme";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function MessagesScreen() {
-    const { theme } =
-        useTheme();
+    const { theme } = useTheme();
+    const { user } = useAuth();
 
-    const [search, setSearch] =
+    const styles = useMemo(
+        () => createStyles(theme),
+        [theme]
+    );
+
+    const [
+        conversations,
+        setConversations,
+    ] = useState<Conversation[]>([]);
+
+    const [loading, setLoading] =
+        useState(true);
+
+    const [refreshing, setRefreshing] =
+        useState(false);
+
+    const [error, setError] =
         useState("");
 
-    const styles =
-        createStyles(theme);
+    const loadConversations =
+        useCallback(
+            async (
+                showLoader = true
+            ) => {
+                try {
+                    if (showLoader) {
+                        setLoading(true);
+                    }
 
-    const filteredConversations =
-        useMemo(() => {
-            const query =
-                search
-                    .trim()
-                    .toLowerCase();
+                    setError("");
 
-            if (!query) {
-                return conversations;
-            }
+                    const data =
+                        await chatService.getConversations();
 
-            return conversations.filter(
-                (conversation) =>
-                    conversation.name
-                        .toLowerCase()
-                        .includes(query) ||
-                    conversation.message
-                        .toLowerCase()
-                        .includes(query)
+                    setConversations(
+                        data
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to load conversations:",
+                        error
+                    );
+
+                    setError(
+                        "Nu am putut încărca mesajele."
+                    );
+                } finally {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            },
+            []
+        );
+
+    useEffect(() => {
+        loadConversations();
+    }, [loadConversations]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            loadConversations(false);
+        }, 5000);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, [loadConversations]);
+
+    const handleRefresh =
+        useCallback(() => {
+            setRefreshing(true);
+
+            loadConversations(false);
+        }, [loadConversations]);
+
+    function openConversation(
+        conversationId: string
+    ) {
+        router.push({
+            pathname: "/chat/[id]",
+            params: {
+                id: conversationId,
+            },
+        });
+    }
+
+    function getOtherParticipant(
+        conversation: Conversation
+    ): ChatUser | null {
+        return (
+            conversation
+                .participants?.[0] ??
+            null
+        );
+    }
+
+    function getLastMessage(
+        conversation: Conversation
+    ) {
+        if (
+            typeof conversation.lastMessage ===
+            "string"
+        ) {
+            return conversation.lastMessage;
+        }
+
+        if (
+            conversation.lastMessage &&
+            typeof conversation.lastMessage ===
+            "object"
+        ) {
+            return (
+                conversation.lastMessage
+                    .text || ""
             );
-        }, [search]);
+        }
 
-    return (
-        <View
-            style={
-                styles.container
+        return "";
+    }
+
+    function getUnreadCount(
+        conversation: Conversation
+    ) {
+        if (
+            !conversation.unread ||
+            !user?._id
+        ) {
+            return 0;
+        }
+
+        return Number(
+            conversation.unread[user._id] || 0
+        );
+    }
+
+    function formatDate(
+        value?: string
+    ) {
+        if (!value) {
+            return "";
+        }
+
+        const date =
+            new Date(value);
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+            return "";
+        }
+
+        const now =
+            new Date();
+
+        const sameDay =
+            date.toDateString() ===
+            now.toDateString();
+
+        if (sameDay) {
+            return new Intl.DateTimeFormat(
+                "ro-RO",
+                {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }
+            ).format(date);
+        }
+
+        const yesterday =
+            new Date(now);
+
+        yesterday.setDate(
+            now.getDate() - 1
+        );
+
+        if (
+            date.toDateString() ===
+            yesterday.toDateString()
+        ) {
+            return "Ieri";
+        }
+
+        return new Intl.DateTimeFormat(
+            "ro-RO",
+            {
+                day: "2-digit",
+                month: "2-digit",
             }
-        >
-            <FlatList
-                data={
-                    filteredConversations
-                }
-                keyExtractor={(item) =>
-                    item.id
-                }
-                showsVerticalScrollIndicator={
-                    false
-                }
-                contentContainerStyle={
-                    styles.content
-                }
-                ListHeaderComponent={
-                    <>
-                        {/* HEADER */}
+        ).format(date);
+    }
 
-                        <View
+    function renderConversation({
+        item,
+    }: {
+        item: Conversation;
+    }) {
+        const participant =
+            getOtherParticipant(
+                item
+            );
+
+        const lastMessage =
+            getLastMessage(item);
+
+        const unread =
+            getUnreadCount(item);
+
+        return (
+            <Pressable
+                onPress={() =>
+                    openConversation(
+                        item._id
+                    )
+                }
+                style={({ pressed }) => [
+                    styles.conversation,
+                    pressed &&
+                    styles.conversationPressed,
+                ]}
+            >
+                <View
+                    style={
+                        styles.avatarContainer
+                    }
+                >
+                    {participant?.avatar ? (
+                        <Image
+                            source={{
+                                uri: participant.avatar,
+                            }}
                             style={
-                                styles.header
+                                styles.avatar
                             }
-                        >
-                            <View>
-                                <Text
-                                    style={
-                                        styles.title
-                                    }
-                                >
-                                    Messages
-                                </Text>
-
-                                <Text
-                                    style={
-                                        styles.subtitle
-                                    }
-                                >
-                                    Conversațiile tale
-                                </Text>
-                            </View>
-
-                            <Pressable
-                                style={
-                                    styles.composeButton
-                                }
-                                onPress={() => {}}
-                            >
-                                <Ionicons
-                                    name="create-outline"
-                                    size={21}
-                                    color={
-                                        theme
-                                            .colors
-                                            .primaryText
-                                    }
-                                />
-                            </Pressable>
-                        </View>
-
-                        {/* SEARCH */}
-
+                            contentFit="cover"
+                        />
+                    ) : (
                         <View
                             style={
-                                styles.searchWrapper
+                                styles.avatarPlaceholder
                             }
                         >
                             <Ionicons
-                                name="search-outline"
-                                size={20}
+                                name="person"
+                                size={22}
                                 color={
-                                    theme
-                                        .colors
+                                    theme.colors
                                         .textMuted
                                 }
                             />
-
-                            <TextInput
-                                value={search}
-                                onChangeText={
-                                    setSearch
-                                }
-                                placeholder="Search messages..."
-                                placeholderTextColor={
-                                    theme
-                                        .colors
-                                        .textMuted
-                                }
-                                style={
-                                    styles.searchInput
-                                }
-                            />
-
-                            {search.length >
-                            0 ? (
-                                <Pressable
-                                    onPress={() =>
-                                        setSearch(
-                                            ""
-                                        )
-                                    }
-                                    hitSlop={8}
-                                >
-                                    <Ionicons
-                                        name="close-circle"
-                                        size={19}
-                                        color={
-                                            theme
-                                                .colors
-                                                .textMuted
-                                        }
-                                    />
-                                </Pressable>
-                            ) : null}
                         </View>
+                    )}
 
-                        {/* SECTION */}
-
+                    {unread > 0 && (
                         <View
                             style={
-                                styles.sectionHeader
+                                styles.onlineDot
+                            }
+                        />
+                    )}
+                </View>
+
+                <View
+                    style={
+                        styles.conversationContent
+                    }
+                >
+                    <View
+                        style={
+                            styles.topRow
+                        }
+                    >
+                        <Text
+                            numberOfLines={
+                                1
+                            }
+                            style={
+                                styles.username
+                            }
+                        >
+                            {participant?.username ||
+                                "Utilizator"}
+                        </Text>
+
+                        <Text
+                            style={
+                                styles.date
+                            }
+                        >
+                            {formatDate(
+                                item.lastMessageAt
+                            )}
+                        </Text>
+                    </View>
+
+                    {item.listing && (
+                        <Text
+                            numberOfLines={
+                                1
+                            }
+                            style={
+                                styles.listingTitle
+                            }
+                        >
+                            {item.listing.title}
+                        </Text>
+                    )}
+
+                    <View
+                        style={
+                            styles.bottomRow
+                        }
+                    >
+                        <Text
+                            numberOfLines={
+                                1
+                            }
+                            style={[
+                                styles.lastMessage,
+                                unread > 0 &&
+                                styles.lastMessageUnread,
+                            ]}
+                        >
+                            {lastMessage ||
+                                "Începe conversația..."}
+                        </Text>
+
+                        {unread > 0 && (
+                            <View
+                                style={
+                                    styles.unreadBadge
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.unreadText
+                                    }
+                                >
+                                    {unread >
+                                        99
+                                        ? "99+"
+                                        : unread}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                {item.listing
+                    ?.images?.[0] && (
+                        <Image
+                            source={{
+                                uri: item.listing
+                                    .images[0],
+                            }}
+                            style={
+                                styles.listingImage
+                            }
+                            contentFit="cover"
+                        />
+                    )}
+            </Pressable>
+        );
+    }
+
+    if (loading) {
+        return (
+            <SafeScreen>
+                <View
+                    style={
+                        styles.center
+                    }
+                >
+                    <ActivityIndicator
+                        size="large"
+                        color={
+                            theme.colors
+                                .primary
+                        }
+                    />
+
+                    <Text
+                        style={
+                            styles.loadingText
+                        }
+                    >
+                        Se încarcă mesajele...
+                    </Text>
+                </View>
+            </SafeScreen>
+        );
+    }
+
+    return (
+        <SafeScreen
+            edges={[
+                "top",
+                "left",
+                "right",
+            ]}
+        >
+            <View
+                style={
+                    styles.container
+                }
+            >
+                {/* HEADER */}
+
+                <View
+                    style={
+                        styles.header
+                    }
+                >
+                    <View>
+                        <Text
+                            style={
+                                styles.title
+                            }
+                        >
+                            Mesaje
+                        </Text>
+
+                        <Text
+                            style={
+                                styles.subtitle
+                            }
+                        >
+                            Conversațiile tale
+                        </Text>
+                    </View>
+
+                    <Pressable
+                        onPress={
+                            handleRefresh
+                        }
+                        style={
+                            styles.headerButton
+                        }
+                    >
+                        <Ionicons
+                            name="refresh-outline"
+                            size={21}
+                            color={
+                                theme.colors
+                                    .text
+                            }
+                        />
+                    </Pressable>
+                </View>
+
+                {/* ERROR */}
+
+                {error ? (
+                    <View
+                        style={
+                            styles.errorContainer
+                        }
+                    >
+                        <Ionicons
+                            name="alert-circle-outline"
+                            size={24}
+                            color={
+                                theme.colors
+                                    .danger
+                            }
+                        />
+
+                        <Text
+                            style={
+                                styles.errorText
+                            }
+                        >
+                            {error}
+                        </Text>
+
+                        <Pressable
+                            onPress={() =>
+                                loadConversations()
                             }
                         >
                             <Text
                                 style={
-                                    styles.sectionTitle
+                                    styles.retryText
                                 }
                             >
-                                Recent
+                                Reîncearcă
+                            </Text>
+                        </Pressable>
+                    </View>
+                ) : null}
+
+                {/* CONVERSATIONS */}
+
+                <FlatList
+                    data={
+                        conversations
+                    }
+                    keyExtractor={(
+                        item
+                    ) => item._id}
+                    renderItem={
+                        renderConversation
+                    }
+                    showsVerticalScrollIndicator={
+                        false
+                    }
+                    contentContainerStyle={
+                        conversations.length ===
+                            0
+                            ? styles.emptyList
+                            : styles.list
+                    }
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={
+                                refreshing
+                            }
+                            onRefresh={
+                                handleRefresh
+                            }
+                            tintColor={
+                                theme.colors
+                                    .primary
+                            }
+                        />
+                    }
+                    ListEmptyComponent={
+                        <View
+                            style={
+                                styles.empty
+                            }
+                        >
+                            <View
+                                style={
+                                    styles.emptyIcon
+                                }
+                            >
+                                <Ionicons
+                                    name="chatbubbles-outline"
+                                    size={34}
+                                    color={
+                                        theme.colors
+                                            .primary
+                                    }
+                                />
+                            </View>
+
+                            <Text
+                                style={
+                                    styles.emptyTitle
+                                }
+                            >
+                                Nicio conversație
                             </Text>
 
                             <Text
                                 style={
-                                    styles.count
+                                    styles.emptyText
                                 }
                             >
-                                {
-                                    filteredConversations.length
-                                }
+                                Când contactezi un
+                                vânzător, conversația
+                                va apărea aici.
                             </Text>
-                        </View>
-                    </>
-                }
-                renderItem={({
-                    item,
-                }) => (
-                    <ConversationItem
-                        conversation={
-                            item
-                        }
-                        theme={theme}
-                    />
-                )}
-                ListEmptyComponent={
-                    <EmptyMessages
-                        theme={theme}
-                    />
-                }
-            />
-        </View>
-    );
-}
 
-function ConversationItem({
-    conversation,
-    theme,
-}: {
-    conversation: Conversation;
-    theme: ReturnType<
-        typeof useTheme
-    >["theme"];
-}) {
-    return (
-        <Pressable
-            onPress={() => {
-                // Conversation screen will be connected next.
-            }}
-            style={({ pressed }) => [
-                {
-                    flexDirection:
-                        "row",
-                    alignItems:
-                        "center",
-                    paddingVertical:
-                        theme.spacing.md,
-                    borderBottomWidth: 1,
-                    borderBottomColor:
-                        theme.colors
-                            .border,
-                },
-
-                pressed && {
-                    opacity: 0.7,
-                },
-            ]}
-        >
-            {/* AVATAR */}
-
-            <View
-                style={
-                    stylesForAvatar(
-                        theme
-                    ).avatar
-                }
-            >
-                <Text
-                    style={
-                        stylesForAvatar(
-                            theme
-                        ).avatarText
-                    }
-                >
-                    {conversation.name
-                        .charAt(0)
-                        .toUpperCase()}
-                </Text>
-
-                {conversation.online ? (
-                    <View
-                        style={
-                            stylesForAvatar(
-                                theme
-                            ).online
-                        }
-                    />
-                ) : null}
-            </View>
-
-            {/* CONTENT */}
-
-            <View
-                style={{
-                    flex: 1,
-                    marginLeft:
-                        theme.spacing.md,
-                }}
-            >
-                <View
-                    style={{
-                        flexDirection:
-                            "row",
-                        alignItems:
-                            "center",
-                        justifyContent:
-                            "space-between",
-                    }}
-                >
-                    <Text
-                        style={{
-                            color:
-                                theme
-                                    .colors
-                                    .text,
-                            fontSize: 15,
-                            fontWeight:
-                                "800",
-                        }}
-                    >
-                        {
-                            conversation.name
-                        }
-                    </Text>
-
-                    <Text
-                        style={{
-                            color:
-                                conversation
-                                    .unread >
-                                0
-                                    ? theme
-                                          .colors
-                                          .primary
-                                    : theme
-                                          .colors
-                                          .textMuted,
-                            fontSize: 11,
-                            fontWeight:
-                                conversation
-                                    .unread >
-                                0
-                                    ? "700"
-                                    : "500",
-                        }}
-                    >
-                        {
-                            conversation.time
-                        }
-                    </Text>
-                </View>
-
-                <View
-                    style={{
-                        flexDirection:
-                            "row",
-                        alignItems:
-                            "center",
-                        marginTop:
-                            theme.spacing
-                                .xs,
-                    }}
-                >
-                    <Text
-                        numberOfLines={1}
-                        style={{
-                            flex: 1,
-                            color:
-                                conversation
-                                    .unread >
-                                0
-                                    ? theme
-                                          .colors
-                                          .text
-                                    : theme
-                                          .colors
-                                          .textSecondary,
-                            fontSize: 13,
-                            fontWeight:
-                                conversation
-                                    .unread >
-                                0
-                                    ? "600"
-                                    : "400",
-                        }}
-                    >
-                        {
-                            conversation.message
-                        }
-                    </Text>
-
-                    {conversation.unread >
-                    0 ? (
-                        <View
-                            style={{
-                                minWidth: 21,
-                                height: 21,
-                                paddingHorizontal:
-                                    5,
-                                marginLeft:
-                                    theme
-                                        .spacing
-                                        .sm,
-                                borderRadius:
-                                    11,
-                                alignItems:
-                                    "center",
-                                justifyContent:
-                                    "center",
-                                backgroundColor:
-                                    theme
-                                        .colors
-                                        .primary,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color:
-                                        theme
-                                            .colors
-                                            .primaryText,
-                                    fontSize: 10,
-                                    fontWeight:
-                                        "800",
-                                }}
+                            <Pressable
+                                onPress={() =>
+                                    router.push(
+                                        "/(tabs)/explore"
+                                    )
+                                }
+                                style={
+                                    styles.exploreButton
+                                }
                             >
-                                {
-                                    conversation.unread
-                                }
-                            </Text>
+                                <Text
+                                    style={
+                                        styles.exploreButtonText
+                                    }
+                                >
+                                    Descoperă anunțuri
+                                </Text>
+                            </Pressable>
                         </View>
-                    ) : null}
-                </View>
-            </View>
-
-            <Ionicons
-                name="chevron-forward"
-                size={17}
-                color={
-                    theme.colors
-                        .textMuted
-                }
-                style={{
-                    marginLeft:
-                        theme.spacing
-                            .sm,
-                }}
-            />
-        </Pressable>
-    );
-}
-
-function EmptyMessages({
-    theme,
-}: {
-    theme: ReturnType<
-        typeof useTheme
-    >["theme"];
-}) {
-    return (
-        <View
-            style={{
-                alignItems:
-                    "center",
-                paddingTop: 80,
-                paddingHorizontal:
-                    theme.spacing.xl,
-            }}
-        >
-            <View
-                style={{
-                    width: 68,
-                    height: 68,
-                    borderRadius: 34,
-                    alignItems:
-                        "center",
-                    justifyContent:
-                        "center",
-                    backgroundColor:
-                        theme.colors
-                            .surfaceSecondary,
-                }}
-            >
-                <Ionicons
-                    name="chatbubbles-outline"
-                    size={31}
-                    color={
-                        theme.colors
-                            .textMuted
                     }
                 />
             </View>
-
-            <Text
-                style={{
-                    marginTop:
-                        theme.spacing.lg,
-                    color:
-                        theme.colors
-                            .text,
-                    fontSize: 18,
-                    fontWeight:
-                        "800",
-                }}
-            >
-                No messages yet
-            </Text>
-
-            <Text
-                style={{
-                    marginTop:
-                        theme.spacing.sm,
-                    textAlign:
-                        "center",
-                    color:
-                        theme.colors
-                            .textSecondary,
-                    fontSize: 13,
-                    lineHeight: 20,
-                }}
-            >
-                Când vei începe o
-                conversație cu un
-                cumpărător sau vânzător,
-                aceasta va apărea aici.
-            </Text>
-        </View>
+        </SafeScreen>
     );
-}
-
-function stylesForAvatar(
-    theme: ReturnType<
-        typeof useTheme
-    >["theme"]
-) {
-    return StyleSheet.create({
-        avatar: {
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            alignItems:
-                "center",
-            justifyContent:
-                "center",
-            backgroundColor:
-                theme.colors
-                    .primarySoft,
-            position:
-                "relative",
-        },
-
-        avatarText: {
-            color:
-                theme.colors
-                    .primaryDark,
-            fontSize: 17,
-            fontWeight:
-                "800",
-        },
-
-        online: {
-            position:
-                "absolute",
-            right: 1,
-            bottom: 1,
-            width: 13,
-            height: 13,
-            borderRadius: 7,
-            backgroundColor:
-                theme.colors
-                    .success,
-            borderWidth: 2,
-            borderColor:
-                theme.colors.surface,
-        },
-    });
 }
 
 function createStyles(
@@ -626,134 +632,290 @@ function createStyles(
         container: {
             flex: 1,
             backgroundColor:
-                theme.colors
-                    .background,
+                theme.colors.background,
         },
 
-        content: {
+        center: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
             paddingHorizontal:
-                theme.spacing.lg,
-            paddingBottom:
-                theme.spacing["5xl"],
+                theme.spacing.xl,
+        },
+
+        loadingText: {
+            marginTop:
+                theme.spacing.md,
+            color:
+                theme.colors.textSecondary,
+            fontSize: 14,
         },
 
         header: {
-            flexDirection:
-                "row",
-            alignItems:
-                "center",
+            minHeight: 76,
+            paddingHorizontal:
+                theme.spacing.md,
+            flexDirection: "row",
+            alignItems: "center",
             justifyContent:
                 "space-between",
-            paddingTop:
-                theme.spacing.xl,
-            paddingBottom:
-                theme.spacing.lg,
+            borderBottomWidth: 1,
+            borderBottomColor:
+                theme.colors.border,
+            backgroundColor:
+                theme.colors.surface,
         },
 
         title: {
             color:
                 theme.colors.text,
-            fontSize: 30,
-            fontWeight:
-                "900",
-            letterSpacing:
-                -0.8,
+            fontSize: 25,
+            fontWeight: "800",
         },
 
         subtitle: {
-            marginTop:
-                theme.spacing.xs,
+            marginTop: 2,
             color:
-                theme.colors
-                    .textSecondary,
-            fontSize: 14,
+                theme.colors.textMuted,
+            fontSize: 12,
         },
 
-        composeButton: {
-            width: 44,
-            height: 44,
-            borderRadius:
-                theme.radius.full,
-            alignItems:
-                "center",
-            justifyContent:
-                "center",
+        headerButton: {
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            alignItems: "center",
+            justifyContent: "center",
             backgroundColor:
-                theme.colors
-                    .primary,
+                theme.colors.surfaceSecondary,
         },
 
-        searchWrapper: {
-            height: 50,
-            flexDirection:
-                "row",
-            alignItems:
-                "center",
-            gap:
-                theme.spacing.sm,
+        list: {
+            paddingVertical:
+                theme.spacing.xs,
+        },
+
+        conversation: {
+            minHeight: 84,
             paddingHorizontal:
                 theme.spacing.md,
-            borderRadius:
-                theme.radius.full,
-            backgroundColor:
-                theme.colors
-                    .surface,
-            borderWidth: 1,
-            borderColor:
-                theme.colors
-                    .border,
-        },
-
-        searchInput: {
-            flex: 1,
-            height: "100%",
-            color:
-                theme.colors.text,
-            fontSize: 14,
-        },
-
-        sectionHeader: {
-            flexDirection:
-                "row",
-            alignItems:
-                "center",
-            gap:
+            paddingVertical:
                 theme.spacing.sm,
-            marginTop:
-                theme.spacing["2xl"],
-            marginBottom:
-                theme.spacing.xs,
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor:
+                theme.colors.background,
         },
 
-        sectionTitle: {
+        conversationPressed: {
+            opacity: 0.65,
+        },
+
+        avatarContainer: {
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            position: "relative",
+        },
+
+        avatar: {
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+        },
+
+        avatarPlaceholder: {
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+                theme.colors.surfaceSecondary,
+        },
+
+        onlineDot: {
+            position: "absolute",
+            right: 0,
+            bottom: 1,
+            width: 15,
+            height: 15,
+            borderRadius: 8,
+            borderWidth: 2,
+            borderColor:
+                theme.colors.background,
+            backgroundColor:
+                theme.colors.primary,
+        },
+
+        conversationContent: {
+            flex: 1,
+            minWidth: 0,
+            marginLeft:
+                theme.spacing.sm,
+        },
+
+        topRow: {
+            flexDirection: "row",
+            alignItems: "center",
+        },
+
+        username: {
+            flex: 1,
             color:
                 theme.colors.text,
-            fontSize: 17,
-            fontWeight:
-                "800",
+            fontSize: 15,
+            fontWeight: "700",
         },
 
-        count: {
-            minWidth: 23,
-            height: 23,
-            paddingHorizontal: 6,
-            borderRadius: 12,
-            alignItems:
-                "center",
-            justifyContent:
-                "center",
-            textAlign:
-                "center",
-            backgroundColor:
-                theme.colors
-                    .primarySoft,
+        date: {
+            marginLeft:
+                theme.spacing.xs,
             color:
-                theme.colors
-                    .primaryDark,
+                theme.colors.textMuted,
+            fontSize: 10,
+        },
+
+        listingTitle: {
+            marginTop: 2,
+            color:
+                theme.colors.primary,
             fontSize: 11,
-            fontWeight:
-                "800",
-            overflow: "hidden",
+            fontWeight: "600",
+        },
+
+        bottomRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 4,
+        },
+
+        lastMessage: {
+            flex: 1,
+            color:
+                theme.colors.textSecondary,
+            fontSize: 13,
+        },
+
+        lastMessageUnread: {
+            color:
+                theme.colors.text,
+            fontWeight: "700",
+        },
+
+        unreadBadge: {
+            minWidth: 21,
+            height: 21,
+            paddingHorizontal: 5,
+            marginLeft: 7,
+            borderRadius: 11,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+                theme.colors.primary,
+        },
+
+        unreadText: {
+            color:
+                theme.colors.primaryText,
+            fontSize: 10,
+            fontWeight: "800",
+        },
+
+        listingImage: {
+            width: 52,
+            height: 52,
+            marginLeft: 8,
+            borderRadius: 10,
+        },
+
+        errorContainer: {
+            margin:
+                theme.spacing.md,
+            padding:
+                theme.spacing.md,
+            borderRadius: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            backgroundColor:
+                theme.colors.danger,
+        },
+
+        errorText: {
+            flex: 1,
+            color:
+                theme.colors.danger,
+            fontSize: 12,
+        },
+
+        retryText: {
+            color:
+                theme.colors.primary,
+            fontSize: 12,
+            fontWeight: "800",
+        },
+
+        emptyList: {
+            flexGrow: 1,
+        },
+
+        empty: {
+            flex: 1,
+            minHeight: 500,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal:
+                theme.spacing.xl,
+        },
+
+        emptyIcon: {
+            width: 76,
+            height: 76,
+            borderRadius: 38,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+                theme.colors.primarySoft,
+        },
+
+        emptyTitle: {
+            marginTop:
+                theme.spacing.lg,
+            color:
+                theme.colors.text,
+            fontSize: 19,
+            fontWeight: "800",
+        },
+
+        emptyText: {
+            marginTop:
+                theme.spacing.sm,
+            maxWidth: 300,
+            color:
+                theme.colors.textSecondary,
+            textAlign: "center",
+            fontSize: 13,
+            lineHeight: 20,
+        },
+
+        exploreButton: {
+            marginTop:
+                theme.spacing.lg,
+            paddingHorizontal:
+                theme.spacing.lg,
+            paddingVertical:
+                theme.spacing.md,
+            borderRadius: 13,
+            backgroundColor:
+                theme.colors.primary,
+        },
+
+        exploreButtonText: {
+            color:
+                theme.colors.primaryText,
+            fontSize: 13,
+            fontWeight: "800",
         },
     });
 }

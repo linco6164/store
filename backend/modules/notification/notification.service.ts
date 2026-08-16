@@ -6,6 +6,11 @@ import {
     NotificationType,
 } from "./notification.model.js";
 
+import {
+    PushTokenModel,
+    PushPlatform,
+} from "./push-token.model.js";
+
 interface CreateNotificationData {
     user: string;
 
@@ -35,18 +40,18 @@ class NotificationService {
             ),
             actor: data.actor
                 ? new mongoose.Types.ObjectId(
-                      data.actor
-                  )
+                    data.actor
+                )
                 : undefined,
             listing: data.listing
                 ? new mongoose.Types.ObjectId(
-                      data.listing
-                  )
+                    data.listing
+                )
                 : undefined,
             conversation: data.conversation
                 ? new mongoose.Types.ObjectId(
-                      data.conversation
-                  )
+                    data.conversation
+                )
                 : undefined,
         });
     }
@@ -118,6 +123,56 @@ class NotificationService {
             _id: notificationId,
             user: userId,
         });
+    }
+
+    async registerPushToken(
+        userId: string,
+        token: string,
+        platform: PushPlatform
+    ) {
+        const userObjectId =
+            new mongoose.Types.ObjectId(
+                userId
+            );
+
+        return PushTokenModel.findOneAndUpdate(
+            {
+                token,
+            },
+            {
+                $set: {
+                    user: userObjectId,
+                    platform,
+                    active: true,
+                    lastUsedAt: new Date(),
+                },
+            },
+            {
+                new: true,
+                upsert: true,
+                setDefaultsOnInsert: true,
+            }
+        );
+    }
+
+    async removePushToken(
+        userId: string,
+        token: string
+    ) {
+        return PushTokenModel.findOneAndUpdate(
+            {
+                user: userId,
+                token,
+            },
+            {
+                $set: {
+                    active: false,
+                },
+            },
+            {
+                new: true,
+            }
+        );
     }
 }
 

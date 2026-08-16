@@ -38,4 +38,10 @@ router.delete(
     notificationController.remove
 );
 
+router.post(
+    "/push-token",
+    auth,
+    notificationController.registerPushToken
+);
+
 export default router;
