@@ -63,21 +63,21 @@ class NotificationService {
 
                 actor: data.actor
                     ? this.toObjectId(
-                          data.actor
-                      )
+                        data.actor
+                    )
                     : undefined,
 
                 listing: data.listing
                     ? this.toObjectId(
-                          data.listing
-                      )
+                        data.listing
+                    )
                     : undefined,
 
                 conversation:
                     data.conversation
                         ? this.toObjectId(
-                              data.conversation
-                          )
+                            data.conversation
+                        )
                         : undefined,
             });
 
@@ -123,16 +123,16 @@ class NotificationService {
 
                         ...(data.listing
                             ? {
-                                  listingId:
-                                      data.listing,
-                              }
+                                listingId:
+                                    data.listing,
+                            }
                             : {}),
 
                         ...(data.conversation
                             ? {
-                                  conversationId:
-                                      data.conversation,
-                              }
+                                conversationId:
+                                    data.conversation,
+                            }
                             : {}),
                     },
                 }
@@ -149,13 +149,20 @@ class NotificationService {
 
     async getAll(userId: string) {
         try {
-            const userObjectId =
-                this.toObjectId(userId);
+            if (
+                !mongoose.Types.ObjectId.isValid(
+                    userId
+                )
+            ) {
+                throw new Error(
+                    `Invalid notification userId: ${userId}`
+                );
+            }
 
-            console.log(
-                "[NotificationService] getAll:",
-                userObjectId.toString()
-            );
+            const userObjectId =
+                new mongoose.Types.ObjectId(
+                    userId
+                );
 
             const notifications =
                 await NotificationModel.find({
@@ -176,14 +183,14 @@ class NotificationService {
                     .lean();
 
             console.log(
-                "[NotificationService] getAll result:",
+                "[Notifications] getAll:",
                 notifications.length
             );
 
             return notifications;
         } catch (error) {
             console.error(
-                "[NotificationService] getAll ERROR:",
+                "[Notifications] getAll ERROR:",
                 error
             );
 
@@ -195,13 +202,20 @@ class NotificationService {
         userId: string
     ) {
         try {
-            const userObjectId =
-                this.toObjectId(userId);
+            if (
+                !mongoose.Types.ObjectId.isValid(
+                    userId
+                )
+            ) {
+                throw new Error(
+                    `Invalid notification userId: ${userId}`
+                );
+            }
 
-            console.log(
-                "[NotificationService] getUnreadCount:",
-                userObjectId.toString()
-            );
+            const userObjectId =
+                new mongoose.Types.ObjectId(
+                    userId
+                );
 
             const count =
                 await NotificationModel.countDocuments(
@@ -212,14 +226,14 @@ class NotificationService {
                 );
 
             console.log(
-                "[NotificationService] unreadCount:",
+                "[Notifications] unreadCount:",
                 count
             );
 
             return count;
         } catch (error) {
             console.error(
-                "[NotificationService] getUnreadCount ERROR:",
+                "[Notifications] getUnreadCount ERROR:",
                 error
             );
 
