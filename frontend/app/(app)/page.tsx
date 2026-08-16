@@ -69,7 +69,7 @@ export default function HomePage() {
 
                 <div className="mt-16">
                     <p className="text-gray-500">
-                        © {new Date().getFullYear()} Nexora
+                        © {new Date().getFullYear()} Nexora. Toate drepturile rezervate.
                     </p>
                 </div>
 
