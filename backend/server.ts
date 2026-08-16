@@ -41,21 +41,21 @@ app.use(cors());
 
 app.use(express.json());
 
-app.use("/api/auth", authRoutes);
+app.use("/auth", authRoutes);
 
-app.use("/api/upload", uploadRoutes);
+app.use("/upload", uploadRoutes);
 
-app.use("/api/listings", listingRoutes);
+app.use("/listings", listingRoutes);
 
-app.use("/api/profile", profileRoutes);
+app.use("/profile", profileRoutes);
 
-app.use("/api/profile/2fa", twoFactorRoutes);
+app.use("/profile/2fa", twoFactorRoutes);
 
-app.use("/api/chat", chatRoutes);
+app.use("/chat", chatRoutes);
 
-app.use("/api/favorites", favoriteRoutes);
+app.use("/favorites", favoriteRoutes);
 
-app.use("/api/notifications", notificationRoutes);
+app.use("/notifications", notificationRoutes);
 
 app.get("/", (_, res) => {
     res.send("API is running");
