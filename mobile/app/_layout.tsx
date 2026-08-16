@@ -30,25 +30,7 @@ import {
     AuthProvider,
 } from "@/hooks/useAuth";
 
-import * as Updates from "expo-updates";
-
 import UpdateManager from "@/components/UpdateManager";
-
-console.log("========== EAS UPDATE ==========");
-console.log("Update ID:", Updates.updateId);
-console.log(
-  "Runtime Version:",
-  Updates.runtimeVersion
-);
-console.log(
-  "Channel:",
-  Updates.channel
-);
-console.log(
-  "Is Embedded Launch:",
-  Updates.isEmbeddedLaunch
-);
-console.log("================================");
 
 export const unstable_settings = {
     anchor: "(tabs)",
@@ -104,9 +86,6 @@ export default function RootLayout() {
                                     "dark"
                                     ? "light"
                                     : "dark"
-                            }
-                            translucent={
-                                false
                             }
                         />
                     </ThemeProvider>

@@ -191,6 +191,70 @@ class NotificationController {
             });
         }
     }
+
+    async registerPushToken(
+        req: AuthRequest,
+        res: Response
+    ) {
+        try {
+            if (!req.userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: "Unauthorized",
+                });
+            }
+
+            const {
+                token,
+                platform,
+            } = req.body;
+
+            if (
+                typeof token !== "string" ||
+                !token.trim()
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Push token is required.",
+                });
+            }
+
+            if (
+                platform !== "android" &&
+                platform !== "ios"
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Invalid platform.",
+                });
+            }
+
+            const pushToken =
+                await notificationService.registerPushToken(
+                    req.userId,
+                    token.trim(),
+                    platform
+                );
+
+            return res.json({
+                success: true,
+                pushToken,
+            });
+        } catch (error) {
+            console.error(
+                "Failed to register push token:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Failed to register push token.",
+            });
+        }
+    }
 }
 
 export const notificationController =
