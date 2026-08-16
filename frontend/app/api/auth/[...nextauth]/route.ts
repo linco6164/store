@@ -19,7 +19,7 @@ const handler = NextAuth({
 
       async authorize(credentials) {
         try {
-          const res = await fetch("http://localhost:3001/auth/login", {
+          const res = await fetch("http://api.nx-store.com/auth/login", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
