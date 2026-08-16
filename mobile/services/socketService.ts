@@ -10,6 +10,10 @@ class SocketService {
     private connecting: Promise<Socket> | null = null;
 
     async connect(): Promise<Socket> {
+        console.log("========== SOCKET CONNECT ==========");
+        console.log("API_URL:", API_URL);
+        console.log("Has socket:", !!this.socket);
+        console.log("Socket connected:", this.socket?.connected);
         if (this.socket?.connected) {
             return this.socket;
         }

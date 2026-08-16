@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 
 import {
-    NotificationDocument,
     NotificationModel,
     NotificationType,
 } from "./notification.model.js";
@@ -25,55 +24,74 @@ import {
 
 interface CreateNotificationData {
     user: string;
-
     type: NotificationType;
-
     title: string;
-
     message: string;
-
     actor?: string;
-
     listing?: string;
-
     conversation?: string;
-
     metadata?: Record<string, unknown>;
 }
 
 class NotificationService {
+    private toObjectId(userId: string) {
+        if (
+            !mongoose.Types.ObjectId.isValid(
+                userId
+            )
+        ) {
+            throw new Error(
+                `Invalid userId: ${userId}`
+            );
+        }
+
+        return new mongoose.Types.ObjectId(
+            userId
+        );
+    }
+
     async create(
         data: CreateNotificationData
     ) {
         const notification =
             await NotificationModel.create({
                 ...data,
-                user: new mongoose.Types.ObjectId(
+
+                user: this.toObjectId(
                     data.user
                 ),
+
                 actor: data.actor
-                    ? new mongoose.Types.ObjectId(
-                        data.actor
-                    )
+                    ? this.toObjectId(
+                          data.actor
+                      )
                     : undefined,
+
                 listing: data.listing
-                    ? new mongoose.Types.ObjectId(
-                        data.listing
-                    )
+                    ? this.toObjectId(
+                          data.listing
+                      )
                     : undefined,
-                conversation: data.conversation
-                    ? new mongoose.Types.ObjectId(
-                        data.conversation
-                    )
-                    : undefined,
+
+                conversation:
+                    data.conversation
+                        ? this.toObjectId(
+                              data.conversation
+                          )
+                        : undefined,
             });
 
         try {
             const unreadCount =
-                await NotificationModel.countDocuments({
-                    user: data.user,
-                    read: false,
-                });
+                await NotificationModel.countDocuments(
+                    {
+                        user: this.toObjectId(
+                            data.user
+                        ),
+                        read: false,
+                    }
+                );
+
             try {
                 const io = getSocketIO();
 
@@ -95,7 +113,6 @@ class NotificationService {
                 {
                     title: data.title,
                     body: data.message,
-
                     badge: unreadCount,
 
                     data: {
@@ -106,27 +123,23 @@ class NotificationService {
 
                         ...(data.listing
                             ? {
-                                listingId:
-                                    data.listing,
-                            }
+                                  listingId:
+                                      data.listing,
+                              }
                             : {}),
 
                         ...(data.conversation
                             ? {
-                                conversationId:
-                                    data.conversation,
-                            }
+                                  conversationId:
+                                      data.conversation,
+                              }
                             : {}),
                     },
                 }
             );
         } catch (error) {
-            /*
-             * Push-ul nu trebuie să facă
-             * eșueze crearea notificării.
-             */
             console.error(
-                "Failed to send push notification:",
+                "Failed to send notification side effects:",
                 error
             );
         }
@@ -135,28 +148,83 @@ class NotificationService {
     }
 
     async getAll(userId: string) {
-        return NotificationModel.find({
-            user: userId,
-        })
-            .populate(
-                "actor",
-                "username avatar"
-            )
-            .populate(
-                "listing",
-                "title images price"
-            )
-            .sort({
-                createdAt: -1,
-            })
-            .limit(50);
+        try {
+            const userObjectId =
+                this.toObjectId(userId);
+
+            console.log(
+                "[NotificationService] getAll:",
+                userObjectId.toString()
+            );
+
+            const notifications =
+                await NotificationModel.find({
+                    user: userObjectId,
+                })
+                    .populate(
+                        "actor",
+                        "username avatar"
+                    )
+                    .populate(
+                        "listing",
+                        "title images price"
+                    )
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .limit(50)
+                    .lean();
+
+            console.log(
+                "[NotificationService] getAll result:",
+                notifications.length
+            );
+
+            return notifications;
+        } catch (error) {
+            console.error(
+                "[NotificationService] getAll ERROR:",
+                error
+            );
+
+            throw error;
+        }
     }
 
-    async getUnreadCount(userId: string) {
-        return NotificationModel.countDocuments({
-            user: userId,
-            read: false,
-        });
+    async getUnreadCount(
+        userId: string
+    ) {
+        try {
+            const userObjectId =
+                this.toObjectId(userId);
+
+            console.log(
+                "[NotificationService] getUnreadCount:",
+                userObjectId.toString()
+            );
+
+            const count =
+                await NotificationModel.countDocuments(
+                    {
+                        user: userObjectId,
+                        read: false,
+                    }
+                );
+
+            console.log(
+                "[NotificationService] unreadCount:",
+                count
+            );
+
+            return count;
+        } catch (error) {
+            console.error(
+                "[NotificationService] getUnreadCount ERROR:",
+                error
+            );
+
+            throw error;
+        }
     }
 
     async markAsRead(
@@ -166,7 +234,9 @@ class NotificationService {
         return NotificationModel.findOneAndUpdate(
             {
                 _id: notificationId,
-                user: userId,
+                user: this.toObjectId(
+                    userId
+                ),
             },
             {
                 $set: {
@@ -179,10 +249,14 @@ class NotificationService {
         );
     }
 
-    async markAllAsRead(userId: string) {
+    async markAllAsRead(
+        userId: string
+    ) {
         await NotificationModel.updateMany(
             {
-                user: userId,
+                user: this.toObjectId(
+                    userId
+                ),
                 read: false,
             },
             {
@@ -197,10 +271,14 @@ class NotificationService {
         userId: string,
         notificationId: string
     ) {
-        return NotificationModel.findOneAndDelete({
-            _id: notificationId,
-            user: userId,
-        });
+        return NotificationModel.findOneAndDelete(
+            {
+                _id: notificationId,
+                user: this.toObjectId(
+                    userId
+                ),
+            }
+        );
     }
 
     async registerPushToken(
@@ -209,9 +287,7 @@ class NotificationService {
         platform: PushPlatform
     ) {
         const userObjectId =
-            new mongoose.Types.ObjectId(
-                userId
-            );
+            this.toObjectId(userId);
 
         return PushTokenModel.findOneAndUpdate(
             {
@@ -239,7 +315,8 @@ class NotificationService {
     ) {
         return PushTokenModel.findOneAndUpdate(
             {
-                user: userId,
+                user:
+                    this.toObjectId(userId),
                 token,
             },
             {
