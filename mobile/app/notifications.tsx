@@ -36,6 +36,10 @@ import {
     NotificationItem,
 } from "@/services/notificationService";
 
+import {
+    useNotifications,
+} from "@/context/NotificationContext";
+
 export default function NotificationsScreen() {
     const { theme } =
         useTheme();
@@ -58,6 +62,12 @@ export default function NotificationsScreen() {
     const styles =
         createStyles(theme);
 
+    const {
+        refreshUnreadCount,
+        decrementUnread,
+        clearUnread,
+    } = useNotifications();
+
     const loadNotifications =
         useCallback(
             async (
@@ -74,6 +84,8 @@ export default function NotificationsScreen() {
                         await notificationService.getAll();
 
                     setNotifications(data);
+
+                    await refreshUnreadCount();
                 } catch (error) {
                     console.error(
                         "Failed to load notifications:",
@@ -103,84 +115,57 @@ export default function NotificationsScreen() {
         }
     }
 
-    async function handleMarkAsRead(
+    const handleMarkAsRead = async (
         notification: NotificationItem
-    ) {
+    ) => {
         if (notification.read) {
             return;
         }
 
         try {
-            setNotifications(
-                (current) =>
-                    current.map((item) =>
-                        item._id ===
-                        notification._id
-                            ? {
-                                  ...item,
-                                  read: true,
-                              }
-                            : item
-                    )
-            );
-
             await notificationService.markAsRead(
                 notification._id
             );
+
+            setNotifications((current) =>
+                current.map((item) =>
+                    item._id === notification._id
+                        ? {
+                            ...item,
+                            read: true,
+                        }
+                        : item
+                )
+            );
+
+            decrementUnread();
         } catch (error) {
             console.error(
                 "Failed to mark notification as read:",
                 error
             );
-
-            setNotifications(
-                (current) =>
-                    current.map((item) =>
-                        item._id ===
-                        notification._id
-                            ? {
-                                  ...item,
-                                  read: false,
-                              }
-                            : item
-                    )
-            );
         }
-    }
+    };
 
-    async function handleMarkAllAsRead() {
-        const unread =
-            notifications.some(
-                (item) => !item.read
-            );
-
-        if (!unread) {
-            return;
-        }
-
+    const handleMarkAllAsRead = async () => {
         try {
-            setActionLoading(true);
+            await notificationService.markAllAsRead();
 
-            setNotifications(
-                (current) =>
-                    current.map((item) => ({
-                        ...item,
-                        read: true,
-                    }))
+            setNotifications((current) =>
+                current.map((item) => ({
+                    ...item,
+                    read: true,
+                }))
             );
 
-            await notificationService.markAllAsRead();
+            clearUnread();
         } catch (error) {
             console.error(
                 "Failed to mark all notifications as read:",
                 error
             );
-
-            await loadNotifications(false);
-        } finally {
-            setActionLoading(false);
         }
-    }
+    };
 
     async function handleDelete(
         notificationId: string
@@ -216,19 +201,31 @@ export default function NotificationsScreen() {
     function handleNotificationPress(
         notification: NotificationItem
     ) {
-        void handleMarkAsRead(
-            notification
-        );
+        void handleMarkAsRead(notification);
 
-        /*
-         * Ulterior vom folosi:
-         *
-         * notification.conversation
-         * notification.listing
-         *
-         * pentru a deschide direct
-         * conversația sau produsul.
-         */
+        // Notificare legată de conversație
+        if (notification.conversation) {
+            router.push({
+                pathname: "/chat/[id]",
+                params: {
+                    id: notification.conversation,
+                },
+            });
+
+            return;
+        }
+
+        // Notificare legată de anunț
+        if (notification.listing?._id) {
+            router.push({
+                pathname: "/listing/[id]",
+                params: {
+                    id: notification.listing._id,
+                },
+            });
+
+            return;
+        }
     }
 
     const unreadCount =
@@ -252,7 +249,7 @@ export default function NotificationsScreen() {
                 }
                 contentContainerStyle={
                     notifications.length ===
-                    0
+                        0
                         ? styles.emptyContent
                         : styles.content
                 }
@@ -316,7 +313,7 @@ export default function NotificationsScreen() {
                                     }
                                 >
                                     {unreadCount >
-                                    0
+                                        0
                                         ? `${unreadCount} unread`
                                         : "You're all caught up"}
                                 </Text>
@@ -324,7 +321,7 @@ export default function NotificationsScreen() {
                         </View>
 
                         {unreadCount >
-                        0 ? (
+                            0 ? (
                             <Pressable
                                 onPress={
                                     handleMarkAllAsRead
@@ -510,20 +507,20 @@ function NotificationRow({
                     backgroundColor:
                         item.read
                             ? theme
-                                  .colors
-                                  .surface
+                                .colors
+                                .surface
                             : theme
-                                  .colors
-                                  .primarySoft,
+                                .colors
+                                .primarySoft,
                     borderWidth: 1,
                     borderColor:
                         item.read
                             ? theme
-                                  .colors
-                                  .border
+                                .colors
+                                .border
                             : theme
-                                  .colors
-                                  .primary,
+                                .colors
+                                .primary,
                 },
 
                 pressed && {
@@ -543,11 +540,11 @@ function NotificationRow({
                     backgroundColor:
                         item.read
                             ? theme
-                                  .colors
-                                  .surfaceSecondary
+                                .colors
+                                .surfaceSecondary
                             : theme
-                                  .colors
-                                  .surface,
+                                .colors
+                                .surface,
                 }}
             >
                 <Ionicons
@@ -556,11 +553,11 @@ function NotificationRow({
                     color={
                         item.read
                             ? theme
-                                  .colors
-                                  .textSecondary
+                                .colors
+                                .textSecondary
                             : theme
-                                  .colors
-                                  .primary
+                                .colors
+                                .primary
                     }
                 />
             </View>

@@ -7,6 +7,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 
@@ -34,10 +35,20 @@ import {
 
 import { useTheme } from "@/theme";
 import { useAuth } from "@/hooks/useAuth";
+import { socketService } from "@/services/socketService";
+import { CHAT_EVENTS } from "@/constants/events";
 
 export default function ChatScreen() {
     const { theme } = useTheme();
     const { user } = useAuth();
+
+    const [typingUser, setTypingUser] =
+        useState<string | null>(null);
+
+    const typingTimeout =
+        useRef<ReturnType<
+            typeof setTimeout
+        > | null>(null);
 
     const styles = useMemo(
         () => createStyles(theme),
@@ -144,6 +155,219 @@ export default function ChatScreen() {
             return;
         }
 
+        let cleanup: (() => void) | undefined;
+
+        async function setupSocket() {
+            try {
+                const socket =
+                    await socketService.connect();
+
+                socket.emit(
+                    CHAT_EVENTS.JOIN_CONVERSATION,
+                    id
+                );
+
+                socket.emit(
+                    CHAT_EVENTS.SEEN,
+                    {
+                        conversationId: id,
+                    }
+                );
+
+                const handleNewMessage = (
+                    message: Message
+                ) => {
+                    setMessages((current) => {
+                        const exists = current.some(
+                            (item) =>
+                                item._id === message._id
+                        );
+
+                        if (exists) {
+                            return current;
+                        }
+
+                        return [
+                            ...current,
+                            message,
+                        ];
+                    });
+
+                    socket.emit(
+                        CHAT_EVENTS.DELIVER_MESSAGE,
+                        {
+                            conversationId: id,
+                            messageId: message._id,
+                        }
+                    );
+                };
+
+                socket.on(
+                    CHAT_EVENTS.NEW_MESSAGE,
+                    handleNewMessage
+                );
+
+                const handleTyping = (data: {
+                    conversationId: string;
+                    userId: string;
+                }) => {
+                    if (
+                        data.conversationId !== id ||
+                        data.userId === user?._id
+                    ) {
+                        return;
+                    }
+
+                    setTypingUser(data.userId);
+                };
+
+                const handleStopTyping = (data: {
+                    conversationId: string;
+                    userId: string;
+                }) => {
+                    if (
+                        data.conversationId !== id ||
+                        data.userId === user?._id
+                    ) {
+                        return;
+                    }
+
+                    setTypingUser(null);
+                };
+
+                socket.on(
+                    CHAT_EVENTS.TYPING,
+                    handleTyping
+                );
+
+                socket.on(
+                    CHAT_EVENTS.STOP_TYPING,
+                    handleStopTyping
+                );
+
+                const handleMessageDelivered = (data: {
+                    conversationId: string;
+                    messageId: string;
+                    userId: string;
+                }) => {
+                    if (data.conversationId !== id) {
+                        return;
+                    }
+
+                    setMessages((current) =>
+                        current.map((message) => {
+                            if (message._id !== data.messageId) {
+                                return message;
+                            }
+
+                            return {
+                                ...message,
+                                deliveredTo: Array.from(
+                                    new Set([
+                                        ...(message.deliveredTo ?? []),
+                                        data.userId,
+                                    ])
+                                ),
+                            };
+                        })
+                    );
+                };
+
+                socket.on(
+                    CHAT_EVENTS.MESSAGE_DELIVERED,
+                    handleMessageDelivered
+                );
+
+                const handleMessagesSeen = (data: {
+                    conversationId: string;
+                    userId: string;
+                    messageIds: string[];
+                }) => {
+                    if (data.conversationId !== id) {
+                        return;
+                    }
+
+                    setMessages((current) =>
+                        current.map((message) => {
+                            if (
+                                !data.messageIds.includes(
+                                    message._id
+                                )
+                            ) {
+                                return message;
+                            }
+
+                            return {
+                                ...message,
+                                seenBy: Array.from(
+                                    new Set([
+                                        ...(message.seenBy ?? []),
+                                        data.userId,
+                                    ])
+                                ),
+                            };
+                        })
+                    );
+                };
+
+                socket.on(
+                    CHAT_EVENTS.MESSAGES_SEEN,
+                    handleMessagesSeen
+                );
+
+                cleanup = () => {
+                    socket.off(
+                        CHAT_EVENTS.NEW_MESSAGE,
+                        handleNewMessage
+                    );
+
+                    socket.off(
+                        CHAT_EVENTS.TYPING,
+                        handleTyping
+                    );
+
+                    socket.off(
+                        CHAT_EVENTS.STOP_TYPING,
+                        handleStopTyping
+                    );
+
+                    socket.off(
+                        CHAT_EVENTS.MESSAGE_DELIVERED,
+                        handleMessageDelivered
+                    );
+
+                    socket.off(
+                        CHAT_EVENTS.MESSAGES_SEEN,
+                        handleMessagesSeen
+                    );
+
+                    socket.emit(
+                        CHAT_EVENTS.LEAVE_CONVERSATION,
+                        id
+                    );
+                };
+            } catch (socketError) {
+                console.error(
+                    "Failed to connect chat socket:",
+                    socketError
+                );
+
+
+            }
+        }
+
+        setupSocket();
+
+        return () => {
+            cleanup?.();
+        };
+    }, [id]);
+
+    useEffect(() => {
+        if (!id) {
+            return;
+        }
+
         const interval = setInterval(async () => {
             try {
                 const messagesData =
@@ -185,8 +409,7 @@ export default function ChatScreen() {
     }, [id]);
 
     async function handleSend() {
-        const value =
-            text.trim();
+        const value = text.trim();
 
         if (
             !value ||
@@ -199,17 +422,15 @@ export default function ChatScreen() {
         try {
             setSending(true);
 
-            const message =
-                await chatService.sendMessage(
-                    id,
-                    value
-                );
+            const socket =
+                await socketService.connect();
 
-            setMessages(
-                (current) => [
-                    ...current,
-                    message,
-                ]
+            socket.emit(
+                CHAT_EVENTS.SEND_MESSAGE,
+                {
+                    conversationId: id,
+                    text: value,
+                }
             );
 
             setText("");
@@ -596,6 +817,13 @@ export default function ChatScreen() {
                             )
                         )
                     )}
+                    {typingUser ? (
+                        <View style={styles.typingContainer}>
+                            <Text style={styles.typingText}>
+                                Scrie...
+                            </Text>
+                        </View>
+                    ) : null}
                 </ScrollView>
 
                 {/* COMPOSER */}
@@ -622,9 +850,49 @@ export default function ChatScreen() {
 
                     <TextInput
                         value={text}
-                        onChangeText={
-                            setText
-                        }
+                        onChangeText={(value) => {
+                            setText(value);
+
+                            if (!id) {
+                                return;
+                            }
+
+                            socketService
+                                .connect()
+                                .then((socket) => {
+                                    socket.emit(
+                                        CHAT_EVENTS.TYPING,
+                                        {
+                                            conversationId: id,
+                                        }
+                                    );
+
+                                    if (
+                                        typingTimeout.current
+                                    ) {
+                                        clearTimeout(
+                                            typingTimeout.current
+                                        );
+                                    }
+
+                                    typingTimeout.current =
+                                        setTimeout(() => {
+                                            socket.emit(
+                                                CHAT_EVENTS.STOP_TYPING,
+                                                {
+                                                    conversationId:
+                                                        id,
+                                                }
+                                            );
+                                        }, 1200);
+                                })
+                                .catch((error) => {
+                                    console.error(
+                                        "Typing socket error:",
+                                        error
+                                    );
+                                });
+                        }}
                         placeholder="Scrie un mesaj..."
                         placeholderTextColor={
                             theme.colors
@@ -1139,6 +1407,17 @@ function createStyles(
             borderRadius: 21,
             alignItems: "center",
             justifyContent: "center",
+        },
+
+        typingContainer: {
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+        },
+
+        typingText: {
+            color: theme.colors.textMuted,
+            fontSize: 12,
+            fontStyle: "italic",
         },
     });
 }

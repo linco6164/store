@@ -143,19 +143,29 @@ export default function registerChatSocket(io: Server) {
         );
 
         socket.on("disconnect", async () => {
-            if (!socket.userId) return;
+            if (!socket.userId) {
+                return;
+            }
 
-            onlineUsers.remove(socket.id);
+            const userId =
+                onlineUsers.remove(
+                    socket.id
+                );
 
             io.emit(
                 CHAT_EVENTS.ONLINE_USERS,
                 onlineUsers.getAll()
             );
 
-            socket.broadcast.emit(
-                CHAT_EVENTS.USER_OFFLINE,
-                socket.userId
-            );
+            if (
+                userId &&
+                !onlineUsers.isOnline(userId)
+            ) {
+                socket.broadcast.emit(
+                    CHAT_EVENTS.USER_OFFLINE,
+                    userId
+                );
+            }
 
             console.log(
                 `Socket disconnected: ${socket.id}`
