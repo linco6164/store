@@ -53,6 +53,15 @@ class NotificationService {
     async create(
         data: CreateNotificationData
     ) {
+        console.log(
+            "[Notification] CREATE",
+            {
+                user: data.user,
+                type: data.type,
+                title: data.title,
+                conversation: data.conversation,
+            }
+        );
         const notification =
             await NotificationModel.create({
                 ...data,
@@ -94,6 +103,15 @@ class NotificationService {
 
             try {
                 const io = getSocketIO();
+
+                console.log(
+                    "[Notification] EMIT",
+                    {
+                        room: `user:${data.user}`,
+                        unreadCount,
+                        notificationId: notification._id,
+                    }
+                );
 
                 emitNewNotification(
                     io,
