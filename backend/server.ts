@@ -22,6 +22,10 @@ import registerChatSocket from "./sockets/chat.socket.js";
 
 import mongoose from "mongoose";
 
+import {
+    setSocketIO,
+} from "./sockets/socket.io.js";
+
 const app = express();
 
 const httpServer = createServer(app);
@@ -32,6 +36,8 @@ const io = new Server(httpServer, {
         credentials: true,
     },
 });
+
+setSocketIO(io);
 
 io.use(authenticateSocket);
 

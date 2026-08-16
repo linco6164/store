@@ -20,6 +20,8 @@ export default function registerChatSocket(io: Server) {
             return;
         }
 
+        socket.join(`user:${socket.userId}`);
+
         onlineUsers.add(socket.userId, socket.id);
 
         io.emit(
