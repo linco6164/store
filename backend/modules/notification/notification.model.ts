@@ -41,7 +41,7 @@ const NotificationSchema =
         {
             user: {
                 type: Schema.Types.ObjectId,
-                ref: "User",
+                ref: "Store",
                 required: true,
                 index: true,
             },
@@ -80,7 +80,7 @@ const NotificationSchema =
 
             actor: {
                 type: Schema.Types.ObjectId,
-                ref: "User",
+                ref: "Store",
             },
 
             listing: {

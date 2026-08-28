@@ -158,7 +158,10 @@ class PushNotificationService {
     }
 
     async getLastNotificationResponse() {
-        return Notifications.getLastNotificationResponseAsync();
+        if (Platform.OS === 'web') {
+            return null;
+        }
+        return Notifications.getLastNotificationResponse();
     }
 
     async getBadgeCount(): Promise<number> {

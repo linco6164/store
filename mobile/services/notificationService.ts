@@ -5,7 +5,7 @@ const API_URL =
 
 async function getAuthToken() {
     const SecureStore =
-        await import("expo-secure-store");
+        await import("@/services/storage");
 
     return SecureStore.getItemAsync(
         "nexora_access_token"

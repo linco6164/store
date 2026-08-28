@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "@/services/storage";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
