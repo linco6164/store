@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as SecureStore from '@/services/storage';
+import * as SecureStore from 'expo-secure-store';
 
 export async function getItemAsync(key: string): Promise<string | null> {
     if (Platform.OS === 'web') {

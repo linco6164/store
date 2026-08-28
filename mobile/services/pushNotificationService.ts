@@ -225,6 +225,10 @@ class PushNotificationService {
                     }),
                 }
             );
+        console.log(
+            "Push token backend response:",
+            response.status
+        );
 
         if (!response.ok) {
             const message =
@@ -261,6 +265,10 @@ class PushNotificationService {
         } catch (error) {
             console.error(
                 "Failed to initialize push notifications:",
+                error
+            );
+            console.error(
+                "Failed to register push token with backend:",
                 error
             );
 
