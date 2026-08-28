@@ -25,17 +25,15 @@ import {
 } from "@expo/vector-icons";
 
 import {
-    GoogleSignin,
-} from "@react-native-google-signin/google-signin";
-
-import {
     AccessToken,
     LoginManager,
-} from "react-native-fbsdk-next";
+} from "@/services/facebookAuth";
 
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { makeRedirectUri } from "expo-auth-session";
+
+import { GoogleSignin } from "../../services/googleSignin";
 
 
 import {
@@ -46,15 +44,7 @@ import {
     useTheme,
 } from "@/theme";
 
-if (Platform.OS !== "web") {
-    console.log("WEB_CLIENT_ID:", process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
-    GoogleSignin.configure({
-        webClientId:
-            process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
 
-        offlineAccess: false,
-    });
-}
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -62,7 +52,7 @@ export default function LoginScreen() {
     const {
         theme,
     } = useTheme();
-
+AccessToken
     const {
         login,
         loginWithGoogle,

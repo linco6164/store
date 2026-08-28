@@ -29,7 +29,7 @@ const PushTokenSchema =
         {
             user: {
                 type: Schema.Types.ObjectId,
-                ref: "User",
+                ref: "Store",
                 required: true,
                 index: true,
             },
