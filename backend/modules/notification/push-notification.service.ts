@@ -35,59 +35,130 @@ export const pushNotificationService = {
             badge?: number;
         }
     ) {
-        const tokens =
-            await PushTokenModel.find({
-                user: userId,
-                active: true,
-            }).lean();
+        try {
+            console.log(
+                "========== PUSH NOTIFICATION =========="
+            );
 
-        if (!tokens.length) {
-            return [];
-        }
+            console.log(
+                "[Push] User:",
+                userId
+            );
 
-        const messages: ExpoPushMessage[] =
-            tokens.map((item) => ({
-                to: item.token,
-                title: payload.title,
-                body: payload.body,
-                data: payload.data,
-                sound: "default",
-                badge: payload.badge,
-            }));
+            const tokens =
+                await PushTokenModel.find({
+                    user: userId,
+                    active: true,
+                }).lean();
 
-        const response =
-            await fetch(EXPO_PUSH_URL, {
-                method: "POST",
-                headers: {
-                    Accept: "application/json",
-                    "Accept-encoding":
-                        "gzip, deflate",
-                    "Content-Type":
-                        "application/json",
-                },
-                body: JSON.stringify(
-                    messages
-                ),
-            });
+            console.log(
+                "[Push] Active tokens:",
+                tokens.length
+            );
 
-        if (!response.ok) {
-            const text =
+            if (!tokens.length) {
+                console.log(
+                    "[Push] No active tokens found"
+                );
+
+                console.log(
+                    "======================================="
+                );
+
+                return [];
+            }
+
+            const messages: ExpoPushMessage[] =
+                tokens.map((item) => ({
+                    to: item.token,
+                    title: payload.title,
+                    body: payload.body,
+                    data: payload.data,
+                    sound: "default",
+                    badge: payload.badge,
+                }));
+
+            console.log(
+                "[Push] Tokens:",
+                tokens.map(
+                    (item) => item.token
+                )
+            );
+
+            console.log(
+                "[Push] Sending to Expo..."
+            );
+
+            const response =
+                await fetch(
+                    EXPO_PUSH_URL,
+                    {
+                        method: "POST",
+                        headers: {
+                            Accept:
+                                "application/json",
+                            "Accept-Encoding":
+                                "gzip, deflate",
+                            "Content-Type":
+                                "application/json",
+                        },
+                        body: JSON.stringify(
+                            messages
+                        ),
+                    }
+                );
+
+            console.log(
+                "[Push] Expo status:",
+                response.status
+            );
+
+            const responseText =
                 await response.text();
 
-            throw new Error(
-                `Expo Push API error ${response.status}: ${text}`
+            console.log(
+                "[Push] Expo raw response:",
+                responseText
             );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Expo Push API error ${response.status}: ${responseText}`
+                );
+            }
+
+            const result =
+                JSON.parse(
+                    responseText
+                ) as ExpoPushResponse;
+
+            console.log(
+                "[Push] Expo response:",
+                result.data
+            );
+
+            await this.processTickets(
+                tokens,
+                result.data
+            );
+
+            console.log(
+                "======================================="
+            );
+
+            return result.data;
+        } catch (error) {
+            console.error(
+                "[Push] Failed to send push notification:",
+                error
+            );
+
+            console.log(
+                "======================================="
+            );
+
+            return [];
         }
-
-        const result =
-            (await response.json()) as ExpoPushResponse;
-
-        await this.processTickets(
-            tokens,
-            result.data
-        );
-
-        return result.data;
     },
 
     async processTickets(
@@ -101,10 +172,8 @@ export const pushNotificationService = {
         tickets.forEach(
             (ticket, index) => {
                 if (
-                    ticket.status ===
-                        "error" &&
-                    ticket.details
-                        ?.error ===
+                    ticket.status === "error" &&
+                    ticket.details?.error ===
                         "DeviceNotRegistered"
                 ) {
                     const token =
@@ -122,6 +191,11 @@ export const pushNotificationService = {
         if (
             invalidTokens.length > 0
         ) {
+            console.log(
+                "[Push] Deactivating invalid tokens:",
+                invalidTokens
+            );
+
             await PushTokenModel.updateMany(
                 {
                     token: {
