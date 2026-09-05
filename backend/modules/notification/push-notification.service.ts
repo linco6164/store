@@ -1,29 +1,10 @@
-import { PushTokenModel } from "./push-token.model.js";
+import {
+    firebaseMessaging,
+} from "../../config/firebase.js";
 
-interface ExpoPushMessage {
-    to: string;
-    title: string;
-    body: string;
-    data?: Record<string, unknown>;
-    sound?: "default" | null;
-    badge?: number;
-}
-
-interface ExpoPushTicket {
-    status: "ok" | "error";
-    id?: string;
-    message?: string;
-    details?: {
-        error?: string;
-    };
-}
-
-interface ExpoPushResponse {
-    data: ExpoPushTicket[];
-}
-
-const EXPO_PUSH_URL =
-    "https://exp.host/--/api/v2/push/send";
+import {
+    PushTokenModel,
+} from "./push-token.model.js";
 
 export const pushNotificationService = {
     async sendToUser(
@@ -37,11 +18,11 @@ export const pushNotificationService = {
     ) {
         try {
             console.log(
-                "========== PUSH NOTIFICATION =========="
+                "========== FCM PUSH NOTIFICATION =========="
             );
 
             console.log(
-                "[Push] User:",
+                "[FCM] User:",
                 userId
             );
 
@@ -52,162 +33,137 @@ export const pushNotificationService = {
                 }).lean();
 
             console.log(
-                "[Push] Active tokens:",
+                "[FCM] Active tokens:",
                 tokens.length
             );
 
             if (!tokens.length) {
                 console.log(
-                    "[Push] No active tokens found"
-                );
-
-                console.log(
-                    "======================================="
+                    "[FCM] No active tokens found"
                 );
 
                 return [];
             }
 
-            const messages: ExpoPushMessage[] =
-                tokens.map((item) => ({
-                    to: item.token,
-                    title: payload.title,
-                    body: payload.body,
-                    data: payload.data,
-                    sound: "default",
-                    badge: payload.badge,
-                }));
+            const results = [];
 
-            console.log(
-                "[Push] Tokens:",
-                tokens.map(
-                    (item) => item.token
-                )
-            );
+            for (const item of tokens) {
+                try {
+                    const message = {
+                        token: item.token,
 
-            console.log(
-                "[Push] Sending to Expo..."
-            );
-
-            const response =
-                await fetch(
-                    EXPO_PUSH_URL,
-                    {
-                        method: "POST",
-                        headers: {
-                            Accept:
-                                "application/json",
-                            "Accept-Encoding":
-                                "gzip, deflate",
-                            "Content-Type":
-                                "application/json",
+                        notification: {
+                            title: payload.title,
+                            body: payload.body,
                         },
-                        body: JSON.stringify(
-                            messages
+
+                        data: Object.fromEntries(
+                            Object.entries(
+                                payload.data ?? {}
+                            ).map(
+                                ([key, value]) => [
+                                    key,
+                                    String(value),
+                                ]
+                            )
                         ),
+
+                        android: {
+                            priority: "high" as const,
+
+                            notification: {
+                                sound: "default",
+                                channelId:
+                                    "nexora_notifications",
+                            },
+                        },
+
+                        apns: {
+                            payload: {
+                                aps: {
+                                    sound: "default",
+                                    badge:
+                                        payload.badge,
+                                },
+                            },
+                        },
+                    };
+
+                    console.log(
+                        "[FCM] Sending to:",
+                        item.token
+                    );
+
+                    const response =
+                        await firebaseMessaging.send(
+                            message
+                        );
+
+                    console.log(
+                        "[FCM] Sent:",
+                        response
+                    );
+
+                    results.push({
+                        token: item.token,
+                        success: true,
+                        messageId: response,
+                    });
+                } catch (error: any) {
+                    console.error(
+                        "[FCM] Failed for token:",
+                        item.token,
+                        error
+                    );
+
+                    const errorCode =
+                        error?.code;
+
+                    // Tokenul nu mai este valid.
+                    if (
+                        errorCode ===
+                            "messaging/registration-token-not-registered" ||
+                        errorCode ===
+                            "messaging/invalid-registration-token"
+                    ) {
+                        await PushTokenModel.updateOne(
+                            {
+                                token: item.token,
+                            },
+                            {
+                                $set: {
+                                    active: false,
+                                },
+                            }
+                        );
+
+                        console.log(
+                            "[FCM] Invalid token deactivated:",
+                            item.token
+                        );
                     }
-                );
 
-            console.log(
-                "[Push] Expo status:",
-                response.status
-            );
-
-            const responseText =
-                await response.text();
-
-            console.log(
-                "[Push] Expo raw response:",
-                responseText
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    `Expo Push API error ${response.status}: ${responseText}`
-                );
+                    results.push({
+                        token: item.token,
+                        success: false,
+                        error: errorCode ??
+                            String(error),
+                    });
+                }
             }
 
-            const result =
-                JSON.parse(
-                    responseText
-                ) as ExpoPushResponse;
-
             console.log(
-                "[Push] Expo response:",
-                result.data
+                "============================================"
             );
 
-            await this.processTickets(
-                tokens,
-                result.data
-            );
-
-            console.log(
-                "======================================="
-            );
-
-            return result.data;
+            return results;
         } catch (error) {
             console.error(
-                "[Push] Failed to send push notification:",
+                "[FCM] Failed to send notification:",
                 error
             );
 
-            console.log(
-                "======================================="
-            );
-
             return [];
-        }
-    },
-
-    async processTickets(
-        tokens: Array<{
-            token: string;
-        }>,
-        tickets: ExpoPushTicket[]
-    ) {
-        const invalidTokens: string[] = [];
-
-        tickets.forEach(
-            (ticket, index) => {
-                if (
-                    ticket.status === "error" &&
-                    ticket.details?.error ===
-                        "DeviceNotRegistered"
-                ) {
-                    const token =
-                        tokens[index]?.token;
-
-                    if (token) {
-                        invalidTokens.push(
-                            token
-                        );
-                    }
-                }
-            }
-        );
-
-        if (
-            invalidTokens.length > 0
-        ) {
-            console.log(
-                "[Push] Deactivating invalid tokens:",
-                invalidTokens
-            );
-
-            await PushTokenModel.updateMany(
-                {
-                    token: {
-                        $in: invalidTokens,
-                    },
-                },
-                {
-                    $set: {
-                        active: false,
-                    },
-                }
-            );
         }
     },
 };
