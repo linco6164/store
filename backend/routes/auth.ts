@@ -395,8 +395,7 @@ router.post("/forgot-password", async (req, res) => {
 
         await user.save();
 
-        const link =
-            `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+       const link = `nexorastore://reset-password?token=${token}`;
 
         await sendEmail(
             user.email,
