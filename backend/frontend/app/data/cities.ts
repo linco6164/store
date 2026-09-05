@@ -1,0 +1,18 @@
+export const cities = [
+    "București",
+    "Cluj-Napoca",
+    "Timișoara",
+    "Iași",
+    "Constanța",
+    "Brașov",
+    "Craiova",
+    "Galați",
+    "Ploiești",
+    "Oradea",
+    "Sibiu",
+    "Arad",
+    "Bacău",
+    "Pitești",
+    "Suceava",
+    "Călărași",
+];
