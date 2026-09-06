@@ -6,21 +6,22 @@ import { profileController } from "./profile.controller.js";
 
 const router = Router();
 
+router.get("/", auth, profileController.me);
+
+router.patch("/", auth, profileController.update);
+
 router.get(
-    "/",
-    auth,
-    profileController.me
+  "/notification-settings",
+  auth,
+  profileController.notificationSettings,
 );
 
 router.patch(
-    "/",
-    auth,
-    profileController.update
+  "/notification-settings",
+  auth,
+  profileController.updateNotificationSettings,
 );
 
-router.get(
-    "/:id",
-    profileController.publicProfile
-);
+router.get("/:id", profileController.publicProfile);
 
 export default router;
