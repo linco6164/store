@@ -17,6 +17,7 @@ import chatRoutes from "./routes/chat.js";
 import { authenticateSocket } from "./sockets/socketAuth.js";
 import favoriteRoutes from "./modules/favorite/favorite.routes.js";
 import notificationRoutes from "./modules/notification/notification.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 
@@ -62,6 +63,8 @@ app.use("/chat", chatRoutes);
 app.use("/favorites", favoriteRoutes);
 
 app.use("/notifications", notificationRoutes);
+
+app.use("/admin", adminRoutes);
 
 app.get("/", (_, res) => {
     res.send("API is running");

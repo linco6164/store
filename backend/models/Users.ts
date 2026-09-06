@@ -15,6 +15,13 @@ const StoreUserSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
+
     provider: {
       type: String,
       enum: ["credentials", "google", "facebook", "discord"],
@@ -103,6 +110,11 @@ const StoreUserSchema = new mongoose.Schema(
 
     twoFactorSecret: {
       type: String,
+    },
+
+    banned: {
+      type: Boolean,
+      default: false,
     },
 
     twoFactorRecoveryCodes: [
