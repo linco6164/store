@@ -56,14 +56,14 @@ router.post("/login", async (req, res) => {
     console.log("Email primit:", email);
     console.log("User găsit:", user);
 
-    if (user.banned) {
-      return res.status(403).json({ message: "Acest cont a fost suspendat" });
-    }
-
     if (!user) {
       return res.status(401).json({
         message: "Invalid credentials",
       });
+    }
+
+    if (user.banned) {
+      return res.status(403).json({ message: "Acest cont a fost suspendat" });
     }
 
     if (!user.password) {
