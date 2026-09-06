@@ -16,6 +16,12 @@ router.patch("/users/:id/role", adminController.updateUserRole);
 router.patch("/users/:id/ban", adminController.toggleBanUser);
 router.delete("/users/:id", adminController.deleteUser);
 
+router.get("/users/:id", adminController.getUserDetails);
+router.patch("/users/:id/password", adminController.resetUserPassword);
+router.patch("/users/:id/email", adminController.updateUserEmail);
+router.patch("/users/:id/2fa/disable", adminController.disableUserTwoFactor);
+router.patch("/users/:id/profile", adminController.updateUserProfile);
+
 // Anunțuri
 router.get("/listings", adminController.getAllListings);
 router.delete("/listings/:id", adminController.deleteListing);
