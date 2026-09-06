@@ -1,367 +1,350 @@
 import mongoose from "mongoose";
 
-import {
-    NotificationModel,
-    NotificationType,
-} from "./notification.model.js";
+import { NotificationModel, NotificationType } from "./notification.model.js";
 
-import {
-    PushTokenModel,
-    PushPlatform,
-} from "./push-token.model.js";
+import { PushTokenModel, PushPlatform } from "./push-token.model.js";
 
-import {
-    pushNotificationService,
-} from "./push-notification.service.js";
+import { pushNotificationService } from "./push-notification.service.js";
 
-import {
-    getSocketIO,
-} from "../../sockets/socket.io.js";
+import { getSocketIO } from "../../sockets/socket.io.js";
 
-import {
-    emitNewNotification,
-} from "../../sockets/notification.socket.js";
+import { emitNewNotification } from "../../sockets/notification.socket.js";
+
+import User from "../../models/Users.js";
 
 interface CreateNotificationData {
-    user: string;
-    type: NotificationType;
-    title: string;
-    message: string;
-    actor?: string;
-    listing?: string;
-    conversation?: string;
-    metadata?: Record<string, unknown>;
+  user: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  actor?: string;
+  listing?: string;
+  conversation?: string;
+  metadata?: Record<string, unknown>;
 }
 
 class NotificationService {
-    private toObjectId(userId: string) {
-        if (
-            !mongoose.Types.ObjectId.isValid(
-                userId
-            )
-        ) {
-            throw new Error(
-                `Invalid userId: ${userId}`
-            );
-        }
-
-        return new mongoose.Types.ObjectId(
-            userId
-        );
+  private toObjectId(userId: string) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error(`Invalid userId: ${userId}`);
     }
 
-    async create(
-        data: CreateNotificationData
-    ) {
-        console.log(
-            "[Notification] CREATE",
-            {
-                user: data.user,
-                type: data.type,
-                title: data.title,
-                conversation: data.conversation,
-            }
-        );
-        const notification =
-            await NotificationModel.create({
-                ...data,
+    return new mongoose.Types.ObjectId(userId);
+  }
 
-                user: this.toObjectId(
-                    data.user
-                ),
+  async create(data: CreateNotificationData) {
+    console.log("[Notification] CREATE", {
+      user: data.user,
+      type: data.type,
+      title: data.title,
+      conversation: data.conversation,
+    });
 
-                actor: data.actor
-                    ? this.toObjectId(
-                        data.actor
-                    )
-                    : undefined,
+    const notification = await NotificationModel.create({
+      ...data,
 
-                listing: data.listing
-                    ? this.toObjectId(
-                        data.listing
-                    )
-                    : undefined,
+      user: this.toObjectId(data.user),
 
-                conversation:
-                    data.conversation
-                        ? this.toObjectId(
-                            data.conversation
-                        )
-                        : undefined,
-            });
+      actor: data.actor ? this.toObjectId(data.actor) : undefined,
 
-        try {
-            const unreadCount =
-                await NotificationModel.countDocuments(
-                    {
-                        user: this.toObjectId(
-                            data.user
-                        ),
-                        read: false,
-                    }
-                );
+      listing: data.listing ? this.toObjectId(data.listing) : undefined,
 
-            try {
-                const io = getSocketIO();
+      conversation: data.conversation
+        ? this.toObjectId(data.conversation)
+        : undefined,
+    });
 
-                console.log(
-                    "[Notification] EMIT",
-                    {
-                        room: `user:${data.user}`,
-                        unreadCount,
-                        notificationId: notification._id,
-                    }
-                );
+    try {
+      const unreadCount = await NotificationModel.countDocuments({
+        user: this.toObjectId(data.user),
 
-                emitNewNotification(
-                    io,
-                    data.user,
-                    notification,
-                    unreadCount
-                );
-            } catch (error) {
-                console.error(
-                    "Failed to emit socket notification:",
-                    error
-                );
-            }
+        read: false,
+      });
 
-            await pushNotificationService.sendToUser(
-                data.user,
-                {
-                    title: data.title,
-                    body: data.message,
-                    badge: unreadCount,
+      /*
+       * SOCKET.IO
+       *
+       * Socket notification is not affected
+       * by the push notification settings.
+       */
+      try {
+        const io = getSocketIO();
 
-                    data: {
-                        notificationId:
-                            notification._id.toString(),
+        console.log("[Notification] EMIT", {
+          room: `user:${data.user}`,
 
-                        type: data.type,
+          unreadCount,
 
-                        ...(data.listing
-                            ? {
-                                listingId:
-                                    data.listing,
-                            }
-                            : {}),
+          notificationId: notification._id,
+        });
 
-                        ...(data.conversation
-                            ? {
-                                conversationId:
-                                    data.conversation,
-                            }
-                            : {}),
-                    },
+        emitNewNotification(io, data.user, notification, unreadCount);
+      } catch (error) {
+        console.error("Failed to emit socket notification:", error);
+      }
+
+      /*
+       * GET USER NOTIFICATION SETTINGS
+       */
+      const user = await User.findById(data.user).select(
+        "notificationSettings",
+      );
+
+      const settings = user?.notificationSettings;
+
+      /*
+       * CHECK IF PUSH SHOULD BE SENT
+       */
+      let shouldSendPush = true;
+
+      switch (data.type) {
+        case "message":
+          shouldSendPush =
+            settings?.push !== false && settings?.messages !== false;
+
+          break;
+
+        case "favorite":
+          shouldSendPush =
+            settings?.push !== false && settings?.favorites !== false;
+
+          break;
+
+        case "offer":
+          shouldSendPush =
+            settings?.push !== false && settings?.offers !== false;
+
+          break;
+
+        default:
+          shouldSendPush =
+            settings?.push !== false && settings?.account !== false;
+
+          break;
+      }
+
+      console.log("[Notification] PUSH CHECK", {
+        user: data.user,
+
+        type: data.type,
+
+        push: settings?.push,
+
+        messages: settings?.messages,
+
+        favorites: settings?.favorites,
+
+        offers: settings?.offers,
+
+        account: settings?.account,
+
+        shouldSendPush,
+      });
+
+      /*
+       * SEND FCM PUSH
+       */
+      if (shouldSendPush) {
+        await pushNotificationService.sendToUser(data.user, {
+          title: data.title,
+
+          body: data.message,
+
+          badge: unreadCount,
+
+          sound: settings?.sound !== false,
+
+          vibration: settings?.vibration !== false,
+
+          data: {
+            notificationId: notification._id.toString(),
+
+            type: data.type,
+
+            ...(data.listing
+              ? {
+                  listingId: data.listing,
                 }
-            );
-        } catch (error) {
-            console.error(
-                "Failed to send notification side effects:",
-                error
-            );
-        }
+              : {}),
 
-        return notification;
+            ...(data.conversation
+              ? {
+                  conversationId: data.conversation,
+                }
+              : {}),
+          },
+        });
+      } else {
+        console.log("[Notification] PUSH SKIPPED", {
+          user: data.user,
+
+          type: data.type,
+        });
+      }
+    } catch (error) {
+      /*
+       * The notification was already
+       * saved successfully.
+       *
+       * Push/socket errors must not
+       * delete or invalidate it.
+       */
+      console.error("Failed to send notification side effects:", error);
     }
 
-    async getAll(userId: string) {
-        try {
-            if (
-                !mongoose.Types.ObjectId.isValid(
-                    userId
-                )
-            ) {
-                throw new Error(
-                    `Invalid notification userId: ${userId}`
-                );
-            }
+    return notification;
+  }
 
-            const userObjectId =
-                new mongoose.Types.ObjectId(
-                    userId
-                );
+  async getAll(userId: string) {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error(`Invalid notification userId: ${userId}`);
+      }
 
-            const notifications =
-                await NotificationModel.find({
-                    user: userObjectId,
-                })
-                    .populate(
-                        "actor",
-                        "username avatar"
-                    )
-                    .populate(
-                        "listing",
-                        "title images price"
-                    )
-                    .sort({
-                        createdAt: -1,
-                    })
-                    .limit(50)
-                    .lean();
+      const userObjectId = new mongoose.Types.ObjectId(userId);
 
-            console.log(
-                "[Notifications] getAll:",
-                notifications.length
-            );
+      const notifications = await NotificationModel.find({
+        user: userObjectId,
+      })
+        .populate("actor", "username avatar")
+        .populate("listing", "title images price")
+        .sort({
+          createdAt: -1,
+        })
+        .limit(50)
+        .lean();
 
-            return notifications;
-        } catch (error) {
-            console.error(
-                "[Notifications] getAll ERROR:",
-                error
-            );
+      console.log("[Notifications] getAll:", notifications.length);
 
-            throw error;
-        }
+      return notifications;
+    } catch (error) {
+      console.error("[Notifications] getAll ERROR:", error);
+
+      throw error;
     }
+  }
 
-    async getUnreadCount(
-        userId: string
-    ) {
-        try {
-            if (
-                !mongoose.Types.ObjectId.isValid(
-                    userId
-                )
-            ) {
-                throw new Error(
-                    `Invalid notification userId: ${userId}`
-                );
-            }
+  async getUnreadCount(userId: string) {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error(`Invalid notification userId: ${userId}`);
+      }
 
-            const userObjectId =
-                new mongoose.Types.ObjectId(
-                    userId
-                );
+      const userObjectId = new mongoose.Types.ObjectId(userId);
 
-            const count =
-                await NotificationModel.countDocuments(
-                    {
-                        user: userObjectId,
-                        read: false,
-                    }
-                );
+      const count = await NotificationModel.countDocuments({
+        user: userObjectId,
 
-            console.log(
-                "[Notifications] unreadCount:",
-                count
-            );
+        read: false,
+      });
 
-            return count;
-        } catch (error) {
-            console.error(
-                "[Notifications] getUnreadCount ERROR:",
-                error
-            );
+      console.log("[Notifications] unreadCount:", count);
 
-            throw error;
-        }
+      return count;
+    } catch (error) {
+      console.error("[Notifications] getUnreadCount ERROR:", error);
+
+      throw error;
     }
+  }
 
-    async markAsRead(
-        userId: string,
-        notificationId: string
-    ) {
-        return NotificationModel.findOneAndUpdate(
-            {
-                _id: notificationId,
-                user: this.toObjectId(
-                    userId
-                ),
-            },
-            {
-                $set: {
-                    read: true,
-                },
-            },
-            {
-                new: true,
-            }
-        );
-    }
+  async markAsRead(userId: string, notificationId: string) {
+    return NotificationModel.findOneAndUpdate(
+      {
+        _id: notificationId,
 
-    async markAllAsRead(
-        userId: string
-    ) {
-        await NotificationModel.updateMany(
-            {
-                user: this.toObjectId(
-                    userId
-                ),
-                read: false,
-            },
-            {
-                $set: {
-                    read: true,
-                },
-            }
-        );
-    }
+        user: this.toObjectId(userId),
+      },
 
-    async delete(
-        userId: string,
-        notificationId: string
-    ) {
-        return NotificationModel.findOneAndDelete(
-            {
-                _id: notificationId,
-                user: this.toObjectId(
-                    userId
-                ),
-            }
-        );
-    }
+      {
+        $set: {
+          read: true,
+        },
+      },
 
-    async registerPushToken(
-        userId: string,
-        token: string,
-        platform: PushPlatform
-    ) {
-        const userObjectId =
-            this.toObjectId(userId);
+      {
+        new: true,
+      },
+    );
+  }
 
-        return PushTokenModel.findOneAndUpdate(
-            {
-                token,
-            },
-            {
-                $set: {
-                    user: userObjectId,
-                    platform,
-                    active: true,
-                    lastUsedAt: new Date(),
-                },
-            },
-            {
-                new: true,
-                upsert: true,
-                setDefaultsOnInsert: true,
-            }
-        );
-    }
+  async markAllAsRead(userId: string) {
+    await NotificationModel.updateMany(
+      {
+        user: this.toObjectId(userId),
 
-    async removePushToken(
-        userId: string,
-        token: string
-    ) {
-        return PushTokenModel.findOneAndUpdate(
-            {
-                user:
-                    this.toObjectId(userId),
-                token,
-            },
-            {
-                $set: {
-                    active: false,
-                },
-            },
-            {
-                new: true,
-            }
-        );
-    }
+        read: false,
+      },
+
+      {
+        $set: {
+          read: true,
+        },
+      },
+    );
+  }
+
+  async delete(userId: string, notificationId: string) {
+    return NotificationModel.findOneAndDelete({
+      _id: notificationId,
+
+      user: this.toObjectId(userId),
+    });
+  }
+
+  async registerPushToken(
+    userId: string,
+    token: string,
+    platform: PushPlatform,
+  ) {
+    const userObjectId = this.toObjectId(userId);
+
+    return PushTokenModel.findOneAndUpdate(
+      {
+        token,
+      },
+
+      {
+        $set: {
+          user: userObjectId,
+
+          platform,
+
+          active: true,
+
+          lastUsedAt: new Date(),
+        },
+      },
+
+      {
+        new: true,
+
+        upsert: true,
+
+        setDefaultsOnInsert: true,
+      },
+    );
+  }
+
+  async removePushToken(userId: string, token: string) {
+    return PushTokenModel.findOneAndUpdate(
+      {
+        user: this.toObjectId(userId),
+
+        token,
+      },
+
+      {
+        $set: {
+          active: false,
+        },
+      },
+
+      {
+        new: true,
+      },
+    );
+  }
 }
 
-export const notificationService =
-    new NotificationService();
+export const notificationService = new NotificationService();
