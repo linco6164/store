@@ -195,6 +195,18 @@ class NotificationService {
     return notification;
   }
 
+  async sendBroadcastNotification({
+    title,
+    body,
+    data = {},
+  }: {
+    title: string;
+    body: string;
+    data?: Record<string, unknown>;
+  }) {
+    return pushNotificationService.sendBroadcast({ title, body, data });
+  }
+
   async getAll(userId: string) {
     try {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
