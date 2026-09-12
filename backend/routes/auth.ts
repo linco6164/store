@@ -219,6 +219,10 @@ router.post("/facebook", async (req, res) => {
     } else {
       user.facebookId = data.id;
 
+      if (data.name) {
+        user.username = data.name;
+      }
+
       if (data.picture?.data?.url) {
         user.avatar = data.picture.data.url;
       }
