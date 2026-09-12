@@ -190,49 +190,96 @@ router.post("/google", async (req, res) => {
 router.post("/facebook", async (req, res) => {
   try {
     const { accessToken } = req.body;
-    console.log("Access Token:", accessToken);
+
+    if (!accessToken) {
+      return res.status(400).json({
+        message: "Lipsește accessToken",
+      });
+    }
+
+    console.log("[Facebook] Access Token primit");
+
     const response = await fetch(
-      `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`,
+      `https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(
+        accessToken,
+      )}`,
     );
 
     const data = await response.json();
 
-    console.log("Facebook status:", response.status);
-    console.log("Facebook response:", data);
+    console.log("[Facebook] Status:", response.status);
+
+    console.log("[Facebook] User data:", JSON.stringify(data, null, 2));
 
     if (!response.ok) {
-      return res.status(response.status).json(data);
+      return res.status(response.status).json({
+        message: "Facebook token invalid",
+        facebook: data,
+      });
     }
 
-    let user = await User.findOne({
-      email: data.email,
+    if (!data.id) {
+      return res.status(400).json({
+        message: "Facebook nu a returnat user ID",
+      });
+    }
+
+    const facebookId = data.id;
+    const username = data.name || "Utilizator";
+    const email = data.email || null;
+    const avatar = data.picture?.data?.url || null;
+
+    let user = null;
+
+    // 1. Încercăm întâi după Facebook ID
+    user = await User.findOne({
+      facebookId,
     });
 
+    // 2. Dacă nu există, încercăm după email
+    if (!user && email) {
+      user = await User.findOne({
+        email,
+      });
+    }
+
+    // 3. Creăm utilizatorul
     if (!user) {
       user = await User.create({
-        username: data.name,
-        email: data.email,
+        username,
+        ...(email ? { email } : {}),
         provider: "facebook",
-        facebookId: data.id,
-        avatar: data.picture?.data?.url,
+        facebookId,
+        ...(avatar ? { avatar } : {}),
       });
+
+      console.log("[Facebook] User created:", user._id);
     } else {
-      user.facebookId = data.id;
+      // 4. Actualizăm datele Facebook
+      user.facebookId = facebookId;
 
-      if (data.name) {
-        user.username = data.name;
+      if (username) {
+        user.username = username;
       }
 
-      if (data.picture?.data?.url) {
-        user.avatar = data.picture.data.url;
+      if (email && !user.email) {
+        user.email = email;
       }
+
+      if (avatar) {
+        user.avatar = avatar;
+      }
+
+      user.provider = "facebook";
 
       await user.save();
+
+      console.log("[Facebook] User updated:", user._id);
     }
 
     const token = jwt.sign(
       {
-        id: user._id,
+        id: user._id.toString(),
       },
       process.env.JWT_SECRET!,
       {
@@ -240,14 +287,22 @@ router.post("/facebook", async (req, res) => {
       },
     );
 
-    res.json({
+    return res.json({
       token,
-      user,
+      user: {
+        _id: user._id,
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        provider: user.provider,
+        facebookId: user.facebookId,
+      },
     });
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("[Facebook] Login error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Facebook login failed",
     });
   }
