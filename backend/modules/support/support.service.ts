@@ -64,11 +64,7 @@ export const supportService = {
     ticketId: string;
     message: string;
   }) {
-    const {
-      userId,
-      ticketId,
-      message,
-    } = params;
+    const { userId, ticketId, message } = params;
 
     if (!Types.ObjectId.isValid(ticketId)) {
       return null;
@@ -101,10 +97,7 @@ export const supportService = {
     return ticket;
   },
 
-  async closeTicket(
-    userId: string,
-    ticketId: string,
-  ) {
+  async closeTicket(userId: string, ticketId: string) {
     if (!Types.ObjectId.isValid(ticketId)) {
       return null;
     }
@@ -119,6 +112,89 @@ export const supportService = {
     }
 
     ticket.status = "closed";
+
+    await ticket.save();
+
+    return ticket;
+  },
+
+  async getAllTickets(params?: {
+    status?: SupportTicketStatus;
+    category?: SupportTicketCategory;
+  }) {
+    const filter: Record<string, unknown> = {};
+
+    if (params?.status) {
+      filter.status = params.status;
+    }
+
+    if (params?.category) {
+      filter.category = params.category;
+    }
+
+    return SupportTicket.find(filter)
+      .populate("user", "username email avatar")
+      .sort({ updatedAt: -1 })
+      .lean();
+  },
+
+  async getAdminTicket(ticketId: string) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      return null;
+    }
+
+    return SupportTicket.findById(new Types.ObjectId(ticketId))
+      .populate("user", "username email avatar")
+      .lean();
+  },
+
+  async addAdminMessage(params: {
+    ticketId: string;
+    adminId: string;
+    message: string;
+  }) {
+    const { ticketId, adminId, message } = params;
+
+    if (!Types.ObjectId.isValid(ticketId)) {
+      return null;
+    }
+
+    const ticket = await SupportTicket.findById(new Types.ObjectId(ticketId));
+
+    if (!ticket) {
+      return null;
+    }
+
+    if (ticket.status === "closed") {
+      throw new Error("TICKET_CLOSED");
+    }
+
+    ticket.messages.push({
+      sender: new Types.ObjectId(adminId),
+      senderType: "admin",
+      message: message.trim(),
+      createdAt: new Date(),
+    });
+
+    ticket.status = "pending";
+
+    await ticket.save();
+
+    return ticket;
+  },
+
+  async setTicketStatus(ticketId: string, status: SupportTicketStatus) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      return null;
+    }
+
+    const ticket = await SupportTicket.findById(new Types.ObjectId(ticketId));
+
+    if (!ticket) {
+      return null;
+    }
+
+    ticket.status = status;
 
     await ticket.save();
 
