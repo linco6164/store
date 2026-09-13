@@ -119,24 +119,64 @@ export const supportService = {
   },
 
   async getAllTickets(params?: {
-    status?: SupportTicketStatus;
-    category?: SupportTicketCategory;
-  }) {
+  status?: SupportTicketStatus;
+  category?: SupportTicketCategory;
+}) {
+  try {
     const filter: Record<string, unknown> = {};
 
-    if (params?.status) {
+    if (
+      params?.status &&
+      ["open", "pending", "closed"].includes(params.status)
+    ) {
       filter.status = params.status;
     }
 
-    if (params?.category) {
+    if (
+      params?.category &&
+      [
+        "account_banned",
+        "account",
+        "payments",
+        "orders",
+        "listings",
+        "technical",
+        "other",
+      ].includes(params.category)
+    ) {
       filter.category = params.category;
     }
 
-    return SupportTicket.find(filter)
-      .populate("user", "username email avatar")
-      .sort({ updatedAt: -1 })
+    console.log(
+      "[SUPPORT] Admin ticket filter:",
+      filter,
+    );
+
+    const tickets = await SupportTicket.find(filter)
+      .populate(
+        "user",
+        "username email avatar",
+      )
+      .sort({
+        updatedAt: -1,
+      })
       .lean();
-  },
+
+    console.log(
+      "[SUPPORT] Admin tickets found:",
+      tickets.length,
+    );
+
+    return tickets;
+  } catch (error) {
+    console.error(
+      "[SUPPORT] getAllTickets ERROR:",
+      error,
+    );
+
+    throw error;
+  }
+},
 
   async getAdminTicket(ticketId: string) {
     if (!Types.ObjectId.isValid(ticketId)) {

@@ -216,17 +216,26 @@ export const supportController = {
 
   async getAdminTickets(req: AuthRequest, res: Response) {
     try {
-      const tickets = await supportService.getAllTickets({
-        status:
-          typeof req.query.status === "string"
-            ? (req.query.status as any)
-            : undefined,
+      console.log("========== GET ADMIN SUPPORT TICKETS ==========");
 
-        category:
-          typeof req.query.category === "string"
-            ? (req.query.category as any)
-            : undefined,
+      console.log("[SUPPORT] Query:", req.query);
+
+      const status =
+        typeof req.query.status === "string" && req.query.status.length > 0
+          ? (req.query.status as any)
+          : undefined;
+
+      const category =
+        typeof req.query.category === "string" && req.query.category.length > 0
+          ? (req.query.category as any)
+          : undefined;
+
+      const tickets = await supportService.getAllTickets({
+        status,
+        category,
       });
+
+      console.log("[SUPPORT] Returning tickets:", tickets.length);
 
       return res.json({
         success: true,
