@@ -50,7 +50,7 @@ export const adminController = {
 
       const users = await User.find(query)
         .select("-password -twoFactorSecret")
-        .sort({ createdAt: -1 })
+        .sort({ updatedAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit);
 
