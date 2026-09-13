@@ -7,6 +7,7 @@ import bcrypt from "bcrypt"; // sau bcrypt, orice ai deja folosit în auth.ts
 import crypto from "crypto";
 
 import { notificationService } from "../notification/notification.service.js";
+import { pushNotificationService } from "../notification/push-notification.service.js";
 
 import WalletTransaction from "../wallet/wallet.model.js"; // ← default export, fără acolade
 
@@ -92,20 +93,64 @@ export const adminController = {
 
   async toggleBanUser(req: Request, res: Response) {
     try {
+      console.log("========== TOGGLE BAN ==========");
+      console.log("USER ID:", req.params.id);
+
       const user = await User.findById(req.params.id);
-      if (!user)
-        return res
-          .status(404)
-          .json({ success: false, message: "User negăsit" });
+
+      console.log("USER FOUND:", !!user);
+
+      if (!user) {
+        console.log("USER NOT FOUND");
+
+        return res.status(404).json({
+          success: false,
+          message: "User negăsit",
+        });
+      }
+
+      console.log("OLD BANNED STATUS:", user.banned);
 
       user.banned = !user.banned;
+
       await user.save();
 
-      res.json({ success: true, data: user });
+      console.log("NEW BANNED STATUS:", user.banned);
+
+      if (user.banned) {
+        console.log("USER WAS BANNED - SENDING FCM");
+
+        try {
+          const result = await pushNotificationService.sendToUser(
+            user._id.toString(),
+            {
+              title: "Cont blocat",
+              body: "Contul tău a fost blocat de administrator.",
+              data: {
+                type: "account_banned",
+              },
+            },
+          );
+
+          console.log("FCM RESULT:", result);
+        } catch (fcmError) {
+          console.error("FCM SEND ERROR:", fcmError);
+        }
+      }
+
+      console.log("========== END TOGGLE BAN ==========");
+
+      return res.json({
+        success: true,
+        data: user,
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, message: "Eroare la actualizarea statusului" });
+      console.error("TOGGLE BAN ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la actualizarea statusului",
+      });
     }
   },
 
