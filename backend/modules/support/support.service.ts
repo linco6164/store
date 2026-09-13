@@ -184,6 +184,7 @@ export const supportService = {
     }
 
     return SupportTicket.findById(new Types.ObjectId(ticketId))
+      .populate("user", "username email avatar")
       .sort({
         updatedAt: -1,
       })

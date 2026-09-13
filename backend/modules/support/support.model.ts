@@ -40,7 +40,7 @@ const supportMessageSchema = new Schema<ISupportMessage>(
   {
     sender: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Store",
       required: true,
     },
 
@@ -67,7 +67,7 @@ const supportTicketSchema = new Schema<ISupportTicket>(
   {
     user: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Store",
       required: true,
       index: true,
     },
