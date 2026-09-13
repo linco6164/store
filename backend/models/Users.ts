@@ -57,6 +57,12 @@ const StoreUserSchema = new mongoose.Schema(
     facebook: { type: String, default: "" },
     website: { type: String, default: "" },
 
+    balance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     notificationSettings: {
       push: {
         type: Boolean,
