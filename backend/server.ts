@@ -20,6 +20,7 @@ import notificationRoutes from "./modules/notification/notification.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
+import paymentRoutes from "./modules/payment/payment.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 
@@ -50,6 +51,8 @@ app.use(cors());
 
 app.use(express.json());
 
+app.use(express.urlencoded({ extended: false }));
+
 app.use("/auth", authRoutes);
 
 app.use("/upload", uploadRoutes);
@@ -67,6 +70,8 @@ app.use("/chat", chatRoutes);
 app.use("/favorites", favoriteRoutes);
 
 app.use("/notifications", notificationRoutes);
+
+app.use("/payments", paymentRoutes);
 
 app.use("/admin", adminRoutes);
 
