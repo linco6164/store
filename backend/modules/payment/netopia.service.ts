@@ -46,9 +46,7 @@ function requiredEnv(name: string): string {
 }
 
 function resolveConfiguredPath(value: string): string {
-  return path.isAbsolute(value)
-    ? value
-    : path.resolve(process.cwd(), value);
+  return path.isAbsolute(value) ? value : path.resolve(process.cwd(), value);
 }
 
 function xmlEscape(value: unknown): string {
@@ -65,9 +63,7 @@ function readPublicCertificate(): string {
   const resolvedPath = resolveConfiguredPath(configuredPath);
 
   if (!fs.existsSync(resolvedPath)) {
-    throw new Error(
-      `Certificatul public NETOPIA nu există: ${resolvedPath}`,
-    );
+    throw new Error(`Certificatul public NETOPIA nu există: ${resolvedPath}`);
   }
 
   return fs.readFileSync(resolvedPath, "utf8");
@@ -78,12 +74,23 @@ function readPrivateKey(): string {
   const resolvedPath = resolveConfiguredPath(configuredPath);
 
   if (!fs.existsSync(resolvedPath)) {
-    throw new Error(
-      `Cheia privată NETOPIA nu există: ${resolvedPath}`,
-    );
+    throw new Error(`Cheia privată NETOPIA nu există: ${resolvedPath}`);
   }
 
   return fs.readFileSync(resolvedPath, "utf8");
+}
+
+function formatNetopiaTimestamp(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return (
+    `${date.getFullYear()}` +
+    `${pad(date.getMonth() + 1)}` +
+    `${pad(date.getDate())}` +
+    `${pad(date.getHours())}` +
+    `${pad(date.getMinutes())}` +
+    `${pad(date.getSeconds())}`
+  );
 }
 
 function encryptEnvelope(xml: string) {
@@ -91,6 +98,7 @@ function encryptEnvelope(xml: string) {
   const iv = crypto.randomBytes(16);
 
   const cipher = crypto.createCipheriv("aes-256-cbc", aesKey, iv);
+
   const encryptedData = Buffer.concat([
     cipher.update(Buffer.from(xml, "utf8")),
     cipher.final(),
@@ -125,14 +133,16 @@ function decryptEnvelope(
   }
 
   const privateKey = readPrivateKey();
-  const encryptedKey = Buffer.from(envKeyBase64, "base64");
+
   const encryptedData = Buffer.from(dataBase64, "base64");
 
   const forgePrivateKey = forge.pki.privateKeyFromPem(privateKey);
+
   const aesKeyBytes = forgePrivateKey.decrypt(
     forge.util.decode64(envKeyBase64),
     "RSAES-PKCS1-V1_5",
   );
+
   const aesKey = Buffer.from(aesKeyBytes, "binary");
 
   const normalizedCipher = (cipherName ?? "aes-256-cbc").toLowerCase();
@@ -148,6 +158,7 @@ function decryptEnvelope(
   }
 
   const iv = Buffer.from(ivBase64, "base64");
+
   const decipher = crypto.createDecipheriv("aes-256-cbc", aesKey, iv);
 
   return Buffer.concat([
@@ -159,38 +170,67 @@ function decryptEnvelope(
 function buildCardXml(data: NetopiaCheckoutData): string {
   const amount = data.amount.toFixed(2);
 
-  const billingAddress = [
-    data.billing.address,
-    data.billing.city,
-    data.billing.county,
-    data.billing.postalCode,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const timestamp = formatNetopiaTimestamp();
+
+  const address = data.billing.address ?? "";
+
+  const city = data.billing.city ?? "";
+
+  const county = data.billing.county ?? "";
+
+  const postalCode = data.billing.postalCode ?? "";
+
+  const country = data.billing.country ?? "RO";
+
+  const phone = data.billing.phone ?? "";
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<order id="${xmlEscape(data.orderId)}" timestamp="${new Date().toISOString()}">
+<order
+  type="card"
+  id="${xmlEscape(data.orderId)}"
+  timestamp="${xmlEscape(timestamp)}"
+>
   <signature>${xmlEscape(requiredEnv("NETOPIA_SIGNATURE"))}</signature>
-  <url_confirm>${xmlEscape(data.confirmUrl)}</url_confirm>
-  <url_return>${xmlEscape(data.returnUrl)}</url_return>
-  <invoice currency="${xmlEscape(data.currency)}" amount="${xmlEscape(amount)}">
+
+  <url>
+    <confirm>${xmlEscape(data.confirmUrl)}</confirm>
+    <return>${xmlEscape(data.returnUrl)}</return>
+  </url>
+
+  <invoice
+    currency="${xmlEscape(data.currency)}"
+    amount="${xmlEscape(amount)}"
+  >
     <details>${xmlEscape(data.details)}</details>
+
+    <contact_info>
+      <billing type="person">
+        <first_name>${xmlEscape(data.billing.firstName)}</first_name>
+
+        <last_name>${xmlEscape(data.billing.lastName)}</last_name>
+
+        <country>${xmlEscape(country)}</country>
+
+        <county>${xmlEscape(county)}</county>
+
+        <city>${xmlEscape(city)}</city>
+
+        <zip_code>${xmlEscape(postalCode)}</zip_code>
+
+        <address>${xmlEscape(address)}</address>
+
+        <email>${xmlEscape(data.billing.email)}</email>
+
+        <mobile_phone>${xmlEscape(phone)}</mobile_phone>
+      </billing>
+    </contact_info>
   </invoice>
-  <billing type="person">
-    <first_name>${xmlEscape(data.billing.firstName)}</first_name>
-    <last_name>${xmlEscape(data.billing.lastName)}</last_name>
-    <email>${xmlEscape(data.billing.email)}</email>
-    <phone>${xmlEscape(data.billing.phone ?? "")}</phone>
-    <address>${xmlEscape(billingAddress)}</address>
-    <country>${xmlEscape(data.billing.country ?? "RO")}</country>
-  </billing>
+
+  <ipn_cipher>aes-256-cbc</ipn_cipher>
 </order>`;
 }
 
-function findFirstValue(
-  object: Record<string, any>,
-  keys: string[],
-): unknown {
+function findFirstValue(object: Record<string, any>, keys: string[]): unknown {
   for (const key of keys) {
     if (object[key] !== undefined && object[key] !== null) {
       return object[key];
@@ -201,16 +241,24 @@ function findFirstValue(
 }
 
 function deepFind(object: unknown, keys: string[]): unknown {
-  if (!object || typeof object !== "object") return undefined;
+  if (!object || typeof object !== "object") {
+    return undefined;
+  }
 
   const record = object as Record<string, unknown>;
 
   const direct = findFirstValue(record as Record<string, any>, keys);
-  if (direct !== undefined) return direct;
+
+  if (direct !== undefined) {
+    return direct;
+  }
 
   for (const value of Object.values(record)) {
     const found = deepFind(value, keys);
-    if (found !== undefined) return found;
+
+    if (found !== undefined) {
+      return found;
+    }
   }
 
   return undefined;
@@ -219,8 +267,7 @@ function deepFind(object: unknown, keys: string[]): unknown {
 class NetopiaService {
   private getGatewayUrl(): string {
     const sandbox =
-      String(process.env.NETOPIA_SANDBOX ?? "true").toLowerCase() ===
-      "true";
+      String(process.env.NETOPIA_SANDBOX ?? "true").toLowerCase() === "true";
 
     return sandbox
       ? "https://sandboxsecure.mobilpay.ro"
@@ -229,6 +276,7 @@ class NetopiaService {
 
   createCheckoutEnvelope(data: NetopiaCheckoutData) {
     const xml = buildCardXml(data);
+
     const envelope = encryptEnvelope(xml);
 
     return {
@@ -264,21 +312,26 @@ class NetopiaService {
       parsed;
 
     const orderId = String(
-      deepFind(root, ["@_id", "orderId", "orderID", "purchaseId"]) ??
-        "",
+      deepFind(root, ["@_id", "orderId", "orderID", "purchaseId"]) ?? "",
     );
 
     const ntpIdValue = deepFind(root, ["ntpID", "ntpId", "rrn"]);
+
     const actionValue = deepFind(root, ["action"]);
+
     const errorCodeValue = deepFind(root, ["errorCode", "error_code"]);
+
     const errorMessageValue = deepFind(root, ["errorMessage", "error_message"]);
+
     const processedAmountValue = deepFind(root, [
       "processedAmount",
       "processed_amount",
     ]);
+
     const currencyValue = deepFind(root, ["currency"]);
 
     const errorCode = Number(errorCodeValue ?? 0);
+
     const processedAmount = Number(processedAmountValue);
 
     if (!orderId) {
@@ -287,27 +340,22 @@ class NetopiaService {
 
     return {
       orderId,
-      ntpId:
-        ntpIdValue !== undefined
-          ? String(ntpIdValue)
-          : undefined,
-      action:
-        actionValue !== undefined
-          ? String(actionValue)
-          : undefined,
+
+      ntpId: ntpIdValue !== undefined ? String(ntpIdValue) : undefined,
+
+      action: actionValue !== undefined ? String(actionValue) : undefined,
+
       errorCode: Number.isFinite(errorCode) ? errorCode : 0,
+
       errorMessage:
-        errorMessageValue !== undefined
-          ? String(errorMessageValue)
-          : undefined,
-      processedAmount:
-        Number.isFinite(processedAmount)
-          ? processedAmount
-          : undefined,
-      currency:
-        currencyValue !== undefined
-          ? String(currencyValue)
-          : undefined,
+        errorMessageValue !== undefined ? String(errorMessageValue) : undefined,
+
+      processedAmount: Number.isFinite(processedAmount)
+        ? processedAmount
+        : undefined,
+
+      currency: currencyValue !== undefined ? String(currencyValue) : undefined,
+
       raw: parsed,
     };
   }
