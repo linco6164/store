@@ -152,6 +152,14 @@ router.post("/google", async (req, res) => {
       });
     }
 
+    if (user.banned) {
+      return res.status(403).json({
+        success: false,
+        code: "ACCOUNT_BANNED",
+        message: "Contul tău a fost blocat de administrator.",
+      });
+    }
+
     const token = jwt.sign(
       {
         id: user._id,
