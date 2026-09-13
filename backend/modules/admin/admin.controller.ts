@@ -8,6 +8,8 @@ import crypto from "crypto";
 
 import { notificationService } from "../notification/notification.service.js";
 
+import WalletTransaction from "../wallet/wallet.model.js"; // ← default export, fără acolade
+
 export const adminController = {
   async getStats(req: Request, res: Response) {
     try {
@@ -24,12 +26,10 @@ export const adminController = {
         data: { totalUsers, totalListings, activeListings, totalConversations },
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Eroare la încărcarea statisticilor",
-        });
+      res.status(500).json({
+        success: false,
+        message: "Eroare la încărcarea statisticilor",
+      });
     }
   },
 
@@ -228,12 +228,10 @@ export const adminController = {
         _id: { $ne: req.params.id },
       });
       if (existing) {
-        return res
-          .status(409)
-          .json({
-            success: false,
-            message: "Emailul este deja folosit de alt cont",
-          });
+        return res.status(409).json({
+          success: false,
+          message: "Emailul este deja folosit de alt cont",
+        });
       }
 
       const user = await User.findByIdAndUpdate(
@@ -281,6 +279,137 @@ export const adminController = {
       res
         .status(500)
         .json({ success: false, message: "Eroare la actualizarea profilului" });
+    }
+  },
+
+  async getWithdrawals(req: Request, res: Response) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const status = (req.query.status as string) || "pending";
+
+      const query: Record<string, unknown> = {
+        type: "withdrawal",
+      };
+
+      if (["pending", "completed", "rejected", "failed"].includes(status)) {
+        query.status = status;
+      }
+
+      const withdrawals = await WalletTransaction.find(query)
+        .populate("user", "username email fullName")
+        .sort({
+          createdAt: -1,
+        })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+
+      const total = await WalletTransaction.countDocuments(query);
+
+      return res.json({
+        success: true,
+        data: withdrawals,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la încărcarea retragerilor",
+      });
+    }
+  },
+
+  async approveWithdrawal(req: Request, res: Response) {
+    try {
+      const withdrawal = await WalletTransaction.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          type: "withdrawal",
+          status: "pending",
+        },
+        {
+          $set: {
+            status: "completed",
+          },
+        },
+        {
+          new: true,
+        },
+      ).populate("user", "username email fullName");
+
+      if (!withdrawal) {
+        return res.status(404).json({
+          success: false,
+          message: "Retragerea nu există sau a fost deja procesată.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Retragerea a fost aprobată.",
+        data: withdrawal,
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la aprobarea retragerii",
+      });
+    }
+  },
+
+  async rejectWithdrawal(req: Request, res: Response) {
+    try {
+      const withdrawal = await WalletTransaction.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          type: "withdrawal",
+          status: "pending",
+        },
+        {
+          $set: {
+            status: "rejected",
+          },
+        },
+        {
+          new: true,
+        },
+      );
+
+      if (!withdrawal) {
+        return res.status(404).json({
+          success: false,
+          message: "Retragerea nu există sau a fost deja procesată.",
+        });
+      }
+
+      await User.findByIdAndUpdate(withdrawal.user, {
+        $inc: {
+          balance: withdrawal.amount,
+        },
+      });
+
+      return res.json({
+        success: true,
+        message:
+          "Retragerea a fost respinsă iar suma a fost returnată în sold.",
+        data: withdrawal,
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la respingerea retragerii",
+      });
     }
   },
 };
