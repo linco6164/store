@@ -17,12 +17,7 @@ export const supportController = {
         });
       }
 
-      const {
-        subject,
-        category,
-        message,
-        banReason,
-      } = req.body;
+      const { subject, category, message, banReason } = req.body;
 
       if (!subject?.trim()) {
         return res.status(400).json({
@@ -38,24 +33,20 @@ export const supportController = {
         });
       }
 
-      const ticket =
-        await supportService.createTicket({
-          userId,
-          subject,
-          category,
-          message,
-          banReason,
-        });
+      const ticket = await supportService.createTicket({
+        userId,
+        subject,
+        category,
+        message,
+        banReason,
+      });
 
       return res.status(201).json({
         success: true,
         data: ticket,
       });
     } catch (error) {
-      console.error(
-        "CREATE SUPPORT TICKET ERROR:",
-        error,
-      );
+      console.error("CREATE SUPPORT TICKET ERROR:", error);
 
       return res.status(500).json({
         success: false,
@@ -75,18 +66,14 @@ export const supportController = {
         });
       }
 
-      const tickets =
-        await supportService.getUserTickets(userId);
+      const tickets = await supportService.getUserTickets(userId);
 
       return res.json({
         success: true,
         data: tickets,
       });
     } catch (error) {
-      console.error(
-        "GET SUPPORT TICKETS ERROR:",
-        error,
-      );
+      console.error("GET SUPPORT TICKETS ERROR:", error);
 
       return res.status(500).json({
         success: false,
@@ -106,11 +93,11 @@ export const supportController = {
         });
       }
 
-      const ticket =
-        await supportService.getUserTicket(
-          userId,
-          req.params.id,
-        );
+      const ticketId = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
+
+      const ticket = await supportService.getUserTicket(userId, ticketId);
 
       if (!ticket) {
         return res.status(404).json({
@@ -124,10 +111,7 @@ export const supportController = {
         data: ticket,
       });
     } catch (error) {
-      console.error(
-        "GET SUPPORT TICKET ERROR:",
-        error,
-      );
+      console.error("GET SUPPORT TICKET ERROR:", error);
 
       return res.status(500).json({
         success: false,
@@ -154,12 +138,15 @@ export const supportController = {
         });
       }
 
-      const ticket =
-        await supportService.addUserMessage({
-          userId,
-          ticketId: req.params.id,
-          message: req.body.message,
-        });
+      const ticketId = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
+
+      const ticket = await supportService.addUserMessage({
+        userId,
+        ticketId: String(ticketId),
+        message: req.body.message,
+      });
 
       if (!ticket) {
         return res.status(404).json({
@@ -180,10 +167,7 @@ export const supportController = {
         });
       }
 
-      console.error(
-        "ADD SUPPORT MESSAGE ERROR:",
-        error,
-      );
+      console.error("ADD SUPPORT MESSAGE ERROR:", error);
 
       return res.status(500).json({
         success: false,
@@ -203,11 +187,11 @@ export const supportController = {
         });
       }
 
-      const ticket =
-        await supportService.closeTicket(
-          userId,
-          req.params.id,
-        );
+      const ticketId = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
+
+      const ticket = await supportService.closeTicket(userId, ticketId);
 
       if (!ticket) {
         return res.status(404).json({
@@ -221,10 +205,7 @@ export const supportController = {
         data: ticket,
       });
     } catch (error) {
-      console.error(
-        "CLOSE SUPPORT TICKET ERROR:",
-        error,
-      );
+      console.error("CLOSE SUPPORT TICKET ERROR:", error);
 
       return res.status(500).json({
         success: false,
