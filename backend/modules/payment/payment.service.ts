@@ -49,7 +49,7 @@ class PaymentService {
       ListingModel.findOne({
         _id: listingId,
         status: "active",
-      }).populate("seller", "username"),
+      }),
     ]);
 
     if (!buyer) {
@@ -112,11 +112,7 @@ class PaymentService {
     }
   }
 
-  getCheckoutData(
-    payment: PaymentDocument,
-    buyer?: any,
-    listing?: any,
-  ) {
+  getCheckoutData(payment: PaymentDocument, buyer?: any, listing?: any) {
     const confirmUrl = String(process.env.NETOPIA_CONFIRM_URL ?? "").trim();
     const returnUrl = String(process.env.NETOPIA_RETURN_URL ?? "").trim();
 
@@ -223,9 +219,8 @@ class PaymentService {
     }
 
     if (!isConfirmed) {
-      const failedStatus = action === "canceled" || action === "credit"
-        ? "cancelled"
-        : "failed";
+      const failedStatus =
+        action === "canceled" || action === "credit" ? "cancelled" : "failed";
 
       await PaymentModel.findByIdAndUpdate(payment._id, {
         $set: {
@@ -242,9 +237,7 @@ class PaymentService {
       return {
         paymentStatus: failedStatus,
         message:
-          notification.errorMessage ??
-          notification.action ??
-          "Plata a eșuat.",
+          notification.errorMessage ?? notification.action ?? "Plata a eșuat.",
       };
     }
 
@@ -287,9 +280,7 @@ class PaymentService {
         }
 
         if (lockedPayment.status === "paid") {
-          orderId = lockedPayment.order
-            ? lockedPayment.order.toString()
-            : null;
+          orderId = lockedPayment.order ? lockedPayment.order.toString() : null;
           return;
         }
 
