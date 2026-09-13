@@ -26,6 +26,22 @@ router.patch("/users/:id/profile", adminController.updateUserProfile);
 router.get("/listings", adminController.getAllListings);
 router.delete("/listings/:id", adminController.deleteListing);
 
+// Retrageri
+router.get(
+  "/withdrawals",
+  adminController.getWithdrawals,
+);
+
+router.post(
+  "/withdrawals/:id/approve",
+  adminController.approveWithdrawal,
+);
+
+router.post(
+  "/withdrawals/:id/reject",
+  adminController.rejectWithdrawal,
+);
+
 // Notificări
 router.post("/broadcast", adminController.sendBroadcast);
 

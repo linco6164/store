@@ -18,6 +18,7 @@ import { authenticateSocket } from "./sockets/socketAuth.js";
 import favoriteRoutes from "./modules/favorite/favorite.routes.js";
 import notificationRoutes from "./modules/notification/notification.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import walletRoutes from "./modules/wallet/wallet.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 
@@ -55,6 +56,8 @@ app.use("/upload", uploadRoutes);
 app.use("/listings", listingRoutes);
 
 app.use("/profile", profileRoutes);
+
+app.use("/wallet", walletRoutes);
 
 app.use("/profile/2fa", twoFactorRoutes);
 
