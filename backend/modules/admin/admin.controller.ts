@@ -98,28 +98,38 @@ export const adminController = {
 
       const user = await User.findById(req.params.id);
 
-      console.log("USER FOUND:", !!user);
-
       if (!user) {
-        console.log("USER NOT FOUND");
-
         return res.status(404).json({
           success: false,
           message: "User negăsit",
         });
       }
 
-      console.log("OLD BANNED STATUS:", user.banned);
+      const { reason } = req.body;
+
+      console.log("REASON:", reason);
 
       user.banned = !user.banned;
 
+      if (user.banned) {
+        if (!reason || typeof reason !== "string" || !reason.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: "Trebuie selectat un motiv pentru blocare.",
+          });
+        }
+
+        user.banReason = reason.trim();
+      } else {
+        user.banReason = null;
+      }
+
       await user.save();
 
-      console.log("NEW BANNED STATUS:", user.banned);
+      console.log("BANNED:", user.banned);
+      console.log("BAN REASON:", user.banReason);
 
       if (user.banned) {
-        console.log("USER WAS BANNED - SENDING FCM");
-
         try {
           const result = await pushNotificationService.sendToUser(
             user._id.toString(),
@@ -128,6 +138,7 @@ export const adminController = {
               body: "Contul tău a fost blocat de administrator.",
               data: {
                 type: "account_banned",
+                reason: user.banReason ?? "",
               },
             },
           );

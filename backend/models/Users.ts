@@ -123,6 +123,11 @@ const StoreUserSchema = new mongoose.Schema(
       default: false,
     },
 
+    banReason: {
+      type: String,
+      default: null,
+    },
+
     twoFactorRecoveryCodes: [
       {
         type: String,
