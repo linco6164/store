@@ -84,6 +84,12 @@ function handleError(error: unknown, res: Response) {
         message: "Nu ai acces la acest ticket.",
       });
 
+    case "INVALID_CATEGORY":
+      return res.status(400).json({
+        success: false,
+        message: "Categoria ticketului este invalidă.",
+      });
+
     default:
       return res.status(500).json({
         success: false,

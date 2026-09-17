@@ -3,9 +3,7 @@ import { Types } from "mongoose";
 import User from "../../models/Users.js";
 import { SupportTicket } from "./support.model.js";
 
-import {
-    getAllowedDepartments,
-} from "./support.permissions.js";
+import { getAllowedDepartments } from "./support.permissions.js";
 
 import {
   type SupportTicketCategory,
@@ -63,7 +61,23 @@ class SupportService {
      * Departamentul este stabilit de backend.
      * Clientul nu poate trimite department.
      */
-    const department = CATEGORY_TO_DEPARTMENT[data.category] ?? "call_center";
+    const allowedCategories: SupportTicketCategory[] = [
+      "account_banned",
+      "account",
+      "payments",
+      "orders",
+      "listings",
+      "technical",
+      "logistics",
+      "moderation",
+      "other",
+    ];
+
+    if (!allowedCategories.includes(data.category)) {
+      throw new Error("INVALID_CATEGORY");
+    }
+
+    const department = CATEGORY_TO_DEPARTMENT[data.category];
 
     const ticket = await SupportTicket.create({
       user: userId,
