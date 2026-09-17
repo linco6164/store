@@ -71,6 +71,143 @@ export const adminController = {
     }
   },
 
+  async createUser(req: Request, res: Response) {
+    try {
+      const { username, email, password, fullName, phone, role, department } =
+        req.body;
+
+      if (!username || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: "Username, email și parola sunt obligatorii.",
+        });
+      }
+
+      if (typeof username !== "string" || username.trim().length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: "Username-ul trebuie să aibă cel puțin 3 caractere.",
+        });
+      }
+
+      if (typeof email !== "string" || !email.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Email invalid.",
+        });
+      }
+
+      if (typeof password !== "string" || password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Parola trebuie să aibă cel puțin 6 caractere.",
+        });
+      }
+
+      const allowedRoles = [
+        "user",
+        "admin",
+        "support_agent",
+        "support_manager",
+        "it_agent",
+        "finance_agent",
+        "logistics_agent",
+        "moderator",
+      ];
+
+      const allowedDepartments = [
+        "general",
+        "call_center",
+        "it",
+        "payments",
+        "orders",
+        "logistics",
+        "moderation",
+        "account_security",
+        "admin",
+      ];
+
+      const selectedRole = role || "user";
+      const selectedDepartment = department || "general";
+
+      if (!allowedRoles.includes(selectedRole)) {
+        return res.status(400).json({
+          success: false,
+          message: "Rol invalid.",
+        });
+      }
+
+      if (!allowedDepartments.includes(selectedDepartment)) {
+        return res.status(400).json({
+          success: false,
+          message: "Departament invalid.",
+        });
+      }
+
+      const normalizedUsername = username.trim();
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const existingUser = await User.findOne({
+        $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
+      });
+
+      if (existingUser) {
+        if (existingUser.email === normalizedEmail) {
+          return res.status(409).json({
+            success: false,
+            message: "Acest email este deja folosit.",
+          });
+        }
+
+        return res.status(409).json({
+          success: false,
+          message: "Acest username este deja folosit.",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = await User.create({
+        username: normalizedUsername,
+        email: normalizedEmail,
+        password: hashedPassword,
+
+        fullName: typeof fullName === "string" ? fullName.trim() : "",
+
+        phone: typeof phone === "string" ? phone.trim() : "",
+
+        role: selectedRole,
+        department: selectedDepartment,
+
+        provider: "credentials",
+
+        banned: false,
+        banReason: null,
+
+        balance: 0,
+
+        twoFactorEnabled: false,
+      });
+
+      const safeUser = await User.findById(user._id).select(
+        "-password -twoFactorSecret -twoFactorRecoveryCodes",
+      );
+
+      return res.status(201).json({
+        success: true,
+        message: "Utilizatorul a fost creat cu succes.",
+        data: safeUser,
+      });
+    } catch (error) {
+      console.error("CREATE USER ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la crearea utilizatorului.",
+      });
+    }
+  },
+
   async updateUserRole(req: Request, res: Response) {
     try {
       const { role } = req.body;

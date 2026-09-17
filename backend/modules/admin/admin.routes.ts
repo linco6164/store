@@ -12,6 +12,7 @@ router.get("/stats", adminController.getStats);
 
 // Useri
 router.get("/users", adminController.getUsers);
+router.post("/users", adminController.createUser);
 router.patch("/users/:id/role", adminController.updateUserRole);
 router.patch("/users/:id/ban", adminController.toggleBanUser);
 router.delete("/users/:id", adminController.deleteUser);
