@@ -1,6 +1,6 @@
 import { Response, NextFunction } from "express";
-import { AuthRequest } from "./auth.js";
 import User from "../models/Users.js";
+import { AuthRequest } from "./auth.js";
 
 const STAFF_ROLES = [
   "support_agent",
@@ -11,20 +11,27 @@ const STAFF_ROLES = [
   "moderator",
 ];
 
-export default async function adminOnly(
+export default async function staffAccess(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) {
   try {
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const user = await User.findById(req.userId).select(
       "_id role department banned",
     );
 
     if (!user) {
-      return res.status(403).json({
+      return res.status(401).json({
         success: false,
-        message: "Acces interzis",
+        message: "User not found.",
       });
     }
 
@@ -35,23 +42,30 @@ export default async function adminOnly(
       });
     }
 
-    if (
-      user.role !== "admin" &&
-      !STAFF_ROLES.includes(user.role)
-    ) {
+    /*
+     * Administratorul are acces automat.
+     */
+    if (user.role === "admin") {
+      return next();
+    }
+
+    /*
+     * Verificăm dacă este staff.
+     */
+    if (!STAFF_ROLES.includes(user.role)) {
       return res.status(403).json({
         success: false,
-        message: "Acces interzis",
+        message: "Acces interzis.",
       });
     }
 
     next();
   } catch (error) {
-    console.error("ADMIN AUTH ERROR:", error);
+    console.error("STAFF ACCESS ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Eroare de autorizare",
+      message: "Eroare de autorizare.",
     });
   }
 }
