@@ -1,138 +1,85 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router } from "express";
 
-import supportAuth from "../../middleware/supportAuth.js";
 import auth from "../../middleware/auth.js";
+import supportAuth from "../../middleware/supportAuth.js";
+import supportRole from "../../middleware/supportRole.js";
 
-import User from "../../models/Users.js";
-import { supportController } from "./support.controller.js";
+import {
+  createTicket,
+  getUserTickets,
+  getUserTicket,
+  addUserMessage,
+  getStaffTickets,
+  getStaffTicket,
+  getStaffStats,
+  assignToMe,
+  unassignTicket,
+  updateStatus,
+  updatePriority,
+  addStaffMessage,
+  getStaffInfo,
+} from "./support.controller.js";
 
 const router = Router();
 
 /*
-|--------------------------------------------------------------------------
-| ADMIN SUPPORT AUTH
-|--------------------------------------------------------------------------
-| Folosim auth.ts pentru JWT, apoi verificăm explicit rolul de admin.
-| Nu folosim supportAuth aici deoarece acesta permite accesul și userilor banați.
-|--------------------------------------------------------------------------
-*/
+ * =========================================================
+ * USER SUPPORT
+ * =========================================================
+ *
+ * supportAuth este folosit pentru utilizatorii normali,
+ * inclusiv conturile blocate.
+ */
 
-async function supportAdminOnly(
-  req: Request & { userId?: string },
-  res: Response,
-  next: NextFunction,
-) {
-  try {
-    if (!req.userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+router.post("/tickets", supportAuth, createTicket);
 
-    const user = await User.findById(req.userId).select(
-      "_id role",
-    );
+router.get("/tickets", supportAuth, getUserTickets);
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User not found.",
-      });
-    }
+router.get("/tickets/:id", supportAuth, getUserTicket);
 
-    if (user.role !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Forbidden.",
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error(
-      "SUPPORT ADMIN AUTH ERROR:",
-      error,
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Eroare la verificarea permisiunilor.",
-    });
-  }
-}
+router.post("/tickets/:id/messages", supportAuth, addUserMessage);
 
 /*
-|--------------------------------------------------------------------------
-| USER SUPPORT
-|--------------------------------------------------------------------------
-| supportAuth permite accesul și utilizatorilor banați.
-| Este necesar pentru cazul în care un cont blocat contactează suportul.
-|--------------------------------------------------------------------------
-*/
+ * =========================================================
+ * STAFF SUPPORT
+ * =========================================================
+ *
+ * auth:
+ *   verifică JWT + existența utilizatorului.
+ *
+ * supportRole:
+ *   verifică dacă utilizatorul este staff.
+ *
+ * Departamentul este verificat ulterior
+ * în support.service.ts.
+ */
 
-router.post(
-  "/tickets",
-  supportAuth,
-  supportController.createTicket,
-);
+router.get("/staff/tickets", auth, supportRole(), getStaffTickets);
 
-router.get(
-  "/tickets",
-  supportAuth,
-  supportController.getTickets,
-);
+router.get("/staff/tickets/:id", auth, supportRole(), getStaffTicket);
 
-router.get(
-  "/tickets/:id",
-  supportAuth,
-  supportController.getTicket,
-);
+router.get("/staff/stats", auth, supportRole(), getStaffStats);
 
-router.post(
-  "/tickets/:id/messages",
-  supportAuth,
-  supportController.addMessage,
-);
+router.post("/staff/tickets/:id/assign", auth, supportRole(), assignToMe);
+
+router.post("/staff/tickets/:id/unassign", auth, supportRole(), unassignTicket);
+
+router.patch("/staff/tickets/:id/status", auth, supportRole(), updateStatus);
 
 router.patch(
-  "/tickets/:id/close",
-  supportAuth,
-  supportController.closeTicket,
-);
-
-/*
-|--------------------------------------------------------------------------
-| ADMIN SUPPORT
-|--------------------------------------------------------------------------
-*/
-
-router.get(
-  "/admin/tickets",
+  "/staff/tickets/:id/priority",
   auth,
-  supportAdminOnly,
-  supportController.getAdminTickets,
-);
-
-router.get(
-  "/admin/tickets/:id",
-  auth,
-  supportAdminOnly,
-  supportController.getAdminTicket,
+  supportRole(),
+  updatePriority,
 );
 
 router.post(
-  "/admin/tickets/:id/messages",
+  "/staff/tickets/:id/messages",
   auth,
-  supportAdminOnly,
-  supportController.addAdminMessage,
+  supportRole(),
+  addStaffMessage,
 );
 
-router.patch(
-  "/admin/tickets/:id/status",
-  auth,
-  supportAdminOnly,
-  supportController.updateAdminTicketStatus,
-);
+router.get("/staff/info", auth, supportRole(), getStaffInfo);
 
 export default router;

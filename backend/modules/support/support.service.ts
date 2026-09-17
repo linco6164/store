@@ -1,82 +1,182 @@
 import { Types } from "mongoose";
+
+import User from "../../models/Users.js";
+import { SupportTicket } from "./support.model.js";
+
 import {
-  SupportTicket,
-  SupportTicketCategory,
-  SupportTicketStatus,
+    getAllowedDepartments,
+} from "./support.permissions.js";
+
+import {
+  type SupportTicketCategory,
+  type SupportTicketDepartment,
+  type SupportTicketPriority,
+  type SupportTicketStatus,
 } from "./support.model.js";
 
-export const supportService = {
-  async createTicket(params: {
-    userId: string;
-    subject: string;
-    category?: SupportTicketCategory;
-    message: string;
-    banReason?: string | null;
-  }) {
-    const {
-      userId,
-      subject,
-      category = "other",
-      message,
-      banReason = null,
-    } = params;
+import {
+  CATEGORY_TO_DEPARTMENT,
+  ROLE_DEPARTMENTS,
+} from "./support.constants.js";
+
+class SupportService {
+  /**
+   * =========================================================
+   * USER
+   * =========================================================
+   */
+
+  async createTicket(
+    userId: string,
+    data: {
+      subject: string;
+      category: SupportTicketCategory;
+      message: string;
+      priority?: SupportTicketPriority;
+      banReason?: string | null;
+    },
+  ) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new Error("INVALID_USER_ID");
+    }
+
+    const subject = data.subject?.trim();
+    const message = data.message?.trim();
+
+    if (!subject) {
+      throw new Error("SUBJECT_REQUIRED");
+    }
+
+    if (!message) {
+      throw new Error("MESSAGE_REQUIRED");
+    }
+
+    if (subject.length > 200) {
+      throw new Error("SUBJECT_TOO_LONG");
+    }
+
+    if (message.length > 5000) {
+      throw new Error("MESSAGE_TOO_LONG");
+    }
+
+    /*
+     * Departamentul este stabilit de backend.
+     * Clientul nu poate trimite department.
+     */
+    const department = CATEGORY_TO_DEPARTMENT[data.category] ?? "call_center";
 
     const ticket = await SupportTicket.create({
-      user: new Types.ObjectId(userId),
-      subject: subject.trim(),
-      category,
+      user: userId,
+
+      subject,
+
+      category: data.category,
+
+      department,
+
+      priority: data.priority ?? "normal",
+
       status: "open",
-      banReason: banReason?.trim() || null,
+
+      assignedTo: null,
+
+      banReason: data.banReason?.trim() || null,
+
       messages: [
         {
-          sender: new Types.ObjectId(userId),
+          sender: userId,
+
           senderType: "user",
-          message: message.trim(),
+
+          message,
+
           createdAt: new Date(),
         },
       ],
     });
 
     return ticket;
-  },
+  }
 
-  async getUserTickets(userId: string) {
-    return SupportTicket.find({
-      user: new Types.ObjectId(userId),
-    })
+  /**
+   * =========================================================
+   * USER - LISTA TICKETELOR
+   * =========================================================
+   */
+
+  async getUserTickets(
+    userId: string,
+    options?: {
+      status?: SupportTicketStatus;
+    },
+  ) {
+    const filter: Record<string, unknown> = {
+      user: userId,
+    };
+
+    if (options?.status) {
+      filter.status = options.status;
+    }
+
+    return SupportTicket.find(filter)
       .sort({ updatedAt: -1 })
+      .populate("assignedTo", "_id username fullName email role department")
       .lean();
-  },
+  }
+
+  /**
+   * =========================================================
+   * USER - TICKET
+   * =========================================================
+   */
 
   async getUserTicket(userId: string, ticketId: string) {
     if (!Types.ObjectId.isValid(ticketId)) {
-      return null;
-    }
-
-    return SupportTicket.findOne({
-      _id: new Types.ObjectId(ticketId),
-      user: new Types.ObjectId(userId),
-    }).lean();
-  },
-
-  async addUserMessage(params: {
-    userId: string;
-    ticketId: string;
-    message: string;
-  }) {
-    const { userId, ticketId, message } = params;
-
-    if (!Types.ObjectId.isValid(ticketId)) {
-      return null;
+      throw new Error("INVALID_TICKET_ID");
     }
 
     const ticket = await SupportTicket.findOne({
-      _id: new Types.ObjectId(ticketId),
-      user: new Types.ObjectId(userId),
+      _id: ticketId,
+      user: userId,
+    })
+      .populate("user", "_id username fullName email")
+      .populate("assignedTo", "_id username fullName email role department");
+
+    if (!ticket) {
+      throw new Error("TICKET_NOT_FOUND");
+    }
+
+    return ticket;
+  }
+
+  /**
+   * =========================================================
+   * USER - ADAUGĂ MESAJ
+   * =========================================================
+   */
+
+  async addUserMessage(userId: string, ticketId: string, message: string) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw new Error("INVALID_TICKET_ID");
+    }
+
+    const text = message?.trim();
+
+    if (!text) {
+      throw new Error("MESSAGE_REQUIRED");
+    }
+
+    if (text.length > 5000) {
+      throw new Error("MESSAGE_TOO_LONG");
+    }
+
+    const ticket = await SupportTicket.findOne({
+      _id: ticketId,
+      user: userId,
     });
 
     if (!ticket) {
-      return null;
+      throw new Error("TICKET_NOT_FOUND");
     }
 
     if (ticket.status === "closed") {
@@ -85,156 +185,318 @@ export const supportService = {
 
     ticket.messages.push({
       sender: new Types.ObjectId(userId),
+
       senderType: "user",
-      message: message.trim(),
+
+      message: text,
+
       createdAt: new Date(),
     });
 
-    ticket.status = "open";
+    /*
+     * Dacă utilizatorul răspunde unui ticket
+     * care era pending, îl redeschidem.
+     */
+    if (ticket.status === "pending") {
+      ticket.status = "open";
+    }
 
     await ticket.save();
 
     return ticket;
-  },
+  }
 
-  async closeTicket(userId: string, ticketId: string) {
-    if (!Types.ObjectId.isValid(ticketId)) {
-      return null;
+  /**
+   * =========================================================
+   * STAFF - PERMISSIONS
+   * =========================================================
+   */
+
+  private async getStaff(userId: string) {
+    const user = await User.findById(userId)
+      .select("_id username fullName email role department banned")
+      .lean();
+
+    if (!user) {
+      throw new Error("STAFF_NOT_FOUND");
     }
 
-    const ticket = await SupportTicket.findOne({
-      _id: new Types.ObjectId(ticketId),
-      user: new Types.ObjectId(userId),
-    });
+    const supportRoles = [
+      "admin",
+      "support_agent",
+      "support_manager",
+      "it_agent",
+      "finance_agent",
+      "logistics_agent",
+      "moderator",
+    ];
 
-    if (!ticket) {
-      return null;
+    if (!supportRoles.includes(user.role)) {
+      throw new Error("SUPPORT_ACCESS_DENIED");
     }
 
-    ticket.status = "closed";
+    return user;
+  }
 
-    await ticket.save();
+  /**
+   * Verifică dacă staff-ul poate accesa
+   * departamentul ticketului.
+   */
+  private canAccessDepartment(
+    staff: {
+      role: string;
+      department?: string | null;
+    },
+    department: string,
+  ) {
+    /*
+     * Admin = acces complet.
+     */
+    if (staff.role === "admin") {
+      return true;
+    }
 
-    return ticket;
-  },
+    /*
+     * Verificare departament.
+     */
+    return staff.department === department;
+  }
 
-  async getAllTickets(params?: {
-  status?: SupportTicketStatus;
-  category?: SupportTicketCategory;
-}) {
-  try {
+  /**
+   * =========================================================
+   * STAFF - LISTĂ TICKETE
+   * =========================================================
+   */
+
+  async getStaffTickets(
+    staffId: string,
+    options?: {
+      department?: SupportTicketDepartment;
+      status?: SupportTicketStatus;
+      assignedTo?: "me" | "unassigned" | string;
+      priority?: SupportTicketPriority;
+      limit?: number;
+      skip?: number;
+    },
+  ) {
+    const staff = await this.getStaff(staffId);
+
     const filter: Record<string, unknown> = {};
 
-    if (
-      params?.status &&
-      ["open", "pending", "closed"].includes(params.status)
-    ) {
-      filter.status = params.status;
+    /*
+     * ADMIN
+     *
+     * Admin poate selecta orice departament.
+     */
+    if (staff.role === "admin") {
+      if (options?.department) {
+        filter.department = options.department;
+      }
+    } else {
+      /*
+       * Staff normal vede DOAR departamentul lui.
+       */
+      filter.department = staff.department;
     }
 
-    if (
-      params?.category &&
-      [
-        "account_banned",
-        "account",
-        "payments",
-        "orders",
-        "listings",
-        "technical",
-        "other",
-      ].includes(params.category)
-    ) {
-      filter.category = params.category;
+    /*
+     * Status.
+     */
+    if (options?.status) {
+      filter.status = options.status;
     }
 
-    console.log(
-      "[SUPPORT] Admin ticket filter:",
-      filter,
-    );
+    /*
+     * Assigned.
+     */
+    if (options?.assignedTo === "me") {
+      filter.assignedTo = new Types.ObjectId(staffId);
+    }
 
-    const tickets = await SupportTicket.find(filter)
-      .populate(
-        "user",
-        "username email avatar",
-      )
-      .sort({
-        updatedAt: -1,
-      })
-      .lean();
+    if (options?.assignedTo === "unassigned") {
+      filter.assignedTo = null;
+    }
 
-    console.log(
-      "[SUPPORT] Admin tickets found:",
-      tickets.length,
-    );
+    /*
+     * Un ID specific.
+     */
+    if (
+      options?.assignedTo &&
+      options.assignedTo !== "me" &&
+      options.assignedTo !== "unassigned" &&
+      Types.ObjectId.isValid(options.assignedTo)
+    ) {
+      filter.assignedTo = new Types.ObjectId(options.assignedTo);
+    }
 
-    return tickets;
-  } catch (error) {
-    console.error(
-      "[SUPPORT] getAllTickets ERROR:",
-      error,
-    );
+    /*
+     * Priority.
+     */
+    if (options?.priority) {
+      filter.priority = options.priority;
+    }
 
-    throw error;
+    const limit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+
+    const skip = Math.max(options?.skip ?? 0, 0);
+
+    const [tickets, total] = await Promise.all([
+      SupportTicket.find(filter)
+        .sort({
+          priority: -1,
+          updatedAt: -1,
+        })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "_id username fullName email")
+        .populate("assignedTo", "_id username fullName email role department")
+        .lean(),
+
+      SupportTicket.countDocuments(filter),
+    ]);
+
+    return {
+      tickets,
+      total,
+      limit,
+      skip,
+    };
   }
-},
 
-  async getAdminTicket(ticketId: string) {
+  /**
+   * =========================================================
+   * STAFF - DETALII TICKET
+   * =========================================================
+   */
+
+  async getStaffTicket(staffId: string, ticketId: string) {
     if (!Types.ObjectId.isValid(ticketId)) {
-      return null;
+      throw new Error("INVALID_TICKET_ID");
     }
 
-    return SupportTicket.findById(new Types.ObjectId(ticketId))
-      .populate("user", "username email avatar")
-      .sort({
-        updatedAt: -1,
-      })
-      .lean();
-  },
+    const staff = await this.getStaff(staffId);
 
-  async addAdminMessage(params: {
-    ticketId: string;
-    adminId: string;
-    message: string;
-  }) {
-    const { ticketId, adminId, message } = params;
-
-    if (!Types.ObjectId.isValid(ticketId)) {
-      return null;
-    }
-
-    const ticket = await SupportTicket.findById(new Types.ObjectId(ticketId));
+    const ticket = await SupportTicket.findById(ticketId)
+      .populate("user", "_id username fullName email phone")
+      .populate("assignedTo", "_id username fullName email role department");
 
     if (!ticket) {
-      return null;
+      throw new Error("TICKET_NOT_FOUND");
     }
 
-    if (ticket.status === "closed") {
-      throw new Error("TICKET_CLOSED");
+    if (!this.canAccessDepartment(staff, ticket.department)) {
+      throw new Error("DEPARTMENT_ACCESS_DENIED");
     }
 
-    ticket.messages.push({
-      sender: new Types.ObjectId(adminId),
-      senderType: "admin",
-      message: message.trim(),
-      createdAt: new Date(),
-    });
+    return ticket;
+  }
 
-    ticket.status = "pending";
+  /**
+   * =========================================================
+   * STAFF - ASSIGN TO ME
+   * =========================================================
+   */
+
+  async assignToMe(staffId: string, ticketId: string) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw new Error("INVALID_TICKET_ID");
+    }
+
+    const staff = await this.getStaff(staffId);
+
+    const ticket = await SupportTicket.findById(ticketId);
+
+    if (!ticket) {
+      throw new Error("TICKET_NOT_FOUND");
+    }
+
+    if (!this.canAccessDepartment(staff, ticket.department)) {
+      throw new Error("DEPARTMENT_ACCESS_DENIED");
+    }
+
+    ticket.assignedTo = new Types.ObjectId(staffId);
+
+    /*
+     * Când un agent preia ticketul,
+     * acesta intră în lucru.
+     */
+    if (ticket.status === "open") {
+      ticket.status = "pending";
+    }
+
+    await ticket.save();
+
+    return ticket.populate([
+      {
+        path: "user",
+        select: "_id username fullName email",
+      },
+      {
+        path: "assignedTo",
+        select: "_id username fullName email role department",
+      },
+    ]);
+  }
+
+  /**
+   * =========================================================
+   * STAFF - UNASSIGN
+   * =========================================================
+   */
+
+  async unassignTicket(staffId: string, ticketId: string) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw new Error("INVALID_TICKET_ID");
+    }
+
+    const staff = await this.getStaff(staffId);
+
+    const ticket = await SupportTicket.findById(ticketId);
+
+    if (!ticket) {
+      throw new Error("TICKET_NOT_FOUND");
+    }
+
+    if (!this.canAccessDepartment(staff, ticket.department)) {
+      throw new Error("DEPARTMENT_ACCESS_DENIED");
+    }
+
+    ticket.assignedTo = null;
+
+    if (ticket.status === "pending") {
+      ticket.status = "open";
+    }
 
     await ticket.save();
 
     return ticket;
-  },
+  }
 
-  async setTicketStatus(ticketId: string, status: SupportTicketStatus) {
+  /**
+   * =========================================================
+   * STAFF - SCHIMBĂ STATUS
+   * =========================================================
+   */
+
+  async updateStatus(
+    staffId: string,
+    ticketId: string,
+    status: SupportTicketStatus,
+  ) {
     if (!Types.ObjectId.isValid(ticketId)) {
-      return null;
+      throw new Error("INVALID_TICKET_ID");
     }
 
-    const ticket = await SupportTicket.findById(new Types.ObjectId(ticketId));
+    const staff = await this.getStaff(staffId);
+
+    const ticket = await SupportTicket.findById(ticketId);
 
     if (!ticket) {
-      return null;
+      throw new Error("TICKET_NOT_FOUND");
+    }
+
+    if (!this.canAccessDepartment(staff, ticket.department)) {
+      throw new Error("DEPARTMENT_ACCESS_DENIED");
     }
 
     ticket.status = status;
@@ -242,5 +504,185 @@ export const supportService = {
     await ticket.save();
 
     return ticket;
-  },
-};
+  }
+
+  /**
+   * =========================================================
+   * STAFF - SCHIMBĂ PRIORITATEA
+   * =========================================================
+   */
+
+  async updatePriority(
+    staffId: string,
+    ticketId: string,
+    priority: SupportTicketPriority,
+  ) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw new Error("INVALID_TICKET_ID");
+    }
+
+    const staff = await this.getStaff(staffId);
+
+    const ticket = await SupportTicket.findById(ticketId);
+
+    if (!ticket) {
+      throw new Error("TICKET_NOT_FOUND");
+    }
+
+    if (!this.canAccessDepartment(staff, ticket.department)) {
+      throw new Error("DEPARTMENT_ACCESS_DENIED");
+    }
+
+    ticket.priority = priority;
+
+    await ticket.save();
+
+    return ticket;
+  }
+
+  /**
+   * =========================================================
+   * STAFF - ADAUGĂ MESAJ
+   * =========================================================
+   */
+
+  async addStaffMessage(staffId: string, ticketId: string, message: string) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw new Error("INVALID_TICKET_ID");
+    }
+
+    const text = message?.trim();
+
+    if (!text) {
+      throw new Error("MESSAGE_REQUIRED");
+    }
+
+    if (text.length > 5000) {
+      throw new Error("MESSAGE_TOO_LONG");
+    }
+
+    const staff = await this.getStaff(staffId);
+
+    const ticket = await SupportTicket.findById(ticketId);
+
+    if (!ticket) {
+      throw new Error("TICKET_NOT_FOUND");
+    }
+
+    if (!this.canAccessDepartment(staff, ticket.department)) {
+      throw new Error("DEPARTMENT_ACCESS_DENIED");
+    }
+
+    if (ticket.status === "closed") {
+      throw new Error("TICKET_CLOSED");
+    }
+
+    ticket.messages.push({
+      sender: new Types.ObjectId(staffId),
+
+      /*
+       * Pentru moment păstrăm schema existentă
+       * user/admin.
+       *
+       * Agentul este identificat prin sender.
+       */
+      senderType: "admin",
+
+      message: text,
+
+      createdAt: new Date(),
+    });
+
+    await ticket.save();
+
+    return ticket;
+  }
+
+  /**
+   * =========================================================
+   * STAFF - STATISTICI SIDEBAR
+   * =========================================================
+   */
+
+  async getStaffStats(staffId: string) {
+    const staff = await this.getStaff(staffId);
+
+    const filter: Record<string, unknown> = {};
+
+    if (staff.role !== "admin") {
+      filter.department = staff.department;
+    }
+
+    const [total, open, pending, closed, unassigned, urgent] =
+      await Promise.all([
+        SupportTicket.countDocuments(filter),
+
+        SupportTicket.countDocuments({
+          ...filter,
+          status: "open",
+        }),
+
+        SupportTicket.countDocuments({
+          ...filter,
+          status: "pending",
+        }),
+
+        SupportTicket.countDocuments({
+          ...filter,
+          status: "closed",
+        }),
+
+        SupportTicket.countDocuments({
+          ...filter,
+          assignedTo: null,
+        }),
+
+        SupportTicket.countDocuments({
+          ...filter,
+          priority: "urgent",
+          status: {
+            $ne: "closed",
+          },
+        }),
+      ]);
+
+    const myTickets = await SupportTicket.countDocuments({
+      ...filter,
+      assignedTo: new Types.ObjectId(staffId),
+      status: {
+        $ne: "closed",
+      },
+    });
+
+    return {
+      total,
+      open,
+      pending,
+      closed,
+      unassigned,
+      urgent,
+      myTickets,
+    };
+  }
+
+  async getStaffInfo(userId: string) {
+    const staff = await User.findById(userId)
+      .select("_id role department")
+      .lean();
+
+    if (!staff) {
+      throw new Error("UNAUTHORIZED");
+    }
+
+    const departments = getAllowedDepartments(staff.role);
+
+    return {
+      id: staff._id.toString(),
+      role: staff.role,
+      department: staff.department ?? "general",
+      departments,
+    };
+  }
+}
+
+export const supportService = new SupportService();

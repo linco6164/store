@@ -23,6 +23,7 @@ import supportRoutes from "./modules/support/support.routes.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
+import registerSupportSocket from "./sockets/support.socket.js";
 
 import mongoose from "mongoose";
 
@@ -46,6 +47,7 @@ setSocketIO(io);
 io.use(authenticateSocket);
 
 registerChatSocket(io);
+registerSupportSocket(io);
 
 app.use(cors());
 

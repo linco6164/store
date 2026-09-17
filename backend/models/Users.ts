@@ -18,8 +18,33 @@ const StoreUserSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["user", "admin"],
+      enum: [
+        "user",
+        "admin",
+        "support_agent",
+        "support_manager",
+        "it_agent",
+        "finance_agent",
+        "logistics_agent",
+        "moderator",
+      ],
       default: "user",
+    },
+
+    department: {
+      type: String,
+      enum: [
+        "general",
+        "call_center",
+        "it",
+        "payments",
+        "orders",
+        "logistics",
+        "moderation",
+        "account_security",
+        "admin",
+      ],
+      default: "general",
     },
 
     provider: {

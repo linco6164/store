@@ -1,376 +1,382 @@
-import { Request, Response } from "express";
+import type { Response } from "express";
+
+import type { AuthRequest } from "../../middleware/auth.js";
+
+import { getSocketIO } from "../../sockets/socket.io.js";
+
+import {
+  SupportTicket,
+  type SupportTicketCategory,
+  type SupportTicketDepartment,
+  type SupportTicketPriority,
+  type SupportTicketStatus,
+} from "./support.model.js";
+
 import { supportService } from "./support.service.js";
 
-interface AuthRequest extends Request {
-  userId?: string;
+function getUserId(req: AuthRequest): string {
+  if (!req.userId) {
+    throw new Error("UNAUTHORIZED");
+  }
+
+  return req.userId;
 }
 
-export const supportController = {
-  async createTicket(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.userId;
+function getTicketId(req: AuthRequest): string {
+  return String(req.params.id);
+}
 
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+function emitTicketNew(ticket: any) {
+  const io = getSocketIO();
 
-      const { subject, category, message, banReason } = req.body;
+  io.to(`support:${ticket.department}`).emit("support:ticket:new", {
+    ticket,
+  });
+}
 
-      if (!subject?.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Subiectul este obligatoriu.",
-        });
-      }
+function emitTicketUpdated(ticket: any, type: string) {
+  const io = getSocketIO();
 
-      if (!message?.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Mesajul este obligatoriu.",
-        });
-      }
+  io.to(`support:${ticket.department}`).emit("support:ticket:updated", {
+    ticket,
+    type,
+  });
+}
 
-      const ticket = await supportService.createTicket({
-        userId,
-        subject,
-        category,
-        message,
-        banReason,
+function emitTicketAssigned(ticket: any) {
+  const io = getSocketIO();
+
+  io.to(`support:${ticket.department}`).emit("support:ticket:assigned", {
+    ticket,
+  });
+}
+
+function emitMessageNew(ticket: any, message: any) {
+  const io = getSocketIO();
+
+  io.to(`support:${ticket.department}`).emit("support:message:new", {
+    ticketId: ticket._id,
+    message,
+  });
+}
+
+function handleError(error: unknown, res: Response) {
+  const message = error instanceof Error ? error.message : "Unknown error.";
+
+  console.error("SUPPORT ERROR:", error);
+
+  switch (message) {
+    case "UNAUTHORIZED":
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
       });
 
-      return res.status(201).json({
-        success: true,
-        data: ticket,
+    case "TICKET_NOT_FOUND":
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found.",
       });
-    } catch (error) {
-      console.error("CREATE SUPPORT TICKET ERROR:", error);
 
+    case "FORBIDDEN":
+      return res.status(403).json({
+        success: false,
+        message: "Nu ai acces la acest ticket.",
+      });
+
+    default:
       return res.status(500).json({
         success: false,
-        message: "Nu s-a putut crea tichetul.",
+        message: "Eroare server.",
       });
-    }
-  },
+  }
+}
 
-  async getTickets(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.userId;
+/*
+|--------------------------------------------------------------------------
+| USER
+|--------------------------------------------------------------------------
+*/
 
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+export async function createTicket(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
 
-      const tickets = await supportService.getUserTickets(userId);
+    const { subject, category, message } = req.body as {
+      subject: string;
+      category: SupportTicketCategory;
+      message: string;
+    };
 
-      return res.json({
-        success: true,
-        data: tickets,
-      });
-    } catch (error) {
-      console.error("GET SUPPORT TICKETS ERROR:", error);
+    const ticket = await supportService.createTicket(userId, {
+      subject,
+      category,
+      message,
+    });
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-au putut încărca tichetele.",
-      });
-    }
-  },
+    emitTicketNew(ticket);
 
-  async getTicket(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.userId;
+    return res.status(201).json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+export async function getUserTickets(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
 
-      const ticketId = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
+    const tickets = await supportService.getUserTickets(userId);
 
-      const ticket = await supportService.getUserTicket(userId, ticketId);
+    return res.json({
+      success: true,
+      tickets,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      if (!ticket) {
-        return res.status(404).json({
-          success: false,
-          message: "Tichetul nu a fost găsit.",
-        });
-      }
+export async function getUserTicket(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-      return res.json({
-        success: true,
-        data: ticket,
-      });
-    } catch (error) {
-      console.error("GET SUPPORT TICKET ERROR:", error);
+    const ticket = await supportService.getUserTicket(userId, ticketId);
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-a putut încărca tichetul.",
-      });
-    }
-  },
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-  async addMessage(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.userId;
+export async function addUserMessage(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+    const { message } = req.body as {
+      message: string;
+    };
 
-      if (!req.body.message?.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Mesajul este obligatoriu.",
-        });
-      }
+    const ticket = await supportService.addUserMessage(
+      userId,
+      ticketId,
+      message,
+    );
 
-      const ticketId = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
+    const newMessage = ticket.messages[ticket.messages.length - 1];
 
-      const ticket = await supportService.addUserMessage({
-        userId,
-        ticketId: String(ticketId),
-        message: req.body.message,
-      });
+    emitMessageNew(ticket, newMessage);
 
-      if (!ticket) {
-        return res.status(404).json({
-          success: false,
-          message: "Tichetul nu a fost găsit.",
-        });
-      }
+    emitTicketUpdated(ticket, "message");
 
-      return res.status(201).json({
-        success: true,
-        data: ticket,
-      });
-    } catch (error: any) {
-      if (error?.message === "TICKET_CLOSED") {
-        return res.status(400).json({
-          success: false,
-          message: "Acest tichet este închis.",
-        });
-      }
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      console.error("ADD SUPPORT MESSAGE ERROR:", error);
+/*
+|--------------------------------------------------------------------------
+| STAFF
+|--------------------------------------------------------------------------
+*/
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-a putut trimite mesajul.",
-      });
-    }
-  },
+export async function getStaffTickets(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
 
-  async closeTicket(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.userId;
+    const { status, department, assignedTo, priority } = req.query as {
+      status?: SupportTicketStatus;
+      department?: SupportTicketDepartment;
+      assignedTo?: string;
+      priority?: SupportTicketPriority;
+    };
 
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+    const tickets = await supportService.getStaffTickets(userId, {
+      status,
+      department,
+      assignedTo,
+      priority,
+    });
 
-      const ticketId = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
+    return res.json({
+      success: true,
+      tickets,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      const ticket = await supportService.closeTicket(userId, ticketId);
+export async function getStaffTicket(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-      if (!ticket) {
-        return res.status(404).json({
-          success: false,
-          message: "Tichetul nu a fost găsit.",
-        });
-      }
+    const ticket = await supportService.getStaffTicket(userId, ticketId);
 
-      return res.json({
-        success: true,
-        data: ticket,
-      });
-    } catch (error) {
-      console.error("CLOSE SUPPORT TICKET ERROR:", error);
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-a putut închide tichetul.",
-      });
-    }
-  },
+export async function getStaffStats(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
 
-  async getAdminTickets(req: AuthRequest, res: Response) {
-    try {
-      console.log("========== GET ADMIN SUPPORT TICKETS ==========");
+    const stats = await supportService.getStaffStats(userId);
 
-      console.log("[SUPPORT] Query:", req.query);
+    return res.json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      const status =
-        typeof req.query.status === "string" && req.query.status.length > 0
-          ? (req.query.status as any)
-          : undefined;
+export async function assignToMe(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-      const category =
-        typeof req.query.category === "string" && req.query.category.length > 0
-          ? (req.query.category as any)
-          : undefined;
+    const ticket = await supportService.assignToMe(userId, ticketId);
 
-      const tickets = await supportService.getAllTickets({
-        status,
-        category,
-      });
+    emitTicketAssigned(ticket);
 
-      console.log("[SUPPORT] Returning tickets:", tickets.length);
+    emitTicketUpdated(ticket, "assigned");
 
-      return res.json({
-        success: true,
-        data: tickets,
-      });
-    } catch (error) {
-      console.error("GET ADMIN SUPPORT TICKETS ERROR:", error);
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-au putut încărca tichetele.",
-      });
-    }
-  },
+export async function unassignTicket(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-  async getAdminTicket(req: AuthRequest, res: Response) {
-    try {
-      const ticketId = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
+    const ticket = await supportService.unassignTicket(userId, ticketId);
 
-      const ticket = await supportService.getAdminTicket(ticketId);
+    emitTicketUpdated(ticket, "unassigned");
 
-      if (!ticket) {
-        return res.status(404).json({
-          success: false,
-          message: "Tichetul nu a fost găsit.",
-        });
-      }
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      return res.json({
-        success: true,
-        data: ticket,
-      });
-    } catch (error) {
-      console.error("GET ADMIN SUPPORT TICKET ERROR:", error);
+export async function updateStatus(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-a putut încărca tichetul.",
-      });
-    }
-  },
+    const { status } = req.body as {
+      status: SupportTicketStatus;
+    };
 
-  async addAdminMessage(req: AuthRequest, res: Response) {
-    try {
-      const adminId = req.userId;
+    const ticket = await supportService.updateStatus(userId, ticketId, status);
 
-      if (!adminId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+    emitTicketUpdated(ticket, "status");
 
-      if (!req.body.message?.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Mesajul este obligatoriu.",
-        });
-      }
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      const ticketId = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
+export async function updatePriority(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-      const ticket = await supportService.addAdminMessage({
-        ticketId,
-        adminId,
-        message: req.body.message,
-      });
+    const { priority } = req.body as {
+      priority: SupportTicketPriority;
+    };
 
-      if (!ticket) {
-        return res.status(404).json({
-          success: false,
-          message: "Tichetul nu a fost găsit.",
-        });
-      }
+    const ticket = await supportService.updatePriority(
+      userId,
+      ticketId,
+      priority,
+    );
 
-      return res.status(201).json({
-        success: true,
-        data: ticket,
-      });
-    } catch (error: any) {
-      if (error?.message === "TICKET_CLOSED") {
-        return res.status(400).json({
-          success: false,
-          message: "Acest tichet este închis.",
-        });
-      }
+    emitTicketUpdated(ticket, "priority");
 
-      console.error("ADD ADMIN SUPPORT MESSAGE ERROR:", error);
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-a putut trimite mesajul.",
-      });
-    }
-  },
+export async function addStaffMessage(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+    const ticketId = getTicketId(req);
 
-  async updateAdminTicketStatus(req: AuthRequest, res: Response) {
-    try {
-      const { status } = req.body;
+    const { message } = req.body as {
+      message: string;
+    };
 
-      if (status !== "open" && status !== "pending" && status !== "closed") {
-        return res.status(400).json({
-          success: false,
-          message: "Status invalid.",
-        });
-      }
+    const ticket = await supportService.addStaffMessage(
+      userId,
+      ticketId,
+      message,
+    );
 
-      const ticketId = Array.isArray(req.params.id)
-        ? req.params.id[0]
-        : req.params.id;
+    const newMessage = ticket.messages[ticket.messages.length - 1];
 
-      const ticket = await supportService.setTicketStatus(ticketId, status);
+    emitMessageNew(ticket, newMessage);
 
-      if (!ticket) {
-        return res.status(404).json({
-          success: false,
-          message: "Tichetul nu a fost găsit.",
-        });
-      }
+    emitTicketUpdated(ticket, "message");
 
-      return res.json({
-        success: true,
-        data: ticket,
-      });
-    } catch (error) {
-      console.error("UPDATE ADMIN SUPPORT STATUS ERROR:", error);
+    return res.json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
 
-      return res.status(500).json({
-        success: false,
-        message: "Nu s-a putut modifica statusul.",
-      });
-    }
-  },
-};
+export async function getStaffInfo(req: AuthRequest, res: Response) {
+  try {
+    const userId = getUserId(req);
+
+    const info = await supportService.getStaffInfo(userId);
+
+    return res.json({
+      success: true,
+      ...info,
+    });
+  } catch (error) {
+    return handleError(error, res);
+  }
+}
