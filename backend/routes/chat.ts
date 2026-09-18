@@ -42,4 +42,22 @@ router.patch(
     chatController.markAsSeen
 );
 
+router.post(
+    "/offer",
+    authMiddleware,
+    chatController.sendOffer
+);
+
+router.patch(
+    "/offer/:offerId/accept",
+    authMiddleware,
+    chatController.acceptOffer
+);
+
+router.patch(
+    "/offer/:offerId/reject",
+    authMiddleware,
+    chatController.rejectOffer
+);
+
 export default router;

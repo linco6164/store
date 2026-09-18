@@ -1,81 +1,93 @@
 import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface IMessage extends Document {
-    conversation: Types.ObjectId;
+  conversation: Types.ObjectId;
 
-    sender: Types.ObjectId;
+  sender: Types.ObjectId;
 
-    text: string;
+  text: string;
 
-    images: string[];
+  images: string[];
 
-    replyTo?: Types.ObjectId;
+  replyTo?: Types.ObjectId;
 
-    deliveredTo: Types.ObjectId[];
+  type?: "text" | "offer";
 
-    seenBy: Types.ObjectId[];
+  offer?: Types.ObjectId;
 
-    createdAt: Date;
+  deliveredTo: Types.ObjectId[];
 
-    updatedAt: Date;
+  seenBy: Types.ObjectId[];
+
+  createdAt: Date;
+
+  updatedAt: Date;
 }
 
 const MessageSchema = new Schema<IMessage>(
-    {
-        conversation: {
-            type: Schema.Types.ObjectId,
-            ref: "Conversation",
-            required: true,
-        },
-
-        sender: {
-            type: Schema.Types.ObjectId,
-            ref: "Store",
-            required: true,
-        },
-
-        text: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        images: [
-            {
-                type: String,
-            },
-        ],
-
-        replyTo: {
-            type: Schema.Types.ObjectId,
-            ref: "Message",
-        },
-
-        deliveredTo: [
-            {
-                type: Schema.Types.ObjectId,
-                ref: "Store",
-            },
-        ],
-
-        seenBy: [
-            {
-                type: Schema.Types.ObjectId,
-                ref: "Store",
-            },
-        ],
+  {
+    conversation: {
+      type: Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true,
     },
-    {
-        timestamps: true,
-    }
+
+    sender: {
+      type: Schema.Types.ObjectId,
+      ref: "Store",
+      required: true,
+    },
+
+    text: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    images: [
+      {
+        type: String,
+      },
+    ],
+
+    replyTo: {
+      type: Schema.Types.ObjectId,
+      ref: "Message",
+    },
+
+    type: {
+      type: String,
+      enum: ["text", "offer"],
+      default: "text",
+    },
+
+    offer: {
+      type: Schema.Types.ObjectId,
+      ref: "Offer",
+    },
+
+    deliveredTo: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Store",
+      },
+    ],
+
+    seenBy: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Store",
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  },
 );
 
 MessageSchema.index({
-    conversation: 1,
-    createdAt: -1,
+  conversation: 1,
+  createdAt: -1,
 });
 
-export default mongoose.model<IMessage>(
-    "Message",
-    MessageSchema
-);
+export default mongoose.model<IMessage>("Message", MessageSchema);
