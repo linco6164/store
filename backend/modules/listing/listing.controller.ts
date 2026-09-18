@@ -143,7 +143,7 @@ class ListingController {
 
       return res.status(500).json({
         success: false,
-        message: "Search failed.",
+        message: "Search failed!",
       });
     }
   }
