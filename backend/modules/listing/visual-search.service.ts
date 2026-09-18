@@ -67,7 +67,7 @@ Pentru câmpurile necunoscute folosește string gol.
                                 {
                                     type: "input_image",
                                     image_url:
-                                        `data:${mimetype};base64,${base64Image}`,
+                                        `data:image/jpeg;base64,${base64Image}`,
                                 },
                             ],
                         },
