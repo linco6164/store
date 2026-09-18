@@ -48,6 +48,7 @@ class ChatService {
   async getConversations(userId: string) {
     return Conversation.find({
       participants: new Types.ObjectId(userId),
+      deletedFor: {$ne: new Types.ObjectId(userId),}
     })
       .populate("participants", "_id username avatar")
       .populate("listing", "_id title price images")
@@ -496,6 +497,52 @@ class ChatService {
       messageId,
     };
   }
+
+  async deleteConversation(
+    conversationId: string,
+    userId: string,
+) {
+    if (!Types.ObjectId.isValid(conversationId)) {
+        throw new Error("INVALID_CONVERSATION_ID");
+    }
+
+    const conversation =
+        await Conversation.findById(
+            conversationId,
+        );
+
+    if (!conversation) {
+        throw new Error(
+            "CONVERSATION_NOT_FOUND",
+        );
+    }
+
+    const isParticipant =
+        conversation.participants.some(
+            (participant) =>
+                participant.toString() === userId,
+        );
+
+    if (!isParticipant) {
+        throw new Error("ACCESS_DENIED");
+    }
+
+    await Conversation.updateOne(
+        {
+            _id: conversationId,
+        },
+        {
+            $addToSet: {
+                deletedFor:
+                    new Types.ObjectId(userId),
+            },
+        },
+    );
+
+    return {
+        conversationId,
+    };
+}
 }
 
 export default new ChatService();

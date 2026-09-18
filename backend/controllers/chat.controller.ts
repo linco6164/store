@@ -250,6 +250,43 @@ class ChatController {
       });
     }
   }
+
+  async deleteConversation(
+    req: AuthRequest,
+    res: Response,
+) {
+    try {
+        const conversationId =
+            Array.isArray(
+                req.params.conversationId,
+            )
+                ? req.params.conversationId[0]
+                : req.params.conversationId;
+
+        const result =
+            await chatService.deleteConversation(
+                conversationId,
+                req.userId!,
+            );
+
+        return res.json({
+            success: true,
+            ...result,
+        });
+    } catch (error: any) {
+        console.error(
+            "DELETE CONVERSATION ERROR:",
+            error,
+        );
+
+        return res.status(400).json({
+            success: false,
+            message:
+                error?.message ??
+                "Failed to delete conversation.",
+        });
+    }
+}
 }
 
 export default new ChatController();

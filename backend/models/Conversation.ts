@@ -14,6 +14,8 @@ export interface IConversation extends Document {
     updatedAt: Date;
 
     unread: Map<string, number>;
+
+    deletedFor: Types.ObjectId[];
 }
 
 const ConversationSchema = new Schema<IConversation>(
@@ -44,6 +46,12 @@ const ConversationSchema = new Schema<IConversation>(
             type: Map,
             of: Number,
             default: {},
+        },
+
+        deletedFor: {
+            type: [Schema.Types.ObjectId],
+            ref: "Store",
+            default: [],
         },
     },
     {

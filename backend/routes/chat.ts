@@ -66,4 +66,10 @@ router.delete(
     chatController.deleteMessage,
 );
 
+router.delete(
+    "/conversations/:conversationId",
+    authMiddleware,
+    chatController.deleteConversation,
+);
+
 export default router;
