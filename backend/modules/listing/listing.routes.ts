@@ -26,4 +26,9 @@ router.patch("/:id/status", listingController.updateStatus);
 
 router.delete("/:id", listingController.delete);
 
+router.get(
+    "/categories",
+    listingController.getCategories
+);
+
 export default router;

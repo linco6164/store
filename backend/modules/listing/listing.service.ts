@@ -90,7 +90,10 @@ export class ListingService {
     }
 
     if (filters.category) {
-      query.category = filters.category;
+      query.category = new RegExp(
+        `^${filters.category.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        "i",
+      );
     }
 
     if (filters.city) {
@@ -130,6 +133,10 @@ export class ListingService {
         createdAt: -1,
       });
   }
+
+  async getCategories() {
+    return ListingModel.distinct("category");
+}
 }
 
 export const listingService = new ListingService();
