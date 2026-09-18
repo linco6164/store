@@ -5,6 +5,8 @@ import { SupportTicket } from "./support.model.js";
 
 import { getAllowedDepartments } from "./support.permissions.js";
 
+import { SupportSequence } from "./support.sequence.model.js";
+
 import {
   type SupportTicketCategory,
   type SupportTicketDepartment,
@@ -79,7 +81,29 @@ class SupportService {
 
     const department = CATEGORY_TO_DEPARTMENT[data.category];
 
+    const sequence = await SupportSequence.findOneAndUpdate(
+      { _id: "tickets" },
+      {
+        $inc: {
+          value: 1,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+
+    if (!sequence) {
+      throw new Error("TICKET_NUMBER_GENERATION_FAILED");
+    }
+
+    const ticketNumber = sequence.value;
+
     const ticket = await SupportTicket.create({
+      ticketNumber,
+
       user: userId,
 
       subject,
