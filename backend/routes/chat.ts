@@ -60,4 +60,10 @@ router.patch(
     chatController.rejectOffer
 );
 
+router.delete(
+    "/messages/:messageId",
+    authMiddleware,
+    chatController.deleteMessage,
+);
+
 export default router;

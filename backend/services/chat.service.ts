@@ -88,6 +88,7 @@ class ChatService {
 
     return Message.find({
       conversation: conversationId,
+      deletedFor: {$ne: new Types.ObjectId(userId),}
     })
       .populate("sender", "_id username avatar")
       .populate({
@@ -410,6 +411,90 @@ class ChatService {
 
       await conversation.save();
     }
+  }
+
+  async deleteMessage(
+    messageId: string,
+    userId: string,
+    mode: "me" | "everyone",
+  ) {
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new Error("INVALID_MESSAGE_ID");
+    }
+
+    if (mode !== "me" && mode !== "everyone") {
+      throw new Error("INVALID_DELETE_MODE");
+    }
+
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      throw new Error("MESSAGE_NOT_FOUND");
+    }
+
+    const conversation = await Conversation.findById(message.conversation);
+
+    if (!conversation) {
+      throw new Error("CONVERSATION_NOT_FOUND");
+    }
+
+    const isParticipant = conversation.participants.some(
+      (participant) => participant.toString() === userId,
+    );
+
+    if (!isParticipant) {
+      throw new Error("ACCESS_DENIED");
+    }
+
+    /*
+     * Ștergere doar pentru mine
+     */
+    if (mode === "me") {
+      await Message.updateOne(
+        {
+          _id: messageId,
+        },
+        {
+          $addToSet: {
+            deletedFor: new Types.ObjectId(userId),
+          },
+        },
+      );
+
+      return {
+        mode: "me",
+        messageId,
+      };
+    }
+
+    /*
+     * Ștergere pentru toți:
+     * doar autorul mesajului poate face asta.
+     */
+    if (message.sender.toString() !== userId) {
+      throw new Error("ONLY_SENDER_CAN_DELETE_FOR_EVERYONE");
+    }
+
+    /*
+     * Deocamdată nu permitem ștergerea
+     * mesajelor de tip ofertă.
+     */
+    if (message.type === "offer") {
+      throw new Error("OFFER_CANNOT_BE_DELETED");
+    }
+
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+
+    message.text = "";
+    message.images = [];
+
+    await message.save();
+
+    return {
+      mode: "everyone",
+      messageId,
+    };
   }
 }
 

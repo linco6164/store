@@ -19,6 +19,12 @@ export interface IMessage extends Document {
 
   seenBy: Types.ObjectId[];
 
+  deletedFor: Types.ObjectId[];
+
+  isDeleted: boolean;
+
+  deletedAt?: Date;
+
   createdAt: Date;
 
   updatedAt: Date;
@@ -79,6 +85,21 @@ const MessageSchema = new Schema<IMessage>(
         ref: "Store",
       },
     ],
+
+    deletedFor: {
+      type: [Schema.Types.ObjectId],
+      ref: "User",
+      default: [],
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    deletedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

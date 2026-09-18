@@ -222,6 +222,34 @@ class ChatController {
       });
     }
   }
+
+  async deleteMessage(req: AuthRequest, res: Response) {
+    try {
+      const messageId = Array.isArray(req.params.messageId)
+        ? req.params.messageId[0]
+        : req.params.messageId;
+
+      const mode = req.body.mode === "everyone" ? "everyone" : "me";
+
+      const result = await chatService.deleteMessage(
+        messageId,
+        req.userId!,
+        mode,
+      );
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("DELETE MESSAGE ERROR:", error);
+
+      return res.status(400).json({
+        success: false,
+        message: error?.message ?? "Failed to delete message.",
+      });
+    }
+  }
 }
 
 export default new ChatController();
