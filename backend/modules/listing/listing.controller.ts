@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../../middleware/auth.js";
 
+import { upload } from "../../middleware/upload.js";
+import { visualSearchService } from "./visual-search.service.js";
+
 import { listingService } from "./listing.service.js";
 
 type ListingParams = {
@@ -162,6 +165,36 @@ class ListingController {
       return res.status(500).json({
         success: false,
         message: "Failed to update listing status.",
+      });
+    }
+  }
+
+  async visualSearch(req: Request, res: Response) {
+    try {
+      const file = req.file as Express.Multer.File;
+
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          message: "Nu a fost trimisă nicio imagine.",
+        });
+      }
+
+      const result = await visualSearchService.searchByImage(
+        file.buffer,
+        file.mimetype,
+      );
+
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Visual search error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Căutarea vizuală a eșuat.",
       });
     }
   }

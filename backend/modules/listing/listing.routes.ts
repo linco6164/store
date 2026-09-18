@@ -1,5 +1,6 @@
 import { Router } from "express";
 import auth from "../../middleware/auth.js";
+import { upload } from "../../middleware/upload.js";
 
 import { listingController } from "./listing.controller.js";
 
@@ -10,6 +11,12 @@ router.post("/", auth, listingController.create);
 router.get("/", listingController.findAll);
 
 router.get("/search", listingController.search);
+
+router.post(
+  "/visual-search",
+  upload.single("image"),
+  listingController.visualSearch,
+);
 
 router.get("/:id", listingController.findById);
 
