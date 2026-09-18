@@ -67,7 +67,21 @@ export default function registerChatSocket(io: Server) {
             data.conversationId,
           );
 
-          io.emit(CHAT_EVENTS.CONVERSATION_UPDATED, conversation);
+          const participants = conversation?.participants ?? [];
+
+          for (const participant of participants) {
+            const participantId =
+              typeof participant === "object" &&
+              participant !== null &&
+              "_id" in participant
+                ? String((participant as any)._id)
+                : String(participant);
+
+            io.to(`user:${participantId}`).emit(
+              CHAT_EVENTS.CONVERSATION_UPDATED,
+              conversation,
+            );
+          }
         } catch (error) {
           console.error(error);
         }
