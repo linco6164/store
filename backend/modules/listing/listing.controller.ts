@@ -173,6 +173,12 @@ class ListingController {
     try {
       const file = req.file as Express.Multer.File;
 
+      console.log("VISUAL SEARCH FILE:", {
+        originalname: file?.originalname,
+        mimetype: file?.mimetype,
+        size: file?.size,
+      });
+
       if (!file) {
         return res.status(400).json({
           success: false,
@@ -190,11 +196,16 @@ class ListingController {
         data: result,
       });
     } catch (error) {
-      console.error("Visual search error:", error);
+      console.error("========== VISUAL SEARCH ERROR ==========");
+
+      console.error(error);
+
+      console.error("=========================================");
 
       return res.status(500).json({
         success: false,
-        message: "Căutarea vizuală a eșuat.",
+        message:
+          error instanceof Error ? error.message : "Căutarea vizuală a eșuat.",
       });
     }
   }
