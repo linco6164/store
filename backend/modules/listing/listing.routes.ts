@@ -18,6 +18,10 @@ router.post(
   listingController.visualSearch,
 );
 
+router.get("/categories", listingController.getCategories);
+
+router.get("/categories/:categoryId", listingController.getCategory);
+
 router.get("/:id", listingController.findById);
 
 router.patch("/:id", listingController.update);
@@ -25,10 +29,5 @@ router.patch("/:id", listingController.update);
 router.patch("/:id/status", listingController.updateStatus);
 
 router.delete("/:id", listingController.delete);
-
-router.get(
-    "/categories",
-    listingController.getCategories
-);
 
 export default router;

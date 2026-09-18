@@ -1,4 +1,5 @@
 import { ListingDocument, ListingModel } from "./listing.model.js";
+import { categories } from "./category.data.js";
 
 export class ListingService {
   async create(data: Partial<ListingDocument>) {
@@ -136,7 +137,11 @@ export class ListingService {
 
   async getCategories() {
     return ListingModel.distinct("category");
-}
+  }
+
+  async getCategory(categoryId: string) {
+    return categories.find((category) => category.id === categoryId);
+  }
 }
 
 export const listingService = new ListingService();

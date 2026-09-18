@@ -227,6 +227,31 @@ class ListingController {
       });
     }
   }
+
+  async getCategory(req: Request, res: Response) {
+    try {
+      const category = await listingService.getCategory(String(req.params.categoryId));
+
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: "Category not found.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: category,
+      });
+    } catch (error) {
+      console.error("Get category error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch category.",
+      });
+    }
+  }
 }
 
 export const listingController = new ListingController();
