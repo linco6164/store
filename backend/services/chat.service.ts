@@ -46,16 +46,94 @@ class ChatService {
   }
 
   async getConversations(userId: string) {
-    return Conversation.find({
-      participants: new Types.ObjectId(userId),
-      deletedFor: {$ne: new Types.ObjectId(userId),}
-    })
-      .populate("participants", "_id username avatar")
-      .populate("listing", "_id title price images")
-      .sort({
-        updatedAt: -1,
-      });
-  }
+    const conversations =
+        await Conversation.find({
+            participants:
+                new Types.ObjectId(userId),
+        })
+            .populate(
+                "participants",
+                "_id username avatar"
+            )
+            .populate(
+                "listing",
+                "_id title price images"
+            )
+            .sort({
+                updatedAt: -1,
+            })
+            .lean();
+
+    const result = await Promise.all(
+        conversations.map(async (conversation: any) => {
+            const lastMessage =
+                await Message.findOne({
+                    conversation: conversation._id,
+                })
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .select(
+                        "_id sender deliveredTo seenBy createdAt text"
+                    )
+                    .lean();
+
+            let lastMessageStatus: "sent" | "delivered" | "seen" | null =
+                null;
+
+            if (
+                lastMessage &&
+                String(lastMessage.sender) ===
+                    String(userId)
+            ) {
+                const otherParticipant =
+                    conversation.participants.find(
+                        (participant: any) =>
+                            String(
+                                participant._id
+                            ) !==
+                            String(userId)
+                    );
+
+                const otherUserId =
+                    otherParticipant?._id;
+
+                if (otherUserId) {
+                    const delivered =
+                        lastMessage.deliveredTo?.some(
+                            (id: any) =>
+                                String(id) ===
+                                String(otherUserId)
+                        );
+
+                    const seen =
+                        lastMessage.seenBy?.some(
+                            (id: any) =>
+                                String(id) ===
+                                String(otherUserId)
+                        );
+
+                    if (seen) {
+                        lastMessageStatus = "seen";
+                    } else if (delivered) {
+                        lastMessageStatus =
+                            "delivered";
+                    } else {
+                        lastMessageStatus =
+                            "sent";
+                    }
+                }
+            }
+
+            return {
+                ...conversation,
+                lastMessageStatus,
+            };
+        })
+    );
+
+    return result;
+}
 
   async getConversation(conversationId: string, userId: string) {
     const conversation = await Conversation.findById(conversationId)
