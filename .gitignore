@@ -7,3 +7,6 @@ certs/
 .env.*
 .env.local
 !.env.example
+backend/.env
+backend/.env.local
+backend/!.env.example
