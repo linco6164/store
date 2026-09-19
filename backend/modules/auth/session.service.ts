@@ -76,6 +76,16 @@ export async function deleteSession(
   });
 }
 
+export async function deleteCurrentSession(
+  userId: string,
+  sessionId: string,
+) {
+  return UserSession.findOneAndDelete({
+    user: userId,
+    sessionId,
+  });
+}
+
 export async function deleteOtherSessions(
   userId: string,
   currentSessionId: string,

@@ -4,6 +4,7 @@ import {
   getUserSessions,
   deleteSession,
   deleteOtherSessions,
+  deleteCurrentSession,
 } from "./session.service.js";
 
 export async function getSessions(req: AuthRequest, res: Response) {
@@ -110,6 +111,31 @@ export async function removeOtherSessions(req: AuthRequest, res: Response) {
     return res.status(500).json({
       success: false,
       message: "Celelalte sesiuni nu au putut fi închise.",
+    });
+  }
+}
+
+export async function logout(req: AuthRequest, res: Response) {
+  try {
+    if (!req.userId || !req.sessionId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    await deleteCurrentSession(req.userId, req.sessionId);
+
+    return res.json({
+      success: true,
+      message: "Te-ai deconectat cu succes.",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Nu s-a putut realiza deconectarea.",
     });
   }
 }

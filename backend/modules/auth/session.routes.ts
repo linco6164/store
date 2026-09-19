@@ -5,11 +5,14 @@ import {
   getSessions,
   removeSession,
   removeOtherSessions,
+  logout,
 } from "./session.controller.js";
 
 const router = Router();
 
 router.get("/", auth, getSessions);
+
+router.post("/logout", auth, logout);
 
 router.delete("/others", auth, removeOtherSessions);
 
