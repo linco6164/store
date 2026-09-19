@@ -49,7 +49,12 @@ async function createAuthToken(userId: string, req: ExpressRequest) {
 
     browser: req.headers["x-browser"]?.toString() || "",
 
-    ipAddress: normalizeIp(req.ip || req.socket.remoteAddress || ""),
+    ipAddress: normalizeIp(
+      req.headers["cf-connecting-ip"]?.toString() ||
+        req.ip ||
+        req.socket.remoteAddress ||
+        "",
+    ),
 
     userAgent: req.headers["user-agent"]?.toString() || "",
   });
