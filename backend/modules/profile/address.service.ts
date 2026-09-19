@@ -3,14 +3,13 @@ import mongoose from "mongoose";
 import { AddressModel } from "./address.model.js";
 
 interface AddressPayload {
-  label?: string;
-  fullName?: string;
-  phone?: string;
   county?: string;
   city?: string;
   street?: string;
   number?: string;
   building?: string;
+  staircase?: string;
+  floor?: string;
   apartment?: string;
   postalCode?: string;
   isDefault?: boolean;
@@ -32,14 +31,13 @@ class AddressService {
   ) {
     const address = await AddressModel.create({
       user: userId,
-      label: payload.label ?? "",
-      fullName: payload.fullName ?? "",
-      phone: payload.phone ?? "",
       county: payload.county ?? "",
       city: payload.city ?? "",
       street: payload.street ?? "",
       number: payload.number ?? "",
       building: payload.building,
+      staircase: payload.staircase,
+      floor: payload.floor,
       apartment: payload.apartment,
       postalCode: payload.postalCode,
       isDefault: payload.isDefault === true,
@@ -82,18 +80,6 @@ class AddressService {
       throw new Error("ADDRESS_NOT_FOUND");
     }
 
-    if (payload.label !== undefined) {
-      address.label = payload.label;
-    }
-
-    if (payload.fullName !== undefined) {
-      address.fullName = payload.fullName;
-    }
-
-    if (payload.phone !== undefined) {
-      address.phone = payload.phone;
-    }
-
     if (payload.county !== undefined) {
       address.county = payload.county;
     }
@@ -112,6 +98,14 @@ class AddressService {
 
     if (payload.building !== undefined) {
       address.building = payload.building;
+    }
+
+    if (payload.staircase !== undefined) {
+      address.staircase = payload.staircase;
+    }
+
+    if (payload.floor !== undefined) {
+      address.floor = payload.floor;
     }
 
     if (payload.apartment !== undefined) {

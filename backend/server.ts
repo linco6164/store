@@ -62,9 +62,9 @@ app.use("/upload", uploadRoutes);
 
 app.use("/listings", listingRoutes);
 
-app.use("/profile", profileRoutes);
-
 app.use("/profile/addresses", addressRoutes);
+
+app.use("/profile", profileRoutes);
 
 app.use("/wallet", walletRoutes);
 

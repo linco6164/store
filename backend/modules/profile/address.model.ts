@@ -3,11 +3,6 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IAddress extends Document {
   user: mongoose.Types.ObjectId;
 
-  label: string;
-
-  fullName: string;
-  phone: string;
-
   county: string;
   city: string;
 
@@ -15,6 +10,8 @@ export interface IAddress extends Document {
   number: string;
 
   building?: string;
+  staircase?: string;
+  floor?: string;
   apartment?: string;
 
   postalCode?: string;
@@ -32,27 +29,6 @@ const addressSchema = new Schema<IAddress>(
       ref: "User",
       required: true,
       index: true,
-    },
-
-    label: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 50,
-    },
-
-    fullName: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 100,
-    },
-
-    phone: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 30,
     },
 
     county: {
@@ -87,6 +63,18 @@ const addressSchema = new Schema<IAddress>(
       type: String,
       trim: true,
       maxlength: 20,
+    },
+
+    staircase: {
+      type: String,
+      trim: true,
+      maxLength: 20,
+    },
+
+    floor: {
+      type: String,
+      trim: true,
+      maxLength: 20,
     },
 
     apartment: {
