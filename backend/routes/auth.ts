@@ -1,10 +1,13 @@
 import { Router } from "express";
+import type { Request as ExpressRequest } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail.js";
 import User from "../models/Users.js";
 import { OAuth2Client } from "google-auth-library";
+
+import { createSession } from "../modules/auth/session.service.js";
 
 import qs from "querystring";
 
@@ -15,6 +18,38 @@ import speakeasy from "speakeasy";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = Router();
+
+async function createAuthToken(userId: string, req: ExpressRequest) {
+  const session = await createSession({
+    userId,
+    deviceName:
+      req.headers["x-device-name"]?.toString() || "Dispozitiv necunoscut",
+
+    platform: req.headers["x-platform"]?.toString() || "unknown",
+
+    browser: req.headers["x-browser"]?.toString() || "",
+
+    ipAddress: req.ip || req.socket.remoteAddress || "",
+
+    userAgent: req.headers["user-agent"]?.toString() || "",
+  });
+
+  const token = jwt.sign(
+    {
+      id: userId,
+      sessionId: session.sessionId,
+    },
+    process.env.JWT_SECRET!,
+    {
+      expiresIn: "7d",
+    },
+  );
+
+  return {
+    token,
+    session,
+  };
+}
 
 router.post("/register", async (req, res) => {
   try {
@@ -90,15 +125,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-      },
-      process.env.JWT_SECRET!,
-      {
-        expiresIn: "7d",
-      },
-    );
+    const { token } = await createAuthToken(user._id.toString(), req);
 
     return res.json({
       success: true,
@@ -160,17 +187,7 @@ router.post("/google", async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-      },
-
-      process.env.JWT_SECRET!,
-
-      {
-        expiresIn: "7d",
-      },
-    );
+    const { token } = await createAuthToken(user._id.toString(), req);
 
     res.json({
       token,
@@ -285,15 +302,7 @@ router.post("/facebook", async (req, res) => {
       console.log("[Facebook] User updated:", user._id);
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id.toString(),
-      },
-      process.env.JWT_SECRET!,
-      {
-        expiresIn: "7d",
-      },
-    );
+    const { token } = await createAuthToken(user._id.toString(), req);
 
     return res.json({
       token,
@@ -376,15 +385,7 @@ router.post("/discord", async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-      },
-      process.env.JWT_SECRET!,
-      {
-        expiresIn: "7d",
-      },
-    );
+    const { token } = await createAuthToken(user._id.toString(), req);
 
     res.json({
       token,
@@ -511,8 +512,7 @@ router.patch("/change-password", auth, async (req: AuthRequest, res) => {
     if (currentPassword === newPassword) {
       return res.status(400).json({
         success: false,
-        message:
-          "Parola nouă trebuie să fie diferită de parola actuală.",
+        message: "Parola nouă trebuie să fie diferită de parola actuală.",
       });
     }
 
@@ -532,10 +532,7 @@ router.patch("/change-password", auth, async (req: AuthRequest, res) => {
       });
     }
 
-    const validPassword = await bcrypt.compare(
-      currentPassword,
-      user.password,
-    );
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
 
     if (!validPassword) {
       return res.status(400).json({
@@ -616,15 +613,7 @@ router.post("/2fa/login", async (req, res) => {
       });
     }
 
-    const jwtToken = jwt.sign(
-      {
-        id: user._id,
-      },
-      process.env.JWT_SECRET!,
-      {
-        expiresIn: "7d",
-      },
-    );
+    const { token: jwtToken } = await createAuthToken(user._id.toString(), req);
 
     res.json({
       success: true,

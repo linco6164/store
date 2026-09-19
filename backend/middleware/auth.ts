@@ -2,9 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 import User from "../models/Users.js";
+import UserSession from "../modules/auth/session.model.js";
+import { updateLastActive } from "../modules/auth/session.service.js";
 
 export interface AuthRequest extends Request {
   userId?: string;
+  sessionId?: string;
 }
 
 export default async function auth(
@@ -29,7 +32,42 @@ export default async function auth(
       process.env.JWT_SECRET!,
     ) as {
       id: string;
+      sessionId?: string;
     };
+
+    // ============================================================
+    // SESIUNE
+    // ============================================================
+
+    if (!decoded.sessionId) {
+      return res.status(401).json({
+        success: false,
+        code: "SESSION_REQUIRED",
+        message:
+          "Sesiunea nu este validă. Te rugăm să te autentifici din nou.",
+      });
+    }
+
+    const session = await UserSession.findOne({
+      sessionId: decoded.sessionId,
+      user: decoded.id,
+      expiresAt: {
+        $gt: new Date(),
+      },
+    });
+
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        code: "SESSION_EXPIRED",
+        message:
+          "Sesiunea a expirat sau a fost închisă.",
+      });
+    }
+
+    // ============================================================
+    // USER
+    // ============================================================
 
     const user = await User.findById(
       decoded.id,
@@ -51,7 +89,16 @@ export default async function auth(
       });
     }
 
+    // ============================================================
+    // ACTUALIZĂM ULTIMA ACTIVITATE
+    // ============================================================
+
+    await updateLastActive(
+      decoded.sessionId,
+    );
+
     req.userId = user._id.toString();
+    req.sessionId = decoded.sessionId;
 
     next();
   } catch (error) {

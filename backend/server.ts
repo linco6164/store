@@ -22,6 +22,7 @@ import walletRoutes from "./modules/wallet/wallet.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
 import addressRoutes from "./modules/profile/address.routes.js"
+import sessionRoutes from "./modules/auth/session.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -57,6 +58,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.use("/auth", authRoutes);
+
+app.use("/auth/sessions", sessionRoutes);
 
 app.use("/upload", uploadRoutes);
 
