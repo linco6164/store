@@ -1,18 +1,19 @@
 import nodemailer from "nodemailer";
-import dotenv from "dotenv"
+import dotenv from "dotenv";
+
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: true,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: Number(process.env.SMTP_PORT) || 465,
+  secure: true,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 });
 
-transporter.verify((error, success) => {
+transporter.verify((error) => {
   if (error) {
     console.error("❌ SMTP connection failed:", error);
   } else {
@@ -23,7 +24,7 @@ transporter.verify((error, success) => {
 export async function sendEmail(
   to: string,
   subject: string,
-  html: string
+  html: string,
 ) {
   const info = await transporter.sendMail({
     from: `"SellingApp" <${process.env.SMTP_USER}>`,
