@@ -1,16 +1,25 @@
+import dns from "dns";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
 dotenv.config();
 
+// Fixes ENETUNREACH on hosts without IPv6
+dns.setDefaultResultOrder("ipv4first");
+
+const port = Number(process.env.SMTP_PORT) || 465;
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: true,
+  port,
+  secure: port === 465, // 465 = implicit TLS, 587 = STARTTLS
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER!,
+    pass: process.env.SMTP_PASS!,
   },
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 15_000,
 });
 
 transporter.verify((error) => {
