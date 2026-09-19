@@ -490,6 +490,78 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
+router.patch("/change-password", auth, async (req: AuthRequest, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Parola actuală și parola nouă sunt obligatorii.",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Parola nouă trebuie să aibă cel puțin 8 caractere.",
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Parola nouă trebuie să fie diferită de parola actuală.",
+      });
+    }
+
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Utilizatorul nu a fost găsit.",
+      });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Acest cont nu are o parolă configurată.",
+      });
+    }
+
+    const validPassword = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
+
+    if (!validPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Parola actuală este incorectă.",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 12);
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Parola a fost schimbată cu succes.",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Nu s-a putut schimba parola.",
+    });
+  }
+});
+
 router.get("/me", auth, async (req: AuthRequest, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
