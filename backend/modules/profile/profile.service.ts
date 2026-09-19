@@ -3,7 +3,9 @@ import { ListingModel } from "../listing/listing.model.js";
 
 class ProfileService {
   async getProfile(userId: string) {
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId).select(
+      "-password -emailVerificationCode -emailVerificationExpires -emailChangeCode -emailChangeExpires",
+    );
 
     if (!user) {
       throw new Error("User not found");
