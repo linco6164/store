@@ -6,10 +6,7 @@ import {
   deleteOtherSessions,
 } from "./session.service.js";
 
-export async function getSessions(
-  req: AuthRequest,
-  res: Response,
-) {
+export async function getSessions(req: AuthRequest, res: Response) {
   try {
     if (!req.userId) {
       return res.status(401).json({
@@ -47,10 +44,7 @@ export async function getSessions(
   }
 }
 
-export async function removeSession(
-  req: AuthRequest,
-  res: Response,
-) {
+export async function removeSession(req: AuthRequest, res: Response) {
   try {
     if (!req.userId) {
       return res.status(401).json({
@@ -59,7 +53,11 @@ export async function removeSession(
       });
     }
 
-    const { sessionId } = req.params;
+    const sessionIdParam = req.params.sessionId;
+
+    const sessionId = Array.isArray(sessionIdParam)
+      ? sessionIdParam[0]
+      : sessionIdParam;
 
     if (!sessionId) {
       return res.status(400).json({
@@ -68,11 +66,7 @@ export async function removeSession(
       });
     }
 
-    const session = await deleteSession(
-      req.userId,
-      sessionId,
-    );
-
+    const session = await deleteSession(req.userId, sessionId);
     if (!session) {
       return res.status(404).json({
         success: false,
@@ -94,10 +88,7 @@ export async function removeSession(
   }
 }
 
-export async function removeOtherSessions(
-  req: AuthRequest,
-  res: Response,
-) {
+export async function removeOtherSessions(req: AuthRequest, res: Response) {
   try {
     if (!req.userId || !req.sessionId) {
       return res.status(401).json({
@@ -106,10 +97,7 @@ export async function removeOtherSessions(
       });
     }
 
-    const result = await deleteOtherSessions(
-      req.userId,
-      req.sessionId,
-    );
+    const result = await deleteOtherSessions(req.userId, req.sessionId);
 
     return res.json({
       success: true,
