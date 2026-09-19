@@ -14,10 +14,30 @@ import qs from "querystring";
 import auth, { AuthRequest } from "../middleware/auth.js";
 
 import speakeasy from "speakeasy";
+import { normalize } from "path";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = Router();
+
+function normalizeIp(ip: string): string {
+  if (!ip) {
+    return "";
+  }
+
+  // IPv4-mapped IPv6:
+  // ::ffff:192.168.1.10 -> 192.168.1.10
+  if (ip.startsWith("::ffff:")) {
+    return ip.substring(7);
+  }
+
+  // Localhost IPv6
+  if (ip === "::1") {
+    return "127.0.0.1";
+  }
+
+  return ip;
+}
 
 async function createAuthToken(userId: string, req: ExpressRequest) {
   const session = await createSession({
@@ -29,7 +49,7 @@ async function createAuthToken(userId: string, req: ExpressRequest) {
 
     browser: req.headers["x-browser"]?.toString() || "",
 
-    ipAddress: req.ip || req.socket.remoteAddress || "",
+    ipAddress: normalizeIp(req.ip || req.socket.remoteAddress || ""),
 
     userAgent: req.headers["user-agent"]?.toString() || "",
   });
