@@ -21,17 +21,16 @@ import adminRoutes from "./modules/admin/admin.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
-import addressRoutes from "./modules/profile/address.routes.js"
+import addressRoutes from "./modules/profile/address.routes.js";
 import sessionRoutes from "./modules/auth/session.routes.js";
+import emailVerificationRoutes from "./modules/profile/email-verification/email-verification.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
 
 import mongoose from "mongoose";
 
-import {
-    setSocketIO,
-} from "./sockets/socket.io.js";
+import { setSocketIO } from "./sockets/socket.io.js";
 
 const app = express();
 
@@ -40,10 +39,10 @@ app.set("trust proxy", true);
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-    cors: {
-        origin: process.env.CLIENT_URL,
-        credentials: true,
-    },
+  cors: {
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+  },
 });
 
 setSocketIO(io);
@@ -87,18 +86,20 @@ app.use("/admin", adminRoutes);
 
 app.use("/support", supportRoutes);
 
+app.use("/profile/email-verification", emailVerificationRoutes);
+
 app.get("/", (_, res) => {
-    res.send("API is running");
+  res.send("API is running");
 });
 
 async function start() {
-    await connectDB();
+  await connectDB();
 
-    const PORT = Number(process.env.PORT) || 5000;
+  const PORT = Number(process.env.PORT) || 5000;
 
-    httpServer.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-    });
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
 }
 
 console.log("Registered models:", mongoose.modelNames());

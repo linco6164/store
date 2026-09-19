@@ -11,6 +11,37 @@ const StoreUserSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailVerificationCode: {
+      type: String,
+      default: null,
+    },
+
+    emailVerificationExpires: {
+      type: Date,
+      default: null,
+    },
+
+    emailChangePending: {
+      type: String,
+      default: null,
+    },
+
+    emailChangeCode: {
+      type: String,
+      default: null,
+    },
+
+    emailChangeExpires: {
+      type: Date,
+      default: null,
+    },
+
     password: {
       type: String,
       default: null,
