@@ -21,6 +21,7 @@ import adminRoutes from "./modules/admin/admin.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
+import addressRoutes from "./modules/profile/address.routes.js"
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -62,6 +63,8 @@ app.use("/upload", uploadRoutes);
 app.use("/listings", listingRoutes);
 
 app.use("/profile", profileRoutes);
+
+app.use("/profile/addresses", addressRoutes);
 
 app.use("/wallet", walletRoutes);
 
