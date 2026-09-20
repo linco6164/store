@@ -104,6 +104,37 @@ const StoreUserSchema = new mongoose.Schema(
 
     fullName: { type: String, default: "" },
     phone: { type: String, default: "" },
+
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    phoneVerificationCode: {
+      type: String,
+      default: null,
+    },
+
+    phoneVerificationExpires: {
+      type: Date,
+      default: null,
+    },
+
+    phoneChangePending: {
+      type: String,
+      default: null,
+    },
+
+    phoneChangeCode: {
+      type: String,
+      default: null,
+    },
+
+    phoneChangeExpires: {
+      type: Date,
+      default: null,
+    },
+
     bio: { type: String, default: "" },
     country: { type: String, default: "" },
     city: { type: String, default: "" },
