@@ -3,9 +3,14 @@ import axios from "axios";
 const SMSLINK_URL =
   "https://secure.smslink.ro/sms/gateway/communicate/json.php";
 
+interface SendSmsOptions {
+  test?: boolean;
+}
+
 export async function sendSms(
   phone: string,
   message: string,
+  options: SendSmsOptions = {},
 ) {
   const connectionId = process.env.SMSLINK_CONNECTION_ID;
   const password = process.env.SMSLINK_PASSWORD;
@@ -18,32 +23,31 @@ export async function sendSms(
     throw new Error("SMSLINK_PASSWORD nu este configurat.");
   }
 
-  try {
-    const response = await axios.post(
-      SMSLINK_URL,
-      {
-        connection_id: connectionId,
-        password,
-        to: phone,
-        message,
+  const response = await axios.post(
+    SMSLINK_URL,
+    {
+      connection_id: connectionId,
+      password,
+      to: phone,
+      message,
+      test: options.test ? 1 : 0,
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
       },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      },
+      timeout: 15000,
+    },
+  );
+
+  console.log("📱 SMSLink:", response.data);
+
+  if (response.data?.response_type === "ERROR") {
+    throw new Error(
+      response.data?.response_message ||
+        "SMSLink a returnat o eroare.",
     );
-
-    console.log("📱 SMSLink response:", response.data);
-
-    return response.data;
-  } catch (error: any) {
-    console.error(
-      "❌ SMSLink error:",
-      error?.response?.data || error?.message || error,
-    );
-
-    throw new Error("SMS-ul nu a putut fi trimis.");
   }
+
+  return response.data;
 }
