@@ -59,22 +59,47 @@ function xmlEscape(value: unknown): string {
 }
 
 function readPublicCertificate(): string {
-  const configuredPath = requiredEnv("NETOPIA_PUBLIC_KEY_PATH");
-  const resolvedPath = resolveConfiguredPath(configuredPath);
+  const value = requiredEnv("NETOPIA_PUBLIC_KEY");
+
+  // Dacă variabila conține direct certificatul.
+  if (
+    value.includes("BEGIN CERTIFICATE") ||
+    value.includes("BEGIN PUBLIC KEY") ||
+    value.includes("BEGIN RSA PUBLIC KEY")
+  ) {
+    return value.replace(/\\n/g, "\n");
+  }
+
+  // Altfel considerăm valoarea o cale către fișier.
+  const resolvedPath = resolveConfiguredPath(value);
 
   if (!fs.existsSync(resolvedPath)) {
-    throw new Error(`Certificatul public NETOPIA nu există: ${resolvedPath}`);
+    throw new Error(
+      `Certificatul public NETOPIA nu există: ${resolvedPath}`,
+    );
   }
 
   return fs.readFileSync(resolvedPath, "utf8");
 }
 
 function readPrivateKey(): string {
-  const configuredPath = requiredEnv("NETOPIA_PRIVATE_KEY_PATH");
-  const resolvedPath = resolveConfiguredPath(configuredPath);
+  const value = requiredEnv("NETOPIA_PRIVATE_KEY");
+
+  // Dacă variabila conține direct cheia privată.
+  if (
+    value.includes("BEGIN PRIVATE KEY") ||
+    value.includes("BEGIN RSA PRIVATE KEY")
+  ) {
+    return value.replace(/\\n/g, "\n");
+  }
+
+  // Altfel considerăm valoarea o cale către fișier.
+  const resolvedPath = resolveConfiguredPath(value);
 
   if (!fs.existsSync(resolvedPath)) {
-    throw new Error(`Cheia privată NETOPIA nu există: ${resolvedPath}`);
+    throw new Error(
+      `Cheia privată NETOPIA nu există: ${resolvedPath}`,
+    );
   }
 
   return fs.readFileSync(resolvedPath, "utf8");
