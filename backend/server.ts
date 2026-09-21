@@ -25,6 +25,7 @@ import addressRoutes from "./modules/profile/address.routes.js";
 import sessionRoutes from "./modules/auth/session.routes.js";
 import emailVerificationRoutes from "./modules/profile/email-verification/email-verification.routes.js";
 import phoneVerificationRoutes from "./modules/profile/phone-verification/phone-verification.routes.js";
+import reviewRoutes from "./modules/review/review.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -93,6 +94,8 @@ app.use("/admin", adminRoutes);
 app.use("/support", supportRoutes);
 
 app.use("/profile/email-verification", emailVerificationRoutes);
+
+app.use("/reviews", reviewRoutes);
 
 
 app.get("/", (_, res) => {
