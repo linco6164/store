@@ -27,6 +27,7 @@ import emailVerificationRoutes from "./modules/profile/email-verification/email-
 import phoneVerificationRoutes from "./modules/profile/phone-verification/phone-verification.routes.js";
 import reviewRoutes from "./modules/review/review.routes.js";
 import orderRoutes from "./modules/order/order.routes.js";
+import promotionRoutes from "./modules/promotion/promotion.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -69,6 +70,12 @@ app.use("/upload", uploadRoutes);
 
 app.use("/listings", listingRoutes);
 
+app.use ("/orders", orderRoutes);
+
+app.use("/reviews", reviewRoutes);
+
+app.use("/promotions", promotionRoutes);
+
 app.use("/profile/addresses", addressRoutes);
 
 app.use(
@@ -95,11 +102,6 @@ app.use("/admin", adminRoutes);
 app.use("/support", supportRoutes);
 
 app.use("/profile/email-verification", emailVerificationRoutes);
-
-app.use("/reviews", reviewRoutes);
-
-app.use ("/orders", orderRoutes);
-
 
 app.get("/", (_, res) => {
   res.send("API is running");
