@@ -142,6 +142,16 @@ export class ListingService {
   async getCategory(categoryId: string) {
     return categories.find((category) => category.id === categoryId);
   }
+
+  async getMyListings(userId: string) {
+  return ListingModel.find({
+    seller: userId,
+  })
+    .sort({
+      createdAt: -1,
+    })
+    .populate("seller", "username avatar");
+}
 }
 
 export const listingService = new ListingService();

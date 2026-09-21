@@ -252,6 +252,36 @@ class ListingController {
       });
     }
   }
+
+  async getMyListings(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Neautorizat",
+      });
+    }
+
+    const listings = await listingService.getMyListings(
+      req.userId,
+    );
+
+    return res.json({
+      success: true,
+      data: listings,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.message ??
+        "Eroare la încărcarea anunțurilor.",
+    });
+  }
+}
 }
 
 export const listingController = new ListingController();

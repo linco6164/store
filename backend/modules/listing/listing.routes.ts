@@ -24,6 +24,8 @@ router.get("/categories/:categoryId", listingController.getCategory);
 
 router.get("/:id", listingController.findById);
 
+router.get("/mine", auth, listingController.getMyListings);
+
 router.patch("/:id", listingController.update);
 
 router.patch("/:id/status", listingController.updateStatus);
