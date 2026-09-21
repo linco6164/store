@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 
+import { PromotionPaymentModel } from "./promotion-payment.model.js";
+
 import {
   createPromotionPayment,
   getPromotionPayment,
@@ -221,26 +223,89 @@ export async function confirmPromotionPayment(req: Request, res: Response) {
  * NETOPIA redirecționează utilizatorul aici
  * după checkout.
  */
-export async function promotionPaymentReturn(req: Request, res: Response) {
-  const rawPaymentId = req.query.paymentId;
-  const rawStatus = req.query.status;
+export async function promotionPaymentReturn(
+  req: Request,
+  res: Response
+) {
+  try {
+    const rawOrderId =
+      req.query.orderId ??
+      req.query.orderID ??
+      req.query.order_id ??
+      req.query.paymentId;
 
-  const paymentId = typeof rawPaymentId === "string" ? rawPaymentId : "";
+    const rawStatus = req.query.status;
 
-  const status = typeof rawStatus === "string" ? rawStatus : "pending";
+    const orderId =
+      typeof rawOrderId === "string"
+        ? rawOrderId
+        : "";
 
-  const frontendUrl =
-    process.env.NETOPIA_PROMOTION_FRONTEND_RETURN_URL ??
-    "https://nx-store.com/promotion/payment-return";
+    const status =
+      typeof rawStatus === "string"
+        ? rawStatus
+        : "pending";
 
-  const separator = frontendUrl.includes("?") ? "&" : "?";
+    let paymentId = "";
 
-  const redirectUrl =
-    `${frontendUrl}${separator}` +
-    `paymentId=${encodeURIComponent(paymentId)}` +
-    `&status=${encodeURIComponent(status)}`;
+    if (orderId) {
+      const payment =
+        await PromotionPaymentModel.findOne({
+          providerOrderId: orderId,
+        }).select("_id status");
 
-  return res.redirect(302, redirectUrl);
+      if (payment) {
+        paymentId = String(payment._id);
+
+        console.log(
+          "[PROMOTION PAYMENT RETURN]",
+          {
+            orderId,
+            paymentId,
+            status: payment.status,
+          }
+        );
+      } else {
+        console.warn(
+          "[PROMOTION PAYMENT RETURN] Payment not found",
+          {
+            orderId,
+          }
+        );
+      }
+    }
+
+    const frontendReturnUrl =
+      process.env.NETOPIA_PROMOTION_FRONTEND_RETURN_URL ??
+      "https://nx-store.shop/promotion/payment-return";
+
+    const separator =
+      frontendReturnUrl.includes("?")
+        ? "&"
+        : "?";
+
+    const redirectUrl =
+      `${frontendReturnUrl}${separator}` +
+      `paymentId=${encodeURIComponent(paymentId)}` +
+      `status=${encodeURIComponent(status)}` +
+      `orderId=${encodeURIComponent(orderId)}`;
+
+    console.log(
+      "[PROMOTION PAYMENT RETURN] Redirect:",
+      redirectUrl
+    );
+
+    return res.redirect(302, redirectUrl);
+  } catch (error) {
+    console.error(
+      "[PROMOTION PAYMENT RETURN] Error:",
+      error
+    );
+
+    return res.status(500).send(
+      "Nu s-a putut procesa return-ul plății."
+    );
+  }
 }
 
 function escapeXml(value: string): string {
