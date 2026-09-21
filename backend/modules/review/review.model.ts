@@ -4,6 +4,7 @@ export interface IReview extends Document {
   reviewer: mongoose.Types.ObjectId;
   seller: mongoose.Types.ObjectId;
   listing: mongoose.Types.ObjectId;
+  order: mongoose.Types.ObjectId;
 
   rating: number;
   comment?: string;
@@ -16,14 +17,14 @@ const reviewSchema = new Schema<IReview>(
   {
     reviewer: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Store",
       required: true,
       index: true,
     },
 
     seller: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Store",
       required: true,
       index: true,
     },
@@ -31,6 +32,13 @@ const reviewSchema = new Schema<IReview>(
     listing: {
       type: Schema.Types.ObjectId,
       ref: "Listing",
+      required: true,
+      index: true,
+    },
+
+    order: {
+      type: Schema.Types.ObjectId,
+      ref: "Order",
       required: true,
       index: true,
     },
@@ -58,14 +66,11 @@ const reviewSchema = new Schema<IReview>(
 reviewSchema.index(
   {
     reviewer: 1,
-    listing: 1,
+    order: 1,
   },
   {
     unique: true,
   },
 );
 
-export const ReviewModel = mongoose.model<IReview>(
-  "Review",
-  reviewSchema,
-);
+export const ReviewModel = mongoose.model<IReview>("Review", reviewSchema);

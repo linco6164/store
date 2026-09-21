@@ -5,7 +5,7 @@ interface AuthRequest extends Request {
   userId?: string;
 }
 
-export async function create(
+export async function createReview(
   req: AuthRequest,
   res: Response,
 ) {
@@ -18,34 +18,42 @@ export async function create(
     }
 
     const {
-      sellerId,
-      listingId,
+      orderId,
       rating,
       comment,
     } = req.body;
 
-    if (!sellerId || !listingId || rating == null) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message:
-          "sellerId, listingId și rating sunt obligatorii.",
+        message: "orderId este obligatoriu.",
       });
     }
 
-    const review =
-      await reviewService.createReview({
-        reviewerId: req.userId,
-        sellerId,
-        listingId,
-        rating: Number(rating),
-        comment,
+    if (rating === undefined || rating === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating-ul este obligatoriu.",
       });
+    }
+
+    const review = await reviewService.createReview({
+      reviewerId: req.userId,
+      orderId: String(orderId),
+      rating: Number(rating),
+      comment:
+        comment !== undefined && comment !== null
+          ? String(comment)
+          : undefined,
+    });
 
     return res.status(201).json({
       success: true,
       data: review,
     });
   } catch (error: any) {
+    console.error("❌ createReview:", error);
+
     return res.status(400).json({
       success: false,
       message:
@@ -55,7 +63,7 @@ export async function create(
   }
 }
 
-export async function sellerReviews(
+export async function getSellerReviews(
   req: Request,
   res: Response,
 ) {
@@ -63,15 +71,15 @@ export async function sellerReviews(
     const sellerId = req.params.sellerId as string;
 
     const reviews =
-      await reviewService.getSellerReviews(
-        sellerId,
-      );
+      await reviewService.getSellerReviews(sellerId);
 
     return res.json({
       success: true,
       data: reviews,
     });
   } catch (error: any) {
+    console.error("❌ getSellerReviews:", error);
+
     return res.status(400).json({
       success: false,
       message:
@@ -81,7 +89,7 @@ export async function sellerReviews(
   }
 }
 
-export async function sellerSummary(
+export async function getSellerReviewSummary(
   req: Request,
   res: Response,
 ) {
@@ -98,16 +106,21 @@ export async function sellerSummary(
       data: summary,
     });
   } catch (error: any) {
+    console.error(
+      "❌ getSellerReviewSummary:",
+      error,
+    );
+
     return res.status(400).json({
       success: false,
       message:
         error?.message ||
-        "Nu s-a putut încărca ratingul.",
+        "Nu s-a putut încărca sumarul evaluărilor.",
     });
   }
 }
 
-export async function remove(
+export async function deleteReview(
   req: AuthRequest,
   res: Response,
 ) {
@@ -119,16 +132,21 @@ export async function remove(
       });
     }
 
-    await reviewService.deleteReview(
-      String(req.params.id),
-      req.userId,
-    );
+    const reviewId = req.params.id as string;
+
+    const result =
+      await reviewService.deleteReview(
+        reviewId,
+        req.userId,
+      );
 
     return res.json({
       success: true,
-      message: "Evaluarea a fost ștearsă.",
+      data: result,
     });
   } catch (error: any) {
+    console.error("❌ deleteReview:", error);
+
     return res.status(400).json({
       success: false,
       message:

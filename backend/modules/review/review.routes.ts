@@ -1,33 +1,60 @@
 import { Router } from "express";
-
-import * as reviewController from "./review.controller.js";
-import  auth  from "../../middleware/auth.js";
+import auth from "../../middleware/auth.js";
+import {
+  createReview,
+  getSellerReviews,
+  getSellerReviewSummary,
+  deleteReview,
+} from "./review.controller.js";
 
 const router = Router();
 
-// Evaluări publice
-router.get(
-  "/seller/:sellerId",
-  reviewController.sellerReviews,
-);
-
-router.get(
-  "/seller/:sellerId/summary",
-  reviewController.sellerSummary,
-);
-
-// Creare evaluare
+/*
+ * Creează o evaluare pentru o comandă finalizată
+ *
+ * POST /reviews
+ * Body:
+ * {
+ *   orderId: string,
+ *   rating: number,
+ *   comment?: string
+ * }
+ */
 router.post(
   "/",
   auth,
-  reviewController.create,
+  createReview,
 );
 
-// Ștergere evaluare proprie
+/*
+ * Toate evaluările unui vânzător
+ *
+ * GET /reviews/seller/:sellerId
+ */
+router.get(
+  "/seller/:sellerId",
+  getSellerReviews,
+);
+
+/*
+ * Sumar evaluări vânzător
+ *
+ * GET /reviews/seller/:sellerId/summary
+ */
+router.get(
+  "/seller/:sellerId/summary",
+  getSellerReviewSummary,
+);
+
+/*
+ * Șterge propria evaluare
+ *
+ * DELETE /reviews/:id
+ */
 router.delete(
   "/:id",
   auth,
-  reviewController.remove,
+  deleteReview,
 );
 
 export default router;
