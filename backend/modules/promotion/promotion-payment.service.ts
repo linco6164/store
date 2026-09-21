@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 
-import  User  from "../../models/Users.js";
+import User from "../../models/Users.js";
 import { PromotionModel } from "./promotion.model.js";
 import { PromotionPaymentModel } from "./promotion-payment.model.js";
 import { netopiaService } from "../payment/netopia.service.js";
@@ -92,9 +92,7 @@ export async function createPromotionPayment(
   }
 
   if (promotion.status !== "pending") {
-    throw new Error(
-      "Această promovare nu mai poate fi plătită.",
-    );
+    throw new Error("Această promovare nu mai poate fi plătită.");
   }
 
   if (promotion.amount <= 0) {
@@ -159,10 +157,7 @@ export async function createPromotionPayment(
 /**
  * Găsește plata după ID-ul intern.
  */
-export async function getPromotionPayment(
-  userId: string,
-  paymentId: string,
-) {
+export async function getPromotionPayment(userId: string, paymentId: string) {
   validateObjectId(userId, "ID utilizator invalid.");
   validateObjectId(paymentId, "ID plată invalid.");
 
@@ -181,7 +176,22 @@ export async function getPromotionPayment(
     throw new Error("Plata nu există.");
   }
 
-  return payment;
+  return {
+    _id: payment._id,
+    user: payment.user,
+    promotion: payment.promotion,
+    provider: payment.provider,
+    providerOrderId: payment.providerOrderId,
+    amount: payment.amount,
+    currency: payment.currency,
+    status: payment.status,
+    ntpId: payment.ntpId,
+    action: payment.action,
+    processedAmount: payment.processedAmount,
+    paidAt: payment.paidAt,
+    createdAt: payment.createdAt,
+    updatedAt: payment.updatedAt,
+  };
 }
 
 /**
@@ -270,23 +280,19 @@ export async function handlePromotionNotification(input: {
 
   if (
     notification.currency &&
-    notification.currency.toUpperCase() !==
-      payment.currency.toUpperCase()
+    notification.currency.toUpperCase() !== payment.currency.toUpperCase()
   ) {
     payment.status = "failed";
     payment.ntpId = notification.ntpId;
     payment.action = notification.action;
     payment.processedAmount = notification.processedAmount;
     payment.errorCode = "CURRENCY_MISMATCH";
-    payment.errorMessage =
-      "Moneda confirmată de NETOPIA nu corespunde plății.";
+    payment.errorMessage = "Moneda confirmată de NETOPIA nu corespunde plății.";
     payment.rawNotification = notification.raw;
 
     await payment.save();
 
-    throw new Error(
-      "Moneda confirmată de NETOPIA nu corespunde plății.",
-    );
+    throw new Error("Moneda confirmată de NETOPIA nu corespunde plății.");
   }
 
   const session = await mongoose.startSession();
@@ -299,20 +305,18 @@ export async function handlePromotionNotification(input: {
     } | null = null;
 
     await session.withTransaction(async () => {
-      const lockedPayment =
-        await PromotionPaymentModel.findOne({
-          _id: payment._id,
-        }).session(session);
+      const lockedPayment = await PromotionPaymentModel.findOne({
+        _id: payment._id,
+      }).session(session);
 
       if (!lockedPayment) {
         throw new Error("Plata promovării nu mai există.");
       }
 
       if (lockedPayment.status === "paid") {
-        const existingPromotion =
-          await PromotionModel.findById(
-            lockedPayment.promotion,
-          ).session(session);
+        const existingPromotion = await PromotionModel.findById(
+          lockedPayment.promotion,
+        ).session(session);
 
         result = {
           payment: lockedPayment,
@@ -323,26 +327,22 @@ export async function handlePromotionNotification(input: {
         return;
       }
 
-      const promotion =
-        await PromotionModel.findById(
-          lockedPayment.promotion,
-        ).session(session);
+      const promotion = await PromotionModel.findById(
+        lockedPayment.promotion,
+      ).session(session);
 
       if (!promotion) {
         throw new Error("Promovarea nu mai există.");
       }
 
       if (promotion.status !== "pending") {
-        throw new Error(
-          `Promovarea are deja statusul ${promotion.status}.`,
-        );
+        throw new Error(`Promovarea are deja statusul ${promotion.status}.`);
       }
 
       const now = new Date();
 
       const expiresAt = new Date(
-        now.getTime() +
-          promotion.duration * 60 * 60 * 1000,
+        now.getTime() + promotion.duration * 60 * 60 * 1000,
       );
 
       /**
@@ -352,18 +352,17 @@ export async function handlePromotionNotification(input: {
       promotion.startsAt = now;
       promotion.expiresAt = expiresAt;
 
+      // Legăm promovarea de plata confirmată.
+      promotion.payment = lockedPayment._id;
+
       await promotion.save({ session });
 
       lockedPayment.status = "paid";
       lockedPayment.ntpId = notification.ntpId;
       lockedPayment.action = notification.action;
-      lockedPayment.processedAmount =
-        notification.processedAmount;
-      lockedPayment.errorCode = String(
-        notification.errorCode,
-      );
-      lockedPayment.errorMessage =
-        notification.errorMessage;
+      lockedPayment.processedAmount = notification.processedAmount;
+      lockedPayment.errorCode = String(notification.errorCode);
+      lockedPayment.errorMessage = notification.errorMessage;
       lockedPayment.rawNotification = notification.raw;
       lockedPayment.paidAt = now;
 

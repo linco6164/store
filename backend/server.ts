@@ -28,6 +28,7 @@ import phoneVerificationRoutes from "./modules/profile/phone-verification/phone-
 import reviewRoutes from "./modules/review/review.routes.js";
 import orderRoutes from "./modules/order/order.routes.js";
 import promotionRoutes from "./modules/promotion/promotion.routes.js";
+import promotionPaymentRoutes from "./modules/promotion/promotion-payment.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -75,6 +76,8 @@ app.use ("/orders", orderRoutes);
 app.use("/reviews", reviewRoutes);
 
 app.use("/promotions", promotionRoutes);
+
+app.use("/promotions/payment", promotionPaymentRoutes);
 
 app.use("/profile/addresses", addressRoutes);
 
