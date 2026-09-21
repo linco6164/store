@@ -22,9 +22,9 @@ router.get("/categories", listingController.getCategories);
 
 router.get("/categories/:categoryId", listingController.getCategory);
 
-router.get("/:id", listingController.findById);
-
 router.get("/mine", auth, listingController.getMyListings);
+
+router.get("/:id", listingController.findById);
 
 router.patch("/:id", listingController.update);
 
