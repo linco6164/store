@@ -34,20 +34,14 @@ export async function createPromotionPaymentController(
       });
     }
 
-    const result = await createPromotionPayment(
-      req.userId,
-      promotionId,
-    );
+    const result = await createPromotionPayment(req.userId, promotionId);
 
     return res.status(200).json({
       success: true,
       data: result,
     });
   } catch (error) {
-    console.error(
-      "[PROMOTION PAYMENT CREATE]",
-      error,
-    );
+    console.error("[PROMOTION PAYMENT CREATE]", error);
 
     return res.status(400).json({
       success: false,
@@ -56,6 +50,77 @@ export async function createPromotionPaymentController(
           ? error.message
           : "Nu s-a putut crea plata promovării.",
     });
+  }
+}
+
+export async function promotionPaymentCheckout(req: Request, res: Response) {
+  try {
+    const gatewayUrl = String(req.query.gatewayUrl ?? "");
+    const envKey = String(req.query.env_key ?? "");
+    const data = String(req.query.data ?? "");
+    const cipher = String(req.query.cipher ?? "");
+    const iv = String(req.query.iv ?? "");
+
+    if (!gatewayUrl || !envKey || !data || !cipher || !iv) {
+      return res.status(400).send("Date NETOPIA incomplete.");
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>NETOPIA Checkout</title>
+</head>
+<body>
+  <p>Se deschide pagina de plată...</p>
+
+  <form
+    id="netopia-form"
+    method="POST"
+    action="${gatewayUrl}"
+  >
+    <input
+      type="hidden"
+      name="env_key"
+      value="${envKey}"
+    />
+
+    <input
+      type="hidden"
+      name="data"
+      value="${data}"
+    />
+
+    <input
+      type="hidden"
+      name="cipher"
+      value="${cipher}"
+    />
+
+    <input
+      type="hidden"
+      name="iv"
+      value="${iv}"
+    />
+  </form>
+
+  <script>
+    document.getElementById("netopia-form").submit();
+  </script>
+</body>
+</html>
+`;
+
+    res.status(200).set("Content-Type", "text/html; charset=utf-8").send(html);
+  } catch (error) {
+    console.error("[PROMOTION PAYMENT CHECKOUT]", error);
+
+    return res.status(500).send("Nu s-a putut deschide checkout-ul NETOPIA.");
   }
 }
 
@@ -83,27 +148,19 @@ export async function getPromotionPaymentController(
       });
     }
 
-    const payment = await getPromotionPayment(
-      req.userId,
-      id,
-    );
+    const payment = await getPromotionPayment(req.userId, id);
 
     return res.status(200).json({
       success: true,
       data: payment,
     });
   } catch (error) {
-    console.error(
-      "[PROMOTION PAYMENT GET]",
-      error,
-    );
+    console.error("[PROMOTION PAYMENT GET]", error);
 
     return res.status(404).json({
       success: false,
       message:
-        error instanceof Error
-          ? error.message
-          : "Plata nu a fost găsită.",
+        error instanceof Error ? error.message : "Plata nu a fost găsită.",
     });
   }
 }
@@ -113,29 +170,17 @@ export async function getPromotionPaymentController(
  *
  * Endpoint public apelat de NETOPIA.
  */
-export async function confirmPromotionPayment(
-  req: Request,
-  res: Response,
-) {
+export async function confirmPromotionPayment(req: Request, res: Response) {
   try {
-    const envKey =
-      req.body?.env_key ??
-      req.body?.envKey;
+    const envKey = req.body?.env_key ?? req.body?.envKey;
 
     const data = req.body?.data;
 
-    const cipher =
-      req.body?.cipher ??
-      req.body?.cipher_name;
+    const cipher = req.body?.cipher ?? req.body?.cipher_name;
 
-    const iv =
-      req.body?.iv ??
-      req.body?.IV;
+    const iv = req.body?.iv ?? req.body?.IV;
 
-    if (
-      typeof envKey !== "string" ||
-      typeof data !== "string"
-    ) {
+    if (typeof envKey !== "string" || typeof data !== "string") {
       return res
         .status(400)
         .type("application/xml")
@@ -147,32 +192,19 @@ export async function confirmPromotionPayment(
     await handlePromotionNotification({
       envKey,
       data,
-      cipher:
-        typeof cipher === "string"
-          ? cipher
-          : undefined,
-      iv:
-        typeof iv === "string"
-          ? iv
-          : undefined,
+      cipher: typeof cipher === "string" ? cipher : undefined,
+      iv: typeof iv === "string" ? iv : undefined,
     });
 
     return res
       .status(200)
       .type("application/xml")
-      .send(
-        '<?xml version="1.0" encoding="utf-8"?><crc>OK</crc>',
-      );
+      .send('<?xml version="1.0" encoding="utf-8"?><crc>OK</crc>');
   } catch (error) {
-    console.error(
-      "[PROMOTION PAYMENT CONFIRM]",
-      error,
-    );
+    console.error("[PROMOTION PAYMENT CONFIRM]", error);
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "Eroare la procesarea plății.";
+      error instanceof Error ? error.message : "Eroare la procesarea plății.";
 
     return res
       .status(200)
@@ -189,30 +221,19 @@ export async function confirmPromotionPayment(
  * NETOPIA redirecționează utilizatorul aici
  * după checkout.
  */
-export async function promotionPaymentReturn(
-  req: Request,
-  res: Response,
-) {
+export async function promotionPaymentReturn(req: Request, res: Response) {
   const rawPaymentId = req.query.paymentId;
   const rawStatus = req.query.status;
 
-  const paymentId =
-    typeof rawPaymentId === "string"
-      ? rawPaymentId
-      : "";
+  const paymentId = typeof rawPaymentId === "string" ? rawPaymentId : "";
 
-  const status =
-    typeof rawStatus === "string"
-      ? rawStatus
-      : "pending";
+  const status = typeof rawStatus === "string" ? rawStatus : "pending";
 
   const frontendUrl =
     process.env.NETOPIA_PROMOTION_FRONTEND_RETURN_URL ??
     "https://nx-store.com/promotion/payment-return";
 
-  const separator = frontendUrl.includes("?")
-    ? "&"
-    : "?";
+  const separator = frontendUrl.includes("?") ? "&" : "?";
 
   const redirectUrl =
     `${frontendUrl}${separator}` +
