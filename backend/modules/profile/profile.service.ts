@@ -1,4 +1,5 @@
 import User from "../../models/Users.js";
+import mongoose from "mongoose";
 import { ListingModel } from "../listing/listing.model.js";
 import { ReviewModel } from "../review/review.model.js";
 
@@ -24,9 +25,23 @@ class ProfileService {
       (listing) => listing.status === "sold",
     );
 
-    const reviews = await ReviewModel.countDocuments({
-      seller: userId,
-    });
+    const reviewStats = await ReviewModel.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          average: { $avg: "$rating" },
+        },
+      },
+    ]);
+
+    const reviews = reviewStats[0]?.count ?? 0;
+    const rating = reviewStats[0]?.average ?? 0;
 
     return {
       user,
@@ -35,6 +50,7 @@ class ProfileService {
         listings: listings.length,
         sold: soldListings.length,
         reviews,
+        rating,
         favorites: 0,
       },
 
@@ -51,7 +67,25 @@ class ProfileService {
       throw new Error("USER_NOT_FOUND");
     }
 
-    const [listings, sold, reviews] = await Promise.all([
+    const reviewStats = await ReviewModel.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          average: { $avg: "$rating" },
+        },
+      },
+    ]);
+
+    const reviews = reviewStats[0]?.count ?? 0;
+    const rating = reviewStats[0]?.average ?? 0;
+
+    const [listings, sold] = await Promise.all([
       ListingModel.find({
         seller: userId,
         status: "active",
@@ -65,9 +99,6 @@ class ProfileService {
         seller: userId,
         status: "sold",
       }),
-      ReviewModel.countDocuments({
-        seller: userId,
-      }),
     ]);
 
     return {
@@ -77,6 +108,7 @@ class ProfileService {
         listings: listings.length,
         sold,
         reviews,
+        rating,
         favorites: 0,
       },
 
