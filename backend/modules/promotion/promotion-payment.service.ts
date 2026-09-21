@@ -49,16 +49,28 @@ function getPromotionConfirmUrl(): string {
   return value.trim();
 }
 
-function getPromotionReturnUrl(): string {
-  const value = process.env.NETOPIA_PROMOTION_RETURN_URL;
+function requiredEnv(name: string): string {
+  const value = process.env[name];
 
-  if (!value?.trim()) {
+  if (!value || !value.trim()) {
     throw new Error(
-      "Lipsește variabila de mediu NETOPIA_PROMOTION_RETURN_URL.",
+      `Lipsește variabila de mediu ${name}.`
     );
   }
 
   return value.trim();
+}
+
+function getPromotionReturnUrl(paymentId: string): string {
+  const baseUrl = requiredEnv("NETOPIA_PROMOTION_FRONTEND_RETURN_URL");
+
+  const separator = baseUrl.includes("?") ? "&" : "?";
+
+  return (
+    `${baseUrl}${separator}` +
+    `paymentId=${encodeURIComponent(paymentId)}` +
+    `&status=pending`
+  );
 }
 
 /**
@@ -129,7 +141,7 @@ export async function createPromotionPayment(
     currency: payment.currency,
     details: `Promovare anunț Nexora Store - ${promotion.duration} ore`,
     confirmUrl: getPromotionConfirmUrl(),
-    returnUrl: getPromotionReturnUrl(),
+    returnUrl: getPromotionReturnUrl(String(payment._id)),
     billing: {
       email: user.email,
       firstName,
