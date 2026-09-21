@@ -58,6 +58,14 @@ function xmlEscape(value: unknown): string {
     .replace(/'/g, "&apos;");
 }
 
+/**
+ * Citește certificatul public NETOPIA.
+ *
+ * Sunt acceptate:
+ * 1. NETOPIA_PUBLIC_KEY cu certificatul PEM direct
+ * 2. NETOPIA_PUBLIC_KEY_PATH cu certificatul PEM direct
+ * 3. NETOPIA_PUBLIC_KEY_PATH ca path către un fișier
+ */
 function readPublicCertificate(): string {
   const direct =
     process.env.NETOPIA_PUBLIC_KEY?.trim() ||
@@ -65,14 +73,14 @@ function readPublicCertificate(): string {
 
   if (!direct) {
     throw new Error(
-      "Lipsește NETOPIA_PUBLIC_KEY sau NETOPIA_PUBLIC_KEY_PATH din environment."
+      "Lipsește NETOPIA_PUBLIC_KEY sau NETOPIA_PUBLIC_KEY_PATH din environment.",
     );
   }
 
   // Render poate păstra \n ca text literal.
   const value = direct.replace(/\\n/g, "\n").trim();
 
-  // Dacă variabila conține direct certificatul PEM
+  // Certificatul/cheia este introdus direct în environment.
   if (
     value.includes("-----BEGIN CERTIFICATE-----") ||
     value.includes("-----BEGIN PUBLIC KEY-----") ||
@@ -81,18 +89,75 @@ function readPublicCertificate(): string {
     return value;
   }
 
-  // Altfel presupunem că este o cale către fișier.
+  // Dacă nu este PEM, îl tratăm ca path către fișier.
   const resolvedPath = resolveConfiguredPath(value);
 
   if (!fs.existsSync(resolvedPath)) {
     throw new Error(
-      `NETOPIA public certificate/key nu există la calea: ${resolvedPath}`
+      `NETOPIA public certificate/key nu există la calea: ${resolvedPath}`,
     );
   }
 
   return fs.readFileSync(resolvedPath, "utf8").replace(/\\n/g, "\n").trim();
 }
 
+/**
+ * Extrage cheia publică utilizabilă de crypto.publicEncrypt()
+ * din certificatul X.509 NETOPIA.
+ *
+ * Important:
+ * NETOPIA_PUBLIC_KEY poate fi:
+ *
+ * -----BEGIN CERTIFICATE-----
+ * ...
+ * -----END CERTIFICATE-----
+ *
+ * crypto.publicEncrypt() nu trebuie să primească certificatul
+ * în forma brută; extragem cheia publică SPKI din certificat.
+ */
+function getPublicKeyFromCertificate(certificate: string): string {
+  const normalized = certificate.replace(/\\n/g, "\n").trim();
+
+  if (normalized.includes("-----BEGIN CERTIFICATE-----")) {
+    try {
+      return crypto
+        .createPublicKey(normalized)
+        .export({
+          type: "spki",
+          format: "pem",
+        })
+        .toString();
+    } catch (error) {
+      throw new Error(
+        `Certificatul public NETOPIA nu poate fi decodat: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  // Dacă avem deja o cheie publică PEM, o folosim direct.
+  if (
+    normalized.includes("-----BEGIN PUBLIC KEY-----") ||
+    normalized.includes("-----BEGIN RSA PUBLIC KEY-----")
+  ) {
+    return normalized;
+  }
+
+  throw new Error(
+    "NETOPIA_PUBLIC_KEY nu este un certificat sau o cheie publică PEM validă.",
+  );
+}
+
+/**
+ * Citește cheia privată NETOPIA.
+ *
+ * Sunt acceptate:
+ * - NETOPIA_PRIVATE_KEY
+ * - NETOPIA_PRIVATE_KEY_PATH
+ * - PEM direct
+ * - path către fișier
+ */
 function readPrivateKey(): string {
   const direct =
     process.env.NETOPIA_PRIVATE_KEY?.trim() ||
@@ -100,13 +165,13 @@ function readPrivateKey(): string {
 
   if (!direct) {
     throw new Error(
-      "Lipsește NETOPIA_PRIVATE_KEY sau NETOPIA_PRIVATE_KEY_PATH din environment."
+      "Lipsește NETOPIA_PRIVATE_KEY sau NETOPIA_PRIVATE_KEY_PATH din environment.",
     );
   }
 
   const value = direct.replace(/\\n/g, "\n").trim();
 
-  // Dacă variabila conține direct cheia PEM
+  // Cheia este introdusă direct în environment.
   if (
     value.includes("-----BEGIN PRIVATE KEY-----") ||
     value.includes("-----BEGIN RSA PRIVATE KEY-----") ||
@@ -115,13 +180,11 @@ function readPrivateKey(): string {
     return value;
   }
 
-  // Altfel presupunem că este o cale către fișier.
+  // Dacă nu este PEM, o tratăm ca path.
   const resolvedPath = resolveConfiguredPath(value);
 
   if (!fs.existsSync(resolvedPath)) {
-    throw new Error(
-      `NETOPIA private key nu există la calea: ${resolvedPath}`
-    );
+    throw new Error(`NETOPIA private key nu există la calea: ${resolvedPath}`);
   }
 
   return fs.readFileSync(resolvedPath, "utf8").replace(/\\n/g, "\n").trim();
@@ -140,6 +203,15 @@ function formatNetopiaTimestamp(date = new Date()): string {
   );
 }
 
+/**
+ * Creează envelope-ul criptat pentru NETOPIA.
+ *
+ * AES-256-CBC:
+ * - criptează XML-ul
+ *
+ * RSA:
+ * - criptează cheia AES folosind cheia publică NETOPIA
+ */
 function encryptEnvelope(xml: string) {
   const aesKey = crypto.randomBytes(32);
   const iv = crypto.randomBytes(16);
@@ -151,7 +223,13 @@ function encryptEnvelope(xml: string) {
     cipher.final(),
   ]);
 
-  const publicKey = readPublicCertificate();
+  // Citim certificatul public.
+  const certificate = readPublicCertificate();
+
+  // IMPORTANT:
+  // Dacă avem BEGIN CERTIFICATE, extragem cheia publică
+  // înainte de crypto.publicEncrypt().
+  const publicKey = getPublicKeyFromCertificate(certificate);
 
   const encryptedKey = crypto.publicEncrypt(
     {
@@ -220,15 +298,10 @@ function buildCardXml(data: NetopiaCheckoutData): string {
   const timestamp = formatNetopiaTimestamp();
 
   const address = data.billing.address ?? "";
-
   const city = data.billing.city ?? "";
-
   const county = data.billing.county ?? "";
-
   const postalCode = data.billing.postalCode ?? "";
-
   const country = data.billing.country ?? "RO";
-
   const phone = data.billing.phone ?? "";
 
   return `<?xml version="1.0" encoding="utf-8"?>
