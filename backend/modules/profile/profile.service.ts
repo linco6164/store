@@ -1,5 +1,6 @@
 import User from "../../models/Users.js";
 import { ListingModel } from "../listing/listing.model.js";
+import { ReviewModel } from "../review/review.model.js";
 
 class ProfileService {
   async getProfile(userId: string) {
@@ -23,12 +24,17 @@ class ProfileService {
       (listing) => listing.status === "sold",
     );
 
+    const reviews = await ReviewModel.countDocuments({
+      seller: userId,
+    });
+
     return {
       user,
 
       stats: {
         listings: listings.length,
         sold: soldListings.length,
+        reviews,
         favorites: 0,
       },
 
@@ -45,7 +51,7 @@ class ProfileService {
       throw new Error("USER_NOT_FOUND");
     }
 
-    const [listings, sold] = await Promise.all([
+    const [listings, sold, reviews] = await Promise.all([
       ListingModel.find({
         seller: userId,
         status: "active",
@@ -59,6 +65,9 @@ class ProfileService {
         seller: userId,
         status: "sold",
       }),
+      ReviewModel.countDocuments({
+        seller: userId,
+      }),
     ]);
 
     return {
@@ -67,6 +76,7 @@ class ProfileService {
       stats: {
         listings: listings.length,
         sold,
+        reviews,
         favorites: 0,
       },
 
