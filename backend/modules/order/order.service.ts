@@ -9,7 +9,10 @@ export async function getBuyerOrders(userId: string) {
   return OrderModel.find({
     buyer: userId,
   })
-    .populate("seller", "username avatar fullName")
+    .populate(
+      "seller",
+      "username avatar fullName",
+    )
     .populate(
       "listing",
       "title images price currency status",
@@ -25,7 +28,10 @@ export async function getSellerOrders(userId: string) {
   return OrderModel.find({
     seller: userId,
   })
-    .populate("buyer", "username avatar fullName")
+    .populate(
+      "buyer",
+      "username avatar fullName",
+    )
     .populate(
       "listing",
       "title images price currency status",
@@ -52,8 +58,14 @@ export async function getOrderById(
       { seller: userId },
     ],
   })
-    .populate("buyer", "username avatar fullName")
-    .populate("seller", "username avatar fullName")
+    .populate(
+      "buyer",
+      "username avatar fullName",
+    )
+    .populate(
+      "seller",
+      "username avatar fullName",
+    )
     .populate(
       "listing",
       "title images price currency status",
@@ -77,7 +89,10 @@ export async function getCompletedBuyerOrders(
     buyer: userId,
     status: "completed",
   })
-    .populate("seller", "username avatar fullName")
+    .populate(
+      "seller",
+      "username avatar fullName",
+    )
     .populate(
       "listing",
       "title images price currency status",
