@@ -53,9 +53,7 @@ function requiredEnv(name: string): string {
   const value = process.env[name];
 
   if (!value || !value.trim()) {
-    throw new Error(
-      `Lipsește variabila de mediu ${name}.`
-    );
+    throw new Error(`Lipsește variabila de mediu ${name}.`);
   }
 
   return value.trim();
@@ -103,6 +101,7 @@ export async function createPromotionPayment(
     throw new Error("Promovarea nu există sau nu îți aparține.");
   }
 
+  // Promovarea poate fi plătită doar cât timp este pending.
   if (promotion.status !== "pending") {
     throw new Error("Această promovare nu mai poate fi plătită.");
   }
@@ -111,17 +110,51 @@ export async function createPromotionPayment(
     throw new Error("Valoarea promovării este invalidă.");
   }
 
-  /**
-   * Dacă există deja o plată pending, o reutilizăm.
-   */
+  // ============================================================
+  // CĂUTĂM ULTIMA PLATĂ PENTRU ACEASTĂ PROMOVARE
+  // ============================================================
+
   const existingPayment = await PromotionPaymentModel.findOne({
     promotion: promotion._id,
-    status: "pending",
+    user: user._id,
+  }).sort({
+    createdAt: -1,
   });
 
   let payment = existingPayment;
 
-  if (!payment) {
+  // ============================================================
+  // PLATA ESTE DEJA CONFIRMATĂ
+  // ============================================================
+
+  if (payment?.status === "paid") {
+    throw new Error("Această promovare a fost deja plătită.");
+  }
+
+  // ============================================================
+  // EXISTĂ O PLATĂ PENDING
+  // ============================================================
+  //
+  // O reutilizăm.
+  // Nu creăm o nouă plată.
+  //
+
+  if (payment?.status === "pending") {
+    // payment rămâne cel existent.
+  }
+
+  // ============================================================
+  // NU EXISTĂ PLATĂ SAU ULTIMA PLATĂ A EȘUAT / A FOST ANULATĂ
+  // ============================================================
+  //
+  // Creăm o nouă tranzacție NETOPIA.
+  //
+
+  if (
+    !payment ||
+    payment.status === "failed" ||
+    payment.status === "cancelled"
+  ) {
     payment = await PromotionPaymentModel.create({
       user: user._id,
       promotion: promotion._id,
@@ -133,35 +166,67 @@ export async function createPromotionPayment(
     });
   }
 
+  // ============================================================
+  // BILLING
+  // ============================================================
+
   const { firstName, lastName } = splitName(user);
+
+  // ============================================================
+  // NETOPIA CHECKOUT
+  // ============================================================
 
   const checkoutData = netopiaService.createCheckoutEnvelope({
     orderId: payment.providerOrderId,
+
     amount: payment.amount,
+
     currency: payment.currency,
-    details: `Promovare anunț Nexora Store - ${promotion.duration} ore`,
+
+    details: `Promovare anunț Nexora Store - ` + `${promotion.duration} ore`,
+
     confirmUrl: getPromotionConfirmUrl(),
+
     returnUrl: getPromotionReturnUrl(String(payment._id)),
+
     billing: {
       email: user.email,
+
       firstName,
+
       lastName,
+
       phone: user.phone ?? undefined,
+
       address: undefined,
+
       city: user.city ?? undefined,
+
       county: user.county ?? undefined,
+
       postalCode: user.postalCode ?? undefined,
+
       country: user.country ?? "RO",
     },
   });
 
+  // ============================================================
+  // RESPONSE
+  // ============================================================
+
   return {
     paymentId: payment._id.toString(),
+
     promotionId: promotion._id.toString(),
+
     providerOrderId: payment.providerOrderId,
+
     amount: payment.amount,
+
     currency: payment.currency,
+
     status: payment.status,
+
     checkout: checkoutData,
   };
 }

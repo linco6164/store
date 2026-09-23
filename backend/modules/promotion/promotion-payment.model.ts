@@ -51,7 +51,6 @@ const PromotionPaymentSchema =
         type: Schema.Types.ObjectId,
         ref: "Promotion",
         required: true,
-        unique: true,
         index: true,
       },
 
