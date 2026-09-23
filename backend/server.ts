@@ -29,6 +29,8 @@ import reviewRoutes from "./modules/review/review.routes.js";
 import orderRoutes from "./modules/order/order.routes.js";
 import promotionRoutes from "./modules/promotion/promotion.routes.js";
 import promotionPaymentRoutes from "./modules/promotion/promotion-payment.routes.js";
+import { startPromotionScheduler } from "./modules/promotion/promotion.scheduler.js";
+import checkoutRoutes from "./modules/checkout/checkout.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -106,12 +108,16 @@ app.use("/support", supportRoutes);
 
 app.use("/profile/email-verification", emailVerificationRoutes);
 
+app.use("/checkout", checkoutRoutes);
+
 app.get("/", (_, res) => {
   res.send("API is running");
 });
 
 async function start() {
   await connectDB();
+
+  startPromotionScheduler();
 
   const PORT = Number(process.env.PORT) || 5000;
 

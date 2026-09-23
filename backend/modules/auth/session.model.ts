@@ -73,7 +73,6 @@ const UserSessionSchema = new Schema<IUserSession>(
     expiresAt: {
       type: Date,
       required: true,
-      index: true,
     },
   },
   {

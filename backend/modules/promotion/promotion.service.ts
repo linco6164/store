@@ -155,11 +155,13 @@ export async function getActivePromotion(listingId: string) {
 }
 
 export async function expirePromotions() {
-  await PromotionModel.updateMany(
+  const now = new Date();
+
+  const result = await PromotionModel.updateMany(
     {
       status: "active",
       expiresAt: {
-        $lte: new Date(),
+        $lte: now,
       },
     },
     {
@@ -168,4 +170,6 @@ export async function expirePromotions() {
       },
     },
   );
+
+  return result.modifiedCount;
 }

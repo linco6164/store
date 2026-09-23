@@ -1,4 +1,5 @@
 import { ListingDocument, ListingModel } from "./listing.model.js";
+import { PromotionModel } from "../promotion/promotion.model.js";
 import { categories } from "./category.data.js";
 
 export class ListingService {
@@ -9,13 +10,54 @@ export class ListingService {
   }
 
   async findAll() {
-    return ListingModel.find({
+    const now = new Date();
+
+    // Luăm promovările active și neexpirate.
+    const activePromotions = await PromotionModel.find({
       status: "active",
+      expiresAt: {
+        $gt: now,
+      },
     })
-      .populate("seller", "username avatar")
+      .sort({
+        createdAt: -1,
+      })
+      .select("listing");
+
+    const promotedIds = activePromotions.map((promotion) => promotion.listing);
+
+    // Anunțurile promovate apar primele.
+    const promotedListings =
+      promotedIds.length > 0
+        ? await ListingModel.find({
+            _id: {
+              $in: promotedIds,
+            },
+            status: "active",
+          })
+            .populate("seller", "username avatar verified rating")
+            .sort({
+              createdAt: -1,
+            })
+        : [];
+
+    // Restul anunțurilor.
+    const normalListings = await ListingModel.find({
+      status: "active",
+      ...(promotedIds.length > 0
+        ? {
+            _id: {
+              $nin: promotedIds,
+            },
+          }
+        : {}),
+    })
+      .populate("seller", "username avatar verified rating")
       .sort({
         createdAt: -1,
       });
+
+    return [...promotedListings, ...normalListings];
   }
 
   async findById(id: string) {
@@ -60,6 +102,7 @@ export class ListingService {
       },
     );
   }
+
   async search(filters: {
     search?: string;
     category?: string;
@@ -91,10 +134,12 @@ export class ListingService {
     }
 
     if (filters.category) {
-      query.category = new RegExp(
-        `^${filters.category.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-        "i",
+      const escapedCategory = filters.category.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
       );
+
+      query.category = new RegExp(`^${escapedCategory}$`, "i");
     }
 
     if (filters.city) {
@@ -117,9 +162,45 @@ export class ListingService {
       }
     }
 
-    return ListingModel.find(query).populate("seller", "username avatar").sort({
-      createdAt: -1,
-    });
+    // Întâi găsim rezultatele care respectă filtrele.
+    const matchingListings = await ListingModel.find(query)
+      .populate("seller", "username avatar verified rating")
+      .sort({
+        createdAt: -1,
+      });
+
+    // Verificăm promovările active.
+    const now = new Date();
+
+    const activePromotions = await PromotionModel.find({
+      status: "active",
+      expiresAt: {
+        $gt: now,
+      },
+      listing: {
+        $in: matchingListings.map((listing) => listing._id),
+      },
+    })
+      .sort({
+        createdAt: -1,
+      })
+      .select("listing");
+
+    const promotedIds = new Set(
+      activePromotions.map((promotion) => promotion.listing.toString()),
+    );
+
+    // Promovatele sunt puse primele.
+    const promotedListings = matchingListings.filter((listing) =>
+      promotedIds.has(listing._id.toString()),
+    );
+
+    // Restul rămân în ordinea normală.
+    const normalListings = matchingListings.filter(
+      (listing) => !promotedIds.has(listing._id.toString()),
+    );
+
+    return [...promotedListings, ...normalListings];
   }
 
   async findSimilar(id: string, category: string) {
@@ -144,14 +225,14 @@ export class ListingService {
   }
 
   async getMyListings(userId: string) {
-  return ListingModel.find({
-    seller: userId,
-  })
-    .sort({
-      createdAt: -1,
+    return ListingModel.find({
+      seller: userId,
     })
-    .populate("seller", "username avatar");
-}
+      .sort({
+        createdAt: -1,
+      })
+      .populate("seller", "username avatar");
+  }
 }
 
 export const listingService = new ListingService();
