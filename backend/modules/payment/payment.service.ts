@@ -6,7 +6,7 @@ import { ListingModel } from "../listing/listing.model.js";
 import Order from "../order/order.model.js";
 import WalletTransaction from "../wallet/wallet.model.js";
 import { AddressModel } from "../profile/address.model.js";
-import { SavedCardModel } from "./saved-card.model.js";
+import SavedCardModel from "./saved-card.model.js";
 import PaymentModel, { PaymentDocument } from "./payment.model.js";
 import { netopiaService } from "./netopia.service.js";
 
@@ -24,10 +24,6 @@ type PaymentMethod =
   | "card"
   | "google_pay"
   | "apple_pay";
-
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
 
 function normalizeName(
   value: string | undefined,
@@ -68,22 +64,14 @@ function splitName(
 }
 
 class PaymentService {
-  // ============================================================
-  // CREATE NETOPIA PAYMENT
-  // ============================================================
-
   async createNetopiaPayment(
     buyerId: string,
     listingId: string,
     addressId: string,
     deliveryMethod: DeliveryMethod,
     paymentMethod: PaymentMethod,
-    savedCardId?: string | null,
+    savedCardId?: string,
   ) {
-    // ----------------------------------------------------------
-    // VALIDARE ID-URI
-    // ----------------------------------------------------------
-
     if (!mongoose.isValidObjectId(listingId)) {
       throw new Error("INVALID_LISTING_ID");
     }
@@ -93,59 +81,27 @@ class PaymentService {
     }
 
     if (
-      savedCardId &&
-      !mongoose.isValidObjectId(savedCardId)
-    ) {
-      throw new Error("INVALID_SAVED_CARD_ID");
-    }
-
-    // ----------------------------------------------------------
-    // VALIDARE DELIVERY
-    // ----------------------------------------------------------
-
-    if (
-      !["courier", "pickup_point"].includes(
-        deliveryMethod,
-      )
+      deliveryMethod !== "courier" &&
+      deliveryMethod !== "pickup_point"
     ) {
       throw new Error("INVALID_DELIVERY_METHOD");
     }
 
-    // ----------------------------------------------------------
-    // VALIDARE PAYMENT METHOD
-    // ----------------------------------------------------------
-
     if (
-      !["card", "google_pay", "apple_pay"].includes(
-        paymentMethod,
-      )
+      paymentMethod !== "card" &&
+      paymentMethod !== "google_pay" &&
+      paymentMethod !== "apple_pay"
     ) {
       throw new Error("INVALID_PAYMENT_METHOD");
     }
 
-    // ----------------------------------------------------------
-    // CARD SALVAT
-    // ----------------------------------------------------------
-
-    if (
-      paymentMethod !== "card" &&
-      savedCardId
-    ) {
-      throw new Error(
-        "SAVED_CARD_NOT_ALLOWED_FOR_PAYMENT_METHOD",
-      );
-    }
-
     if (
       paymentMethod === "card" &&
-      !savedCardId
+      (!savedCardId ||
+        !mongoose.isValidObjectId(savedCardId))
     ) {
       throw new Error("SAVED_CARD_REQUIRED");
     }
-
-    // ----------------------------------------------------------
-    // BUYER + LISTING + ADDRESS
-    // ----------------------------------------------------------
 
     const [buyer, listing, address] =
       await Promise.all([
@@ -176,19 +132,11 @@ class PaymentService {
       throw new Error("ADDRESS_NOT_FOUND");
     }
 
-    // ----------------------------------------------------------
-    // NU POȚI CUMPĂRA PROPRIUL PRODUS
-    // ----------------------------------------------------------
-
     const sellerId = listing.seller.toString();
 
     if (sellerId === buyerId) {
       throw new Error("CANNOT_BUY_OWN_LISTING");
     }
-
-    // ----------------------------------------------------------
-    // PREȚ PRODUS
-    // ----------------------------------------------------------
 
     const itemPrice = Number(listing.price);
 
@@ -199,44 +147,39 @@ class PaymentService {
       throw new Error("INVALID_LISTING_PRICE");
     }
 
-    // ----------------------------------------------------------
-    // MONEDĂ
-    // ----------------------------------------------------------
-
     const currency = String(
       listing.currency ?? "RON",
     ).toUpperCase();
 
-    if (
-      !["RON", "EUR", "USD"].includes(currency)
-    ) {
+    if (currency !== "RON") {
       throw new Error("UNSUPPORTED_CURRENCY");
     }
 
-    // ----------------------------------------------------------
-    // IMPORTANT
-    //
-    // Pentru checkout-ul actual folosim tarifele în RON.
-    // Dacă produsul este EUR/USD, momentan nu aplicăm
-    // automat conversie valutară.
-    // ----------------------------------------------------------
+    const buyerProtectionFee = Math.max(
+      Number(
+        (itemPrice * BUYER_PROTECTION_RATE).toFixed(2),
+      ),
+      BUYER_PROTECTION_MIN,
+    );
 
-    if (currency !== "RON") {
-      throw new Error(
-        "CHECKOUT_CURRENCY_NOT_SUPPORTED",
-      );
-    }
+    const shippingCost =
+      SHIPPING_COSTS[deliveryMethod];
 
-    // ----------------------------------------------------------
-    // CARD SALVAT
-    // ----------------------------------------------------------
+    const amount = Number(
+      (
+        itemPrice +
+        buyerProtectionFee +
+        shippingCost
+      ).toFixed(2),
+    );
 
-    let savedCard = null;
+    let savedCard: mongoose.Document | null = null;
 
-    if (savedCardId) {
+    if (paymentMethod === "card") {
       savedCard = await SavedCardModel.findOne({
         _id: savedCardId,
         user: buyerId,
+        provider: "netopia",
       });
 
       if (!savedCard) {
@@ -244,54 +187,10 @@ class PaymentService {
       }
     }
 
-    // ----------------------------------------------------------
-    // BUYER PROTECTION
-    // ----------------------------------------------------------
-
-    const buyerProtectionFee = roundMoney(
-      Math.max(
-        itemPrice * BUYER_PROTECTION_RATE,
-        BUYER_PROTECTION_MIN,
-      ),
-    );
-
-    // ----------------------------------------------------------
-    // SHIPPING
-    // ----------------------------------------------------------
-
-    const shippingCost = SHIPPING_COSTS[
-      deliveryMethod
-    ];
-
-    // ----------------------------------------------------------
-    // TOTAL
-    // ----------------------------------------------------------
-
-    const amount = roundMoney(
-      itemPrice +
-        buyerProtectionFee +
-        shippingCost,
-    );
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error("INVALID_PAYMENT_AMOUNT");
-    }
-
-    // ----------------------------------------------------------
-    // EXISTING PENDING PAYMENT
-    //
-    // Căutăm doar plata care corespunde exact checkout-ului
-    // curent.
-    // ----------------------------------------------------------
-
     const existingPayment =
       await PaymentModel.findOne({
         buyer: buyerId,
         listing: listingId,
-        address: addressId,
-        deliveryMethod,
-        paymentMethod,
-        savedCard: savedCardId ?? null,
         status: "pending",
       }).sort({
         createdAt: -1,
@@ -305,40 +204,33 @@ class PaymentService {
       );
     }
 
-    // ----------------------------------------------------------
-    // NETOPIA ORDER ID
-    // ----------------------------------------------------------
-
     const providerOrderId =
       `NX-${Date.now()}-${crypto
         .randomBytes(6)
         .toString("hex")
         .toUpperCase()}`;
 
-    // ----------------------------------------------------------
-    // CREATE PAYMENT
-    // ----------------------------------------------------------
-
     const payment =
       await PaymentModel.create({
         buyer: buyerId,
         seller: sellerId,
         listing: listingId,
-
-        address: addressId,
+        address: address._id,
 
         deliveryMethod,
 
         paymentMethod,
 
         savedCard:
-          savedCardId ?? null,
+          paymentMethod === "card"
+            ? savedCard?._id
+            : null,
 
         itemPrice,
         buyerProtectionFee,
         shippingCost,
-
         amount,
+
         currency,
 
         provider: "netopia",
@@ -361,10 +253,6 @@ class PaymentService {
       throw error;
     }
   }
-
-  // ============================================================
-  // NETOPIA CHECKOUT DATA
-  // ============================================================
 
   getCheckoutData(
     payment: PaymentDocument,
@@ -409,14 +297,11 @@ class PaymentService {
 
     const checkout =
       netopiaService.createCheckoutEnvelope({
-        orderId:
-          payment.providerOrderId,
+        orderId: payment.providerOrderId,
 
-        amount:
-          payment.amount,
+        amount: payment.amount,
 
-        currency:
-          payment.currency,
+        currency: payment.currency,
 
         details,
 
@@ -432,21 +317,17 @@ class PaymentService {
           }`,
 
         billing: {
-          email:
-            buyer?.email ?? "",
+          email: buyer?.email ?? "",
 
           firstName,
 
           lastName,
 
-          phone:
-            buyer?.phone,
+          phone: buyer?.phone,
 
-          city:
-            buyer?.city,
+          city: buyer?.city,
 
-          county:
-            buyer?.county,
+          county: buyer?.county,
 
           postalCode:
             buyer?.postalCode,
@@ -484,21 +365,12 @@ class PaymentService {
       paymentMethod:
         payment.paymentMethod,
 
-      savedCard:
-        payment.savedCard
-          ? payment.savedCard.toString()
-          : null,
-
       status:
         payment.status,
 
       checkout,
     };
   }
-
-  // ============================================================
-  // NETOPIA NOTIFICATION
-  // ============================================================
 
   async handleNotification(input: {
     envKey: string;
@@ -525,18 +397,11 @@ class PaymentService {
       );
     }
 
-    const result =
-      await this.applyNotification(
-        payment,
-        notification,
-      );
-
-    return result;
+    return this.applyNotification(
+      payment,
+      notification,
+    );
   }
-
-  // ============================================================
-  // APPLY NETOPIA NOTIFICATION
-  // ============================================================
 
   private async applyNotification(
     payment: PaymentDocument,
@@ -544,9 +409,10 @@ class PaymentService {
       typeof netopiaService.decryptNotification
     >,
   ) {
-    const action = (
-      notification.action ?? ""
-    ).toLowerCase();
+    const action =
+      (
+        notification.action ?? ""
+      ).toLowerCase();
 
     const isConfirmed =
       notification.errorCode === 0 &&
@@ -561,10 +427,6 @@ class PaymentService {
         action === "confirmed_pending" ||
         action === "paid_pending"
       );
-
-    // ----------------------------------------------------------
-    // PENDING
-    // ----------------------------------------------------------
 
     if (isPending) {
       await PaymentModel.findByIdAndUpdate(
@@ -604,10 +466,6 @@ class PaymentService {
       };
     }
 
-    // ----------------------------------------------------------
-    // FAILED / CANCELLED
-    // ----------------------------------------------------------
-
     if (!isConfirmed) {
       const failedStatus =
         action === "canceled" ||
@@ -619,8 +477,7 @@ class PaymentService {
         payment._id,
         {
           $set: {
-            status:
-              failedStatus,
+            status: failedStatus,
 
             action:
               notification.action ??
@@ -657,10 +514,6 @@ class PaymentService {
           "Plata a eșuat.",
       };
     }
-
-    // ----------------------------------------------------------
-    // SUMĂ CONFIRMATĂ
-    // ----------------------------------------------------------
 
     const processedAmount =
       Number(
@@ -718,16 +571,12 @@ class PaymentService {
       );
     }
 
-    // ----------------------------------------------------------
-    // TRANSACTION
-    // ----------------------------------------------------------
-
     const session =
       await mongoose.startSession();
 
     try {
-      let orderId: string | null =
-        null;
+      let orderId:
+        string | null = null;
 
       await session.withTransaction(
         async () => {
@@ -742,10 +591,6 @@ class PaymentService {
             );
           }
 
-          // ----------------------------------------------
-          // IDEMPOTENCY
-          // ----------------------------------------------
-
           if (
             lockedPayment.status ===
             "paid"
@@ -758,26 +603,19 @@ class PaymentService {
             return;
           }
 
-          // ----------------------------------------------
-          // VERIFICĂ PRODUSUL ȘI ÎL MARCHEAZĂ SOLD
-          // ----------------------------------------------
-
           const listing =
             await ListingModel.findOneAndUpdate(
               {
                 _id:
                   lockedPayment.listing,
 
-                status:
-                  "active",
+                status: "active",
               },
-
               {
                 $set: {
                   status: "sold",
                 },
               },
-
               {
                 new: true,
                 session,
@@ -789,8 +627,7 @@ class PaymentService {
               lockedPayment._id,
               {
                 $set: {
-                  status:
-                    "conflict",
+                  status: "conflict",
 
                   action:
                     notification.action ??
@@ -819,10 +656,6 @@ class PaymentService {
             );
           }
 
-          // ----------------------------------------------
-          // VERIFICĂ VÂNZĂTORUL
-          // ----------------------------------------------
-
           if (
             listing.seller.toString() !==
             lockedPayment.seller.toString()
@@ -831,40 +664,6 @@ class PaymentService {
               "SELLER_MISMATCH",
             );
           }
-
-          // ----------------------------------------------
-          // VERIFICĂ ADRESA
-          // ----------------------------------------------
-
-          if (
-            lockedPayment.address
-          ) {
-            const address =
-              await AddressModel.findOne({
-                _id:
-                  lockedPayment.address,
-
-                user:
-                  lockedPayment.buyer,
-              }).session(session);
-
-            if (!address) {
-              throw new Error(
-                "ADDRESS_NOT_FOUND",
-              );
-            }
-          }
-
-          // ----------------------------------------------
-          // CREATE ORDER
-          //
-          // Momentan Order-ul existent are doar:
-          // buyer / seller / listing / amount /
-          // currency / status.
-          //
-          // Îl vom extinde în următorul pas cu:
-          // address / deliveryMethod / fees etc.
-          // ----------------------------------------------
 
           const [order] =
             await Order.create(
@@ -885,8 +684,7 @@ class PaymentService {
                   currency:
                     lockedPayment.currency,
 
-                  status:
-                    "paid",
+                  status: "paid",
                 },
               ],
               {
@@ -894,19 +692,12 @@ class PaymentService {
               },
             );
 
-          // ----------------------------------------------
-          // BALANȚA VÂNZĂTORULUI
-          //
-          // Vânzătorul primește prețul produsului,
-          // nu taxa de protecție și transportul.
-          // ----------------------------------------------
-
           await User.findByIdAndUpdate(
             lockedPayment.seller,
             {
               $inc: {
                 balance:
-                  lockedPayment.itemPrice,
+                  lockedPayment.amount,
               },
             },
             {
@@ -915,21 +706,16 @@ class PaymentService {
             },
           );
 
-          // ----------------------------------------------
-          // WALLET TRANSACTION
-          // ----------------------------------------------
-
           await WalletTransaction.create(
             [
               {
                 user:
                   lockedPayment.seller,
 
-                type:
-                  "sale",
+                type: "sale",
 
                 amount:
-                  lockedPayment.itemPrice,
+                  lockedPayment.amount,
 
                 currency:
                   lockedPayment.currency,
@@ -948,10 +734,6 @@ class PaymentService {
               session,
             },
           );
-
-          // ----------------------------------------------
-          // PAYMENT PAID
-          // ----------------------------------------------
 
           lockedPayment.status =
             "paid";
@@ -1003,10 +785,6 @@ class PaymentService {
     }
   }
 
-  // ============================================================
-  // GET PAYMENT
-  // ============================================================
-
   async getPayment(
     userId: string,
     paymentId: string,
@@ -1036,11 +814,11 @@ class PaymentService {
         )
         .populate(
           "address",
-          "county city street number building staircase floor apartment postalCode isDefault",
+          "county city street number building staircase floor apartment postalCode",
         )
         .populate(
           "savedCard",
-          "brand last4 expMonth expYear isDefault",
+          "provider brand last4 expMonth expYear isDefault",
         );
 
     if (!payment) {
@@ -1051,10 +829,6 @@ class PaymentService {
 
     return payment;
   }
-
-  // ============================================================
-  // GET PUBLIC PAYMENT
-  // ============================================================
 
   async getPublicPayment(
     paymentId: string,

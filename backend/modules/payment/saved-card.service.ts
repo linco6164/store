@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { SavedCardModel } from "./saved-card.model.js";
+import SavedCardModel from "./saved-card.model.js";
 
 interface CreateSavedCardPayload {
   provider: "netopia";
@@ -21,14 +21,29 @@ class SavedCardService {
     });
   }
 
-  async createSavedCard(userId: string, payload: CreateSavedCardPayload) {
+  async createSavedCard(
+    userId: string,
+    payload: CreateSavedCardPayload,
+  ) {
     if (!mongoose.isValidObjectId(userId)) {
       throw new Error("USER_NOT_FOUND");
     }
 
-    const brand = String(payload.brand ?? "").trim();
-    const last4 = String(payload.last4 ?? "").trim();
-    const providerReference = String(payload.providerReference ?? "").trim();
+    const providerReference = String(
+      payload.providerReference ?? "",
+    ).trim();
+
+    const brand = String(
+      payload.brand ?? "",
+    ).trim();
+
+    const last4 = String(
+      payload.last4 ?? "",
+    ).trim();
+
+    if (!providerReference) {
+      throw new Error("CARD_REFERENCE_REQUIRED");
+    }
 
     if (!brand) {
       throw new Error("CARD_BRAND_REQUIRED");
@@ -38,22 +53,23 @@ class SavedCardService {
       throw new Error("CARD_LAST4_INVALID");
     }
 
-    if (!providerReference) {
-      throw new Error("CARD_REFERENCE_REQUIRED");
-    }
-
     if (
       payload.expMonth !== undefined &&
-      (!Number.isInteger(payload.expMonth) ||
+      (
+        !Number.isInteger(payload.expMonth) ||
         payload.expMonth < 1 ||
-        payload.expMonth > 12)
+        payload.expMonth > 12
+      )
     ) {
       throw new Error("CARD_EXP_MONTH_INVALID");
     }
 
     if (
       payload.expYear !== undefined &&
-      (!Number.isInteger(payload.expYear) || payload.expYear < 2000)
+      (
+        !Number.isInteger(payload.expYear) ||
+        payload.expYear < 2000
+      )
     ) {
       throw new Error("CARD_EXP_YEAR_INVALID");
     }
@@ -68,14 +84,24 @@ class SavedCardService {
       return existing;
     }
 
+    const hasCards = await SavedCardModel.exists({
+      user: userId,
+    });
+
     const shouldBeDefault =
       payload.isDefault === true ||
-      !(await SavedCardModel.exists({ user: userId }));
+      !hasCards;
 
     if (shouldBeDefault) {
       await SavedCardModel.updateMany(
-        { user: userId },
-        { $set: { isDefault: false } },
+        {
+          user: userId,
+        },
+        {
+          $set: {
+            isDefault: false,
+          },
+        },
       );
     }
 
@@ -108,7 +134,10 @@ class SavedCardService {
     return SavedCardModel.create(cardData);
   }
 
-  async setDefaultCard(userId: string, cardId: string) {
+  async setDefaultCard(
+    userId: string,
+    cardId: string,
+  ) {
     if (!mongoose.isValidObjectId(cardId)) {
       throw new Error("CARD_NOT_FOUND");
     }
@@ -123,17 +152,27 @@ class SavedCardService {
     }
 
     await SavedCardModel.updateMany(
-      { user: userId },
-      { $set: { isDefault: false } },
+      {
+        user: userId,
+      },
+      {
+        $set: {
+          isDefault: false,
+        },
+      },
     );
 
     card.isDefault = true;
+
     await card.save();
 
     return card;
   }
 
-  async deleteSavedCard(userId: string, cardId: string) {
+  async deleteSavedCard(
+    userId: string,
+    cardId: string,
+  ) {
     if (!mongoose.isValidObjectId(cardId)) {
       throw new Error("CARD_NOT_FOUND");
     }
@@ -152,6 +191,8 @@ class SavedCardService {
       user: userId,
     });
 
+    // Dacă am șters cardul implicit,
+    // alegem automat un alt card ca implicit.
     if (card.isDefault) {
       const nextCard = await SavedCardModel.findOne({
         user: userId,
