@@ -31,6 +31,7 @@ import promotionRoutes from "./modules/promotion/promotion.routes.js";
 import promotionPaymentRoutes from "./modules/promotion/promotion-payment.routes.js";
 import { startPromotionScheduler } from "./modules/promotion/promotion.scheduler.js";
 import checkoutRoutes from "./modules/checkout/checkout.routes.js";
+import savedCardRoutes from "./modules/payment/saved-card.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
@@ -101,6 +102,11 @@ app.use("/favorites", favoriteRoutes);
 app.use("/notifications", notificationRoutes);
 
 app.use("/payments", paymentRoutes);
+
+app.use(
+  "/payments/cards",
+  savedCardRoutes,
+);
 
 app.use("/admin", adminRoutes);
 
