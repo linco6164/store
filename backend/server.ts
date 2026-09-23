@@ -74,7 +74,7 @@ app.use("/upload", uploadRoutes);
 
 app.use("/listings", listingRoutes);
 
-app.use ("/orders", orderRoutes);
+app.use("/orders", orderRoutes);
 
 app.use("/reviews", reviewRoutes);
 
@@ -84,10 +84,7 @@ app.use("/promotions/payment", promotionPaymentRoutes);
 
 app.use("/profile/addresses", addressRoutes);
 
-app.use(
-  "/profile/phone-verification",
-  phoneVerificationRoutes,
-);
+app.use("/profile/phone-verification", phoneVerificationRoutes);
 
 app.use("/profile", profileRoutes);
 
@@ -101,12 +98,9 @@ app.use("/favorites", favoriteRoutes);
 
 app.use("/notifications", notificationRoutes);
 
-app.use("/payments", paymentRoutes);
+app.use("/payments/cards", savedCardRoutes);
 
-app.use(
-  "/payments/cards",
-  savedCardRoutes,
-);
+app.use("/payments", paymentRoutes);
 
 app.use("/admin", adminRoutes);
 
