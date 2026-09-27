@@ -37,7 +37,7 @@ export const paymentController = {
         });
       }
 
-      if (deliveryMethod !== "courier" && deliveryMethod !== "pickup_point") {
+      if (deliveryMethod !== null && deliveryMethod !== "courier" && deliveryMethod !== "pickup_point") {
         return res.status(400).json({
           success: false,
           message: "Metoda de livrare este invalidă.",

@@ -81,6 +81,7 @@ class PaymentService {
     }
 
     if (
+      deliveryMethod !== null &&
       deliveryMethod !== "courier" &&
       deliveryMethod !== "pickup_point"
     ) {

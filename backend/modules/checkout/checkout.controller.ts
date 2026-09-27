@@ -26,7 +26,8 @@ export async function getCheckout(
     if (
       typeof listingId !== "string" ||
       typeof addressId !== "string" ||
-      typeof deliveryMethod !== "string"
+      (deliveryMethod !== null &&
+        typeof deliveryMethod !== "string")
     ) {
       return res.status(400).json({
         success: false,
@@ -35,6 +36,7 @@ export async function getCheckout(
     }
 
     if (
+      deliveryMethod !== null &&
       deliveryMethod !== "courier" &&
       deliveryMethod !== "pickup_point"
     ) {
