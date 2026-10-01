@@ -119,6 +119,13 @@ export const paymentController = {
               message: "Cardul selectat nu a fost găsit.",
             });
 
+          case "SAVED_CARD_TOKEN_INCOMPLETE":
+            return res.status(400).json({
+              success: false,
+              message:
+                "Cardul trebuie adăugat din nou pentru a putea fi folosit.",
+            });
+
           case "BUYER_NOT_FOUND":
             return res.status(404).json({
               success: false,

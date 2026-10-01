@@ -11,6 +11,10 @@ export interface SavedCardDocument extends Document {
    */
   providerReference: string;
 
+  panMasked?: string;
+
+  paymentInstrumentId?: string;
+
   brand: string;
 
   last4: string;
@@ -45,6 +49,17 @@ const savedCardSchema = new Schema<SavedCardDocument>(
     providerReference: {
       type: String,
       required: true,
+      trim: true,
+    },
+
+    panMasked: {
+      type: String,
+      trim: true,
+      match: /^\d{6}\*+\d{4}$/,
+    },
+
+    paymentInstrumentId: {
+      type: String,
       trim: true,
     },
 

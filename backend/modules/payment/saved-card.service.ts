@@ -4,6 +4,8 @@ import SavedCardModel from "./saved-card.model.js";
 interface CreateSavedCardPayload {
   provider: "netopia";
   providerReference: string;
+  panMasked?: string;
+  paymentInstrumentId?: string;
   brand: string;
   last4: string;
   expMonth?: number;
@@ -15,10 +17,12 @@ class SavedCardService {
   async getSavedCards(userId: string) {
     return SavedCardModel.find({
       user: userId,
-    }).sort({
-      isDefault: -1,
-      createdAt: -1,
-    });
+    })
+      .select("-providerReference -paymentInstrumentId")
+      .sort({
+        isDefault: -1,
+        createdAt: -1,
+      });
   }
 
   async createSavedCard(
@@ -81,6 +85,15 @@ class SavedCardService {
     });
 
     if (existing) {
+      existing.brand = brand;
+      existing.last4 = last4;
+      existing.panMasked = payload.panMasked;
+      existing.paymentInstrumentId = payload.paymentInstrumentId;
+      existing.expMonth = payload.expMonth;
+      existing.expYear = payload.expYear;
+
+      await existing.save();
+
       return existing;
     }
 
@@ -109,6 +122,8 @@ class SavedCardService {
       user: string;
       provider: "netopia";
       providerReference: string;
+      panMasked?: string;
+      paymentInstrumentId?: string;
       brand: string;
       last4: string;
       expMonth?: number;
@@ -122,6 +137,14 @@ class SavedCardService {
       last4,
       isDefault: shouldBeDefault,
     };
+
+    if (payload.panMasked) {
+      cardData.panMasked = payload.panMasked;
+    }
+
+    if (payload.paymentInstrumentId) {
+      cardData.paymentInstrumentId = payload.paymentInstrumentId;
+    }
 
     if (payload.expMonth !== undefined) {
       cardData.expMonth = payload.expMonth;

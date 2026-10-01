@@ -198,7 +198,7 @@ class PaymentService {
       });
 
     if (existingPayment) {
-      return this.getCheckoutData(
+      return await this.getCheckoutData(
         existingPayment,
         buyer,
         listing,
@@ -241,7 +241,7 @@ class PaymentService {
       });
 
     try {
-      return this.getCheckoutData(
+      return await this.getCheckoutData(
         payment,
         buyer,
         listing,
@@ -255,7 +255,7 @@ class PaymentService {
     }
   }
 
-  getCheckoutData(
+  async getCheckoutData(
     payment: PaymentDocument,
     buyer?: any,
     listing?: any,
@@ -296,6 +296,29 @@ class PaymentService {
         listing?.title ?? "Produs"
       }`;
 
+    let tokenId: string | undefined;
+    let panMasked: string | undefined;
+
+    if (payment.paymentMethod === "card") {
+      const buyerId = buyer?._id ?? payment.buyer;
+      const savedCard = await SavedCardModel.findOne({
+        _id: payment.savedCard,
+        user: buyerId,
+        provider: "netopia",
+      });
+
+      if (!savedCard) {
+        throw new Error("SAVED_CARD_NOT_FOUND");
+      }
+
+      tokenId = savedCard.providerReference;
+      panMasked = savedCard.panMasked;
+
+      if (!tokenId || !panMasked) {
+        throw new Error("SAVED_CARD_TOKEN_INCOMPLETE");
+      }
+    }
+
     const checkout =
       netopiaService.createCheckoutEnvelope({
         orderId: payment.providerOrderId,
@@ -305,6 +328,14 @@ class PaymentService {
         currency: payment.currency,
 
         details,
+
+        customerId: String(buyer?._id ?? payment.buyer),
+
+        tokenId,
+
+        panMasked,
+
+        oneClick: payment.paymentMethod === "card",
 
         confirmUrl,
 

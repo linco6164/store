@@ -11,6 +11,10 @@ export interface NetopiaCheckoutData {
   details: string;
   confirmUrl: string;
   returnUrl: string;
+  customerId?: string;
+  tokenId?: string;
+  panMasked?: string;
+  oneClick?: boolean;
   billing: {
     email: string;
     firstName: string;
@@ -32,6 +36,10 @@ export interface DecryptedNotification {
   errorMessage?: string;
   processedAmount?: number;
   currency?: string;
+  tokenId?: string;
+  panMasked?: string;
+  paymentInstrumentId?: string;
+  tokenExpirationDate?: string;
   raw: Record<string, unknown>;
 }
 
@@ -303,6 +311,21 @@ function buildCardXml(data: NetopiaCheckoutData): string {
   const postalCode = data.billing.postalCode ?? "";
   const country = data.billing.country ?? "RO";
   const phone = data.billing.phone ?? "";
+  const invoiceAttributes = [
+    `currency="${xmlEscape(data.currency)}"`,
+    `amount="${xmlEscape(amount)}"`,
+    data.customerId
+      ? `customer_id="${xmlEscape(data.customerId)}"`
+      : "",
+    data.tokenId
+      ? `token_id="${xmlEscape(data.tokenId)}"`
+      : "",
+    data.panMasked
+      ? `pan_masked="${xmlEscape(data.panMasked)}"`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <order
@@ -317,10 +340,7 @@ function buildCardXml(data: NetopiaCheckoutData): string {
     <return>${xmlEscape(data.returnUrl)}</return>
   </url>
 
-  <invoice
-    currency="${xmlEscape(data.currency)}"
-    amount="${xmlEscape(amount)}"
-  >
+  <invoice ${invoiceAttributes}>
     <details>${xmlEscape(data.details)}</details>
 
     <contact_info>
@@ -385,13 +405,15 @@ function deepFind(object: unknown, keys: string[]): unknown {
 }
 
 class NetopiaService {
-  private getGatewayUrl(): string {
+  private getGatewayUrl(oneClick = false): string {
     const sandbox =
       String(process.env.NETOPIA_SANDBOX ?? "true").toLowerCase() === "true";
 
-    return sandbox
+    const baseUrl = sandbox
       ? "https://sandboxsecure.mobilpay.ro"
       : "https://secure.mobilpay.ro";
+
+    return oneClick ? `${baseUrl}/card4` : baseUrl;
   }
 
   createCheckoutEnvelope(data: NetopiaCheckoutData) {
@@ -400,7 +422,7 @@ class NetopiaService {
     const envelope = encryptEnvelope(xml);
 
     return {
-      gatewayUrl: this.getGatewayUrl(),
+      gatewayUrl: this.getGatewayUrl(data.oneClick === true),
       ...envelope,
     };
   }
@@ -450,6 +472,20 @@ class NetopiaService {
 
     const currencyValue = deepFind(root, ["currency"]);
 
+    const tokenIdValue = deepFind(root, ["token_id", "tokenId"]);
+
+    const panMaskedValue = deepFind(root, ["pan_masked", "panMasked"]);
+
+    const paymentInstrumentIdValue = deepFind(root, [
+      "payment_instrument_id",
+      "paymentInstrumentId",
+    ]);
+
+    const tokenExpirationDateValue = deepFind(root, [
+      "token_expiration_date",
+      "tokenExpirationDate",
+    ]);
+
     const errorCode = Number(errorCodeValue ?? 0);
 
     const processedAmount = Number(processedAmountValue);
@@ -475,6 +511,21 @@ class NetopiaService {
         : undefined,
 
       currency: currencyValue !== undefined ? String(currencyValue) : undefined,
+
+      tokenId: tokenIdValue !== undefined ? String(tokenIdValue) : undefined,
+
+      panMasked:
+        panMaskedValue !== undefined ? String(panMaskedValue) : undefined,
+
+      paymentInstrumentId:
+        paymentInstrumentIdValue !== undefined
+          ? String(paymentInstrumentIdValue)
+          : undefined,
+
+      tokenExpirationDate:
+        tokenExpirationDateValue !== undefined
+          ? String(tokenExpirationDateValue)
+          : undefined,
 
       raw: parsed,
     };

@@ -1,21 +1,23 @@
 import { Router } from "express";
 import auth from "../../middleware/auth.js";
 import { savedCardController } from "./saved-card.controller.js";
+import { cardSetupController } from "./card-setup.controller.js";
 
 const router = Router();
+
+router.post("/setup", auth, cardSetupController.create);
+
+router.get("/setup/checkout/:id", cardSetupController.checkout);
+
+router.post("/setup/confirm", cardSetupController.confirm);
+
+router.get("/setup/return", cardSetupController.returnPage);
 
 // Cardurile utilizatorului
 router.get(
   "/",
   auth,
   savedCardController.list,
-);
-
-// Adăugare card
-router.post(
-  "/",
-  auth,
-  savedCardController.create,
 );
 
 // Setare card implicit
