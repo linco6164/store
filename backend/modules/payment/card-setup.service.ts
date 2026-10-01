@@ -206,7 +206,6 @@ class CardSetupService {
       currency: "RON",
       details: "Verificare card Nexora",
       customerId: setup.user.toString(),
-      oneClick: true,
       confirmUrl: `${apiBaseUrl}/payments/cards/setup/confirm`,
       returnUrl:
         `${apiBaseUrl}/payments/cards/setup/return` +
