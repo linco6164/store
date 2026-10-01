@@ -12,6 +12,7 @@ interface CreateCardSetupInput {
   userId: string;
   platform: CardSetupPlatform;
   returnUrl: string;
+  requestOrigin?: string;
 }
 
 function normalizeOrigin(value: string): string | null {
@@ -35,7 +36,17 @@ function allowedWebOrigins(): Set<string> {
   );
 }
 
-function validateReturnUrl(platform: CardSetupPlatform, rawUrl: string): string {
+function isLoopbackHost(hostname: string): boolean {
+  return ["localhost", "127.0.0.1", "[::1]"].includes(
+    hostname.toLowerCase(),
+  );
+}
+
+function validateReturnUrl(
+  platform: CardSetupPlatform,
+  rawUrl: string,
+  requestOrigin?: string,
+): string {
   const value = rawUrl.trim();
 
   if (platform === "android") {
@@ -54,10 +65,16 @@ function validateReturnUrl(platform: CardSetupPlatform, rawUrl: string): string 
 
   const url = new URL(value);
   const allowedOrigins = allowedWebOrigins();
+  const returnOrigin = url.origin.toLowerCase();
+  const normalizedRequestOrigin = normalizeOrigin(requestOrigin ?? "");
+  const isMatchingLocalRequest =
+    isLoopbackHost(url.hostname) && normalizedRequestOrigin === returnOrigin;
 
   if (
     (url.protocol !== "https:" && url.protocol !== "http:") ||
-    !allowedOrigins.has(url.origin.toLowerCase())
+    url.username !== "" ||
+    url.password !== "" ||
+    (!allowedOrigins.has(returnOrigin) && !isMatchingLocalRequest)
   ) {
     throw new Error("CARD_SETUP_RETURN_URL_INVALID");
   }
@@ -136,7 +153,11 @@ class CardSetupService {
       throw new Error("USER_NOT_FOUND");
     }
 
-    const returnUrl = validateReturnUrl(input.platform, input.returnUrl);
+    const returnUrl = validateReturnUrl(
+      input.platform,
+      input.returnUrl,
+      input.requestOrigin,
+    );
     const providerOrderId = `NX-CARD-${Date.now()}-${crypto
       .randomBytes(6)
       .toString("hex")

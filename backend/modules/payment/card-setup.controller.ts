@@ -128,6 +128,10 @@ export const cardSetupController = {
         userId: req.userId,
         platform,
         returnUrl,
+        requestOrigin:
+          typeof req.headers.origin === "string"
+            ? req.headers.origin
+            : undefined,
       });
       const apiBaseUrl = publicApiBaseUrl(req);
 
