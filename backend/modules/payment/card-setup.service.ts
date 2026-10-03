@@ -251,11 +251,33 @@ class CardSetupService {
       return setup;
     }
 
+    const action = String(notification.action ?? "").toLowerCase();
+
+    if (action === "canceled") {
+      setup.status = "failed";
+      setup.errorCode = 0;
+      setup.errorMessage = "Adăugarea cardului a fost anulată.";
+      await setup.save();
+      return setup;
+    }
+
     let metadata: ReturnType<typeof cardMetadata>;
 
     try {
       metadata = cardMetadata(notification);
     } catch (error) {
+      if (
+        action === "paid_pending" ||
+        action === "confirmed_pending" ||
+        action === ""
+      ) {
+        setup.status = "pending";
+        setup.errorCode = null;
+        setup.errorMessage = null;
+        await setup.save();
+        return setup;
+      }
+
       setup.status = "failed";
       setup.errorCode = 48;
       setup.errorMessage =

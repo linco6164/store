@@ -457,21 +457,89 @@ export const adminController = {
 
   async updateUserProfile(req: Request, res: Response) {
     try {
-      const { username, fullName, phone } = req.body;
+      const {
+        username,
+        fullName,
+        phone,
+        bio,
+        country,
+        city,
+        county,
+        postalCode,
+        instagram,
+        facebook,
+        website,
+      } = req.body;
 
       const updateData: Record<string, unknown> = {};
-      if (username !== undefined) updateData.username = username;
-      if (fullName !== undefined) updateData.fullName = fullName;
-      if (phone !== undefined) updateData.phone = phone;
+
+      if (username !== undefined) {
+        updateData.username = String(username).trim();
+      }
+
+      if (fullName !== undefined) {
+        updateData.fullName = String(fullName).trim();
+      }
+
+      if (phone !== undefined) {
+        updateData.phone = String(phone).trim();
+      }
+
+      if (bio !== undefined) {
+        updateData.bio = String(bio).trim();
+      }
+
+      if (country !== undefined) {
+        updateData.country = String(country).trim();
+      }
+
+      if (city !== undefined) {
+        updateData.city = String(city).trim();
+      }
+
+      if (county !== undefined) {
+        updateData.county = String(county).trim();
+      }
+
+      if (postalCode !== undefined) {
+        updateData.postalCode = String(postalCode).trim();
+      }
+
+      if (instagram !== undefined) {
+        updateData.instagram = String(instagram).trim();
+      }
+
+      if (facebook !== undefined) {
+        updateData.facebook = String(facebook).trim();
+      }
+
+      if (website !== undefined) {
+        updateData.website = String(website).trim();
+      }
 
       const user = await User.findByIdAndUpdate(req.params.id, updateData, {
         new: true,
+        runValidators: true,
+      }).select("-password -twoFactorSecret -twoFactorRecoveryCodes");
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User negăsit",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: user,
       });
-      res.json({ success: true, data: user });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, message: "Eroare la actualizarea profilului" });
+      console.error("UPDATE USER PROFILE ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la actualizarea profilului",
+      });
     }
   },
 
