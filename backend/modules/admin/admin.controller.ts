@@ -318,15 +318,28 @@ export const adminController = {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
 
-      const listings = await ListingModel.find()
+      const seller = req.query.seller as string | undefined;
+      const status = req.query.status as string | undefined;
+
+      const query: Record<string, unknown> = {};
+
+      if (seller) {
+        query.seller = seller;
+      }
+
+      if (status) {
+        query.status = status;
+      }
+
+      const listings = await ListingModel.find(query)
         .populate("seller", "username email")
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit);
 
-      const total = await ListingModel.countDocuments();
+      const total = await ListingModel.countDocuments(query);
 
-      res.json({
+      return res.json({
         success: true,
         data: listings,
         total,
@@ -334,9 +347,12 @@ export const adminController = {
         pages: Math.ceil(total / limit),
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, message: "Eroare la încărcarea anunțurilor" });
+      console.error("GET LISTINGS ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la încărcarea anunțurilor",
+      });
     }
   },
 
