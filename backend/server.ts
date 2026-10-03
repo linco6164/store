@@ -35,6 +35,9 @@ import savedCardRoutes from "./modules/payment/saved-card.routes.js";
 
 import registerChatSocket from "./sockets/chat.socket.js";
 import registerSupportSocket from "./sockets/support.socket.js";
+import {
+  startScheduledPromotions,
+} from "./jobs/scheduledPromotions.js";
 
 import mongoose from "mongoose";
 
@@ -118,6 +121,8 @@ async function start() {
   await connectDB();
 
   startPromotionScheduler();
+
+  startScheduledPromotions();
 
   const PORT = Number(process.env.PORT) || 5000;
 
