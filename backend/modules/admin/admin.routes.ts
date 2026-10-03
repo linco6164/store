@@ -140,16 +140,47 @@ router.post(
 );
 
 
-/*
-|--------------------------------------------------------------------------
-| BROADCAST
-|--------------------------------------------------------------------------
-*/
+// ==============================
+// NOTIFICATIONS
+// ==============================
+
+router.get(
+  "/notifications",
+  adminController.getNotifications,
+);
+
+router.get(
+  "/notifications/:id",
+  adminController.getNotification,
+);
+
+router.post(
+  "/notifications",
+  adminController.createNotification,
+);
+
+router.patch(
+  "/notifications/:id",
+  adminController.updateNotification,
+);
+
+router.post(
+  "/notifications/:id/send",
+  adminController.sendNotificationNow,
+);
+
+router.post(
+  "/notifications/:id/cancel",
+  adminController.cancelNotification,
+);
+
+router.delete(
+  "/notifications/:id",
+  adminController.deleteNotification,
+);
 
 router.post(
   "/broadcast",
-  auth,
-  adminOnly,
   adminController.sendBroadcast,
 );
 

@@ -3,6 +3,8 @@ import User from "../../models/Users.js";
 import { ListingModel } from "../listing/listing.model.js"; // ← corectat: ListingModel, nu Listing
 import Conversation from "../../models/Conversation.js"; // ← default export, fără acolade
 
+import { NotificationCampaign } from "../notification/notification-campaign.model.js";
+
 import bcrypt from "bcrypt"; // sau bcrypt, orice ai deja folosit în auth.ts
 import crypto from "crypto";
 
@@ -368,24 +370,909 @@ export const adminController = {
   },
 
   async sendBroadcast(req: Request, res: Response) {
-    try {
-      const { title, body } = req.body;
-      if (!title || !body) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Titlu și mesaj obligatorii" });
-      }
+    let campaign: any = null;
 
-      await notificationService.sendBroadcastNotification({
+    try {
+      const {
         title,
         body,
-        data: { type: "promotion" },
+        imageUrl,
+        priority = "normal",
+        route,
+        targetId,
+        url,
+      } = req.body;
+
+      if (!title || typeof title !== "string" || !title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Titlul este obligatoriu",
+        });
+      }
+
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Mesajul este obligatoriu",
+        });
+      }
+
+      if (priority !== "normal" && priority !== "high") {
+        return res.status(400).json({
+          success: false,
+          message: "Prioritate invalidă",
+        });
+      }
+
+      /*
+       * 1. Salvăm notificarea înainte de trimitere.
+       */
+      campaign = await NotificationCampaign.create({
+        title: title.trim(),
+
+        body: body.trim(),
+
+        imageUrl:
+          typeof imageUrl === "string" && imageUrl.trim()
+            ? imageUrl.trim()
+            : null,
+
+        audience: "all",
+
+        priority,
+
+        status: "processing",
+
+        data: {
+          type: "promotion",
+
+          ...(route
+            ? {
+                route,
+              }
+            : {}),
+
+          ...(targetId
+            ? {
+                targetId,
+              }
+            : {}),
+
+          ...(url
+            ? {
+                url,
+              }
+            : {}),
+        },
+
+        timezone: "Europe/Bucharest",
       });
-      res.json({ success: true, message: "Notificare trimisă" });
+
+      /*
+       * 2. Trimitem notificarea prin sistemul existent.
+       */
+      await notificationService.sendBroadcastNotification({
+        title: title.trim(),
+
+        body: body.trim(),
+
+        data: {
+          type: "promotion",
+
+          ...(route
+            ? {
+                route,
+              }
+            : {}),
+
+          ...(targetId
+            ? {
+                targetId,
+              }
+            : {}),
+
+          ...(url
+            ? {
+                url,
+              }
+            : {}),
+        },
+      });
+
+      /*
+       * 3. Marcăm notificarea ca trimisă.
+       */
+      campaign.status = "sent";
+      campaign.sentAt = new Date();
+
+      await campaign.save();
+
+      return res.json({
+        success: true,
+
+        message: "Notificare trimisă",
+
+        notification: {
+          id: campaign._id,
+
+          title: campaign.title,
+
+          body: campaign.body,
+
+          status: campaign.status,
+
+          sentAt: campaign.sentAt,
+        },
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, message: "Eroare la trimiterea notificării" });
+      console.error("SEND BROADCAST ERROR:", error);
+
+      /*
+       * Dacă notificarea fusese deja creată,
+       * o marcăm ca failed.
+       */
+      if (campaign) {
+        try {
+          campaign.status = "failed";
+
+          await campaign.save();
+        } catch (saveError) {
+          console.error("FAILED TO UPDATE CAMPAIGN:", saveError);
+        }
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la trimiterea notificării",
+      });
+    }
+  },
+
+  async createNotification(req: Request, res: Response) {
+    try {
+      const {
+        title,
+        body,
+
+        imageUrl,
+
+        audience = "all",
+
+        priority = "normal",
+
+        status = "draft",
+
+        scheduledAt,
+
+        expiresAt,
+
+        timezone = "Europe/Bucharest",
+
+        route,
+        targetId,
+        url,
+      } = req.body;
+
+      /*
+       * Validare titlu
+       */
+      if (!title || typeof title !== "string" || !title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Titlul este obligatoriu",
+        });
+      }
+
+      /*
+       * Validare mesaj
+       */
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Mesajul este obligatoriu",
+        });
+      }
+
+      /*
+       * Status permis la creare:
+       * draft sau scheduled
+       */
+      if (status !== "draft" && status !== "scheduled") {
+        return res.status(400).json({
+          success: false,
+          message: "Statusul trebuie să fie draft sau scheduled",
+        });
+      }
+
+      /*
+       * Prioritate
+       */
+      if (priority !== "normal" && priority !== "high") {
+        return res.status(400).json({
+          success: false,
+          message: "Prioritate invalidă",
+        });
+      }
+
+      const allowedAudiences = [
+        "all",
+        "buyers",
+        "sellers",
+        "verified",
+        "custom",
+      ];
+
+      if (!allowedAudiences.includes(audience)) {
+        return res.status(400).json({
+          success: false,
+          message: "Audiență invalidă",
+        });
+      }
+
+      /*
+       * Programarea este obligatorie
+       * dacă status = scheduled
+       */
+      let scheduledDate: Date | null = null;
+
+      if (status === "scheduled") {
+        if (!scheduledAt) {
+          return res.status(400).json({
+            success: false,
+            message: "Data programării este obligatorie",
+          });
+        }
+
+        scheduledDate = new Date(scheduledAt);
+
+        if (Number.isNaN(scheduledDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Data programării este invalidă",
+          });
+        }
+
+        if (scheduledDate.getTime() <= Date.now()) {
+          return res.status(400).json({
+            success: false,
+            message: "Notificarea trebuie programată în viitor",
+          });
+        }
+      }
+
+      /*
+       * Expirare opțională
+       */
+      let expirationDate: Date | null = null;
+
+      if (expiresAt) {
+        expirationDate = new Date(expiresAt);
+
+        if (Number.isNaN(expirationDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Data expirării este invalidă",
+          });
+        }
+
+        if (
+          scheduledDate &&
+          expirationDate.getTime() <= scheduledDate.getTime()
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Expirarea trebuie să fie după data programării",
+          });
+        }
+      }
+
+      /*
+       * Creăm notificarea.
+       * NU o trimitem încă.
+       */
+      const notification = await NotificationCampaign.create({
+        title: title.trim(),
+
+        body: body.trim(),
+
+        imageUrl:
+          typeof imageUrl === "string" && imageUrl.trim()
+            ? imageUrl.trim()
+            : null,
+
+        audience,
+
+        priority,
+
+        status,
+
+        scheduledAt: status === "scheduled" ? scheduledDate : null,
+
+        expiresAt: expirationDate,
+
+        timezone,
+
+        data: {
+          type: "promotion",
+
+          ...(route
+            ? {
+                route,
+              }
+            : {}),
+
+          ...(targetId
+            ? {
+                targetId,
+              }
+            : {}),
+
+          ...(url
+            ? {
+                url,
+              }
+            : {}),
+        },
+      });
+
+      return res.status(201).json({
+        success: true,
+
+        message:
+          status === "scheduled"
+            ? "Notificarea a fost programată"
+            : "Draft salvat",
+
+        notification,
+      });
+    } catch (error) {
+      console.error("CREATE NOTIFICATION ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-a putut salva notificarea",
+      });
+    }
+  },
+
+  async getNotifications(req: Request, res: Response) {
+    try {
+      const { status, search, page = "1", limit = "20" } = req.query;
+
+      const pageNumber = Math.max(1, Number(page) || 1);
+
+      const limitNumber = Math.min(100, Math.max(1, Number(limit) || 20));
+
+      const skip = (pageNumber - 1) * limitNumber;
+
+      const filter: Record<string, any> = {};
+
+      /*
+       * Filtrare după status.
+       */
+      if (
+        typeof status === "string" &&
+        [
+          "draft",
+          "scheduled",
+          "processing",
+          "sent",
+          "failed",
+          "cancelled",
+        ].includes(status)
+      ) {
+        filter.status = status;
+      }
+
+      /*
+       * Search după titlu sau mesaj.
+       */
+      if (typeof search === "string" && search.trim()) {
+        const searchRegex = new RegExp(search.trim(), "i");
+
+        filter.$or = [
+          {
+            title: searchRegex,
+          },
+          {
+            body: searchRegex,
+          },
+        ];
+      }
+
+      const [notifications, total, statusStats] = await Promise.all([
+        NotificationCampaign.find(filter)
+          .sort({
+            createdAt: -1,
+          })
+          .skip(skip)
+          .limit(limitNumber)
+          .lean(),
+
+        NotificationCampaign.countDocuments(filter),
+
+        NotificationCampaign.aggregate([
+          {
+            $group: {
+              _id: "$status",
+              count: {
+                $sum: 1,
+              },
+            },
+          },
+        ]),
+      ]);
+
+      const stats = {
+        all: 0,
+        draft: 0,
+        scheduled: 0,
+        processing: 0,
+        sent: 0,
+        failed: 0,
+        cancelled: 0,
+      };
+
+      for (const item of statusStats) {
+        const statusName = item._id as keyof typeof stats;
+
+        if (statusName && statusName in stats) {
+          stats[statusName] = item.count;
+        }
+
+        stats.all += item.count;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(total / limitNumber));
+
+      return res.json({
+        success: true,
+
+        notifications,
+
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          total,
+          totalPages,
+          hasNext: pageNumber < totalPages,
+          hasPrevious: pageNumber > 1,
+        },
+
+        stats,
+      });
+    } catch (error) {
+      console.error("GET NOTIFICATIONS ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-au putut încărca notificările",
+      });
+    }
+  },
+
+  async getNotification(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const notification = await NotificationCampaign.findById(id).lean();
+
+      if (!notification) {
+        return res.status(404).json({
+          success: false,
+          message: "Notificarea nu a fost găsită",
+        });
+      }
+
+      return res.json({
+        success: true,
+        notification,
+      });
+    } catch (error) {
+      console.error("GET NOTIFICATION ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-a putut încărca notificarea",
+      });
+    }
+  },
+
+  async updateNotification(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const notification = await NotificationCampaign.findById(id);
+
+      if (!notification) {
+        return res.status(404).json({
+          success: false,
+          message: "Notificarea nu a fost găsită",
+        });
+      }
+
+      /*
+       * Nu modificăm o notificare care este
+       * deja trimisă sau în curs de trimitere.
+       */
+      if (
+        notification.status === "sent" ||
+        notification.status === "processing"
+      ) {
+        return res.status(409).json({
+          success: false,
+          message: "Notificarea nu mai poate fi modificată",
+        });
+      }
+
+      const {
+        title,
+        body,
+        imageUrl,
+        audience,
+        priority,
+        status,
+        scheduledAt,
+        expiresAt,
+        timezone,
+        route,
+        targetId,
+        url,
+      } = req.body;
+
+      if (title !== undefined) {
+        if (typeof title !== "string" || !title.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: "Titlu invalid",
+          });
+        }
+
+        notification.title = title.trim();
+      }
+
+      if (body !== undefined) {
+        if (typeof body !== "string" || !body.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: "Mesaj invalid",
+          });
+        }
+
+        notification.body = body.trim();
+      }
+
+      if (imageUrl !== undefined) {
+        notification.imageUrl =
+          typeof imageUrl === "string" && imageUrl.trim()
+            ? imageUrl.trim()
+            : null;
+      }
+
+      if (priority !== undefined) {
+        if (!["normal", "high"].includes(priority)) {
+          return res.status(400).json({
+            success: false,
+            message: "Prioritate invalidă",
+          });
+        }
+
+        notification.priority = priority;
+      }
+
+      if (audience !== undefined) {
+        const allowedAudiences = [
+          "all",
+          "buyers",
+          "sellers",
+          "verified",
+          "custom",
+        ];
+
+        if (!allowedAudiences.includes(audience)) {
+          return res.status(400).json({
+            success: false,
+            message: "Audiență invalidă",
+          });
+        }
+
+        notification.audience = audience;
+      }
+
+      if (timezone !== undefined) {
+        notification.timezone = timezone || "Europe/Bucharest";
+      }
+
+      /*
+       * Draft sau Scheduled.
+       */
+      if (status !== undefined) {
+        if (!["draft", "scheduled"].includes(status)) {
+          return res.status(400).json({
+            success: false,
+            message: "Status invalid pentru editare",
+          });
+        }
+
+        notification.status = status;
+      }
+
+      /*
+       * Dacă vrem programare,
+       * scheduledAt trebuie să existe
+       * și să fie în viitor.
+       */
+      if (
+        status === "scheduled" ||
+        (notification.status === "scheduled" && scheduledAt !== undefined)
+      ) {
+        if (!scheduledAt) {
+          return res.status(400).json({
+            success: false,
+            message: "Data programării este obligatorie",
+          });
+        }
+
+        const scheduledDate = new Date(scheduledAt);
+
+        if (Number.isNaN(scheduledDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Data programării este invalidă",
+          });
+        }
+
+        if (scheduledDate.getTime() <= Date.now()) {
+          return res.status(400).json({
+            success: false,
+            message: "Data programării trebuie să fie în viitor",
+          });
+        }
+
+        notification.scheduledAt = scheduledDate;
+      }
+
+      if (status === "draft") {
+        notification.scheduledAt = null;
+      }
+
+      if (expiresAt !== undefined) {
+        if (!expiresAt) {
+          notification.expiresAt = null;
+        } else {
+          const expirationDate = new Date(expiresAt);
+
+          if (Number.isNaN(expirationDate.getTime())) {
+            return res.status(400).json({
+              success: false,
+              message: "Data expirării este invalidă",
+            });
+          }
+
+          if (
+            notification.scheduledAt &&
+            expirationDate.getTime() <= notification.scheduledAt.getTime()
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Expirarea trebuie să fie după programare",
+            });
+          }
+
+          notification.expiresAt = expirationDate;
+        }
+      }
+
+      notification.data = {
+        type: notification.data?.type || "promotion",
+
+        ...(route
+          ? {
+              route,
+            }
+          : {}),
+
+        ...(targetId
+          ? {
+              targetId,
+            }
+          : {}),
+
+        ...(url
+          ? {
+              url,
+            }
+          : {}),
+      };
+
+      await notification.save();
+
+      return res.json({
+        success: true,
+        message:
+          notification.status === "scheduled"
+            ? "Notificarea a fost programată"
+            : "Notificarea a fost actualizată",
+
+        notification,
+      });
+    } catch (error) {
+      console.error("UPDATE NOTIFICATION ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-a putut actualiza notificarea",
+      });
+    }
+  },
+
+  async sendNotificationNow(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      /*
+       * Rezervare atomică.
+       * Evită două trimiteri simultane.
+       */
+      const notification = await NotificationCampaign.findOneAndUpdate(
+        {
+          _id: id,
+
+          status: {
+            $in: ["draft", "scheduled", "failed"],
+          },
+        },
+
+        {
+          $set: {
+            status: "processing",
+          },
+        },
+
+        {
+          new: true,
+        },
+      );
+
+      if (!notification) {
+        return res.status(409).json({
+          success: false,
+          message: "Notificarea nu poate fi trimisă în starea actuală",
+        });
+      }
+
+      try {
+        await notificationService.sendBroadcastNotification({
+          title: notification.title,
+
+          body: notification.body,
+
+          data: {
+            type: notification.data?.type || "promotion",
+
+            ...(notification.data?.route
+              ? {
+                  route: notification.data.route,
+                }
+              : {}),
+
+            ...(notification.data?.targetId
+              ? {
+                  targetId: notification.data.targetId,
+                }
+              : {}),
+
+            ...(notification.data?.url
+              ? {
+                  url: notification.data.url,
+                }
+              : {}),
+          },
+        });
+
+        notification.status = "sent";
+
+        notification.sentAt = new Date();
+
+        notification.scheduledAt = null;
+
+        await notification.save();
+
+        return res.json({
+          success: true,
+          message: "Notificarea a fost trimisă",
+          notification,
+        });
+      } catch (error) {
+        notification.status = "failed";
+
+        await notification.save();
+
+        throw error;
+      }
+    } catch (error) {
+      console.error("SEND NOTIFICATION NOW ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-a putut trimite notificarea",
+      });
+    }
+  },
+
+  async cancelNotification(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const notification = await NotificationCampaign.findOneAndUpdate(
+        {
+          _id: id,
+          status: "scheduled",
+        },
+
+        {
+          $set: {
+            status: "cancelled",
+          },
+        },
+
+        {
+          new: true,
+        },
+      );
+
+      if (!notification) {
+        return res.status(409).json({
+          success: false,
+          message: "Doar notificările programate pot fi anulate",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Programarea a fost anulată",
+        notification,
+      });
+    } catch (error) {
+      console.error("CANCEL NOTIFICATION ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-a putut anula notificarea",
+      });
+    }
+  },
+
+  async deleteNotification(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const notification = await NotificationCampaign.findOneAndDelete({
+        _id: id,
+
+        status: {
+          $in: ["draft", "cancelled", "failed"],
+        },
+      });
+
+      if (!notification) {
+        return res.status(409).json({
+          success: false,
+          message: "Notificarea nu poate fi ștearsă în starea actuală",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Notificarea a fost ștearsă",
+      });
+    } catch (error) {
+      console.error("DELETE NOTIFICATION ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Nu s-a putut șterge notificarea",
+      });
     }
   },
 
