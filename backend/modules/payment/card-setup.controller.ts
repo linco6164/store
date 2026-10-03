@@ -182,6 +182,34 @@ export const cardSetupController = {
     }
   },
 
+  async status(req: AuthRequest, res: Response) {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const setup = await cardSetupService.getSetupForUser(
+        String(req.params.id ?? ""),
+        req.userId,
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          status: setup.status,
+          savedCardId: setup.savedCard?.toString() ?? null,
+          errorCode: setup.errorCode ?? null,
+          errorMessage: setup.errorMessage ?? null,
+        },
+      });
+    } catch (error) {
+      return res.status(errorStatus(error)).json({
+        success: false,
+        message: "Sesiunea de adăugare a cardului nu a fost găsită.",
+      });
+    }
+  },
+
   async confirm(req: Request, res: Response) {
     try {
       const body = req.body ?? {};
@@ -227,6 +255,7 @@ export const cardSetupController = {
         "cardSetup",
         setup.status === "completed" ? "success" : setup.status,
       );
+      redirectUrl.searchParams.set("cardSetupId", setup._id.toString());
 
       const safeRedirect = JSON.stringify(redirectUrl.toString()).replace(
         /</g,

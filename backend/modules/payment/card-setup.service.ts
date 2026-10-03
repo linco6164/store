@@ -101,7 +101,8 @@ function splitName(fullName: string, username: string) {
 function cardMetadata(notification: DecryptedNotification) {
   const tokenId = String(notification.tokenId ?? "").trim();
   const panMasked = String(notification.panMasked ?? "")
-    .replace(/\s/g, "")
+    .replace(/[\s-]/g, "")
+    .replace(/[xX]/g, "*")
     .trim();
   const panMatch = panMasked.match(/^(\d{6})\*+(\d{4})$/);
 
@@ -250,7 +251,20 @@ class CardSetupService {
       return setup;
     }
 
-    const metadata = cardMetadata(notification);
+    let metadata: ReturnType<typeof cardMetadata>;
+
+    try {
+      metadata = cardMetadata(notification);
+    } catch (error) {
+      setup.status = "failed";
+      setup.errorCode = 48;
+      setup.errorMessage =
+        "NETOPIA nu a emis tokenul cardului. Verifică activarea " +
+        "tokenizării/One Click pentru punctul de vânzare.";
+      await setup.save();
+      throw error;
+    }
+
     const card = await savedCardService.createSavedCard(setup.user.toString(), {
       provider: "netopia",
       providerReference: metadata.tokenId,
@@ -277,6 +291,26 @@ class CardSetupService {
     }
 
     const setup = await CardSetupModel.findById(setupId);
+
+    if (!setup) {
+      throw new Error("CARD_SETUP_NOT_FOUND");
+    }
+
+    return setup;
+  }
+
+  async getSetupForUser(setupId: string, userId: string) {
+    if (
+      !mongoose.isValidObjectId(setupId) ||
+      !mongoose.isValidObjectId(userId)
+    ) {
+      throw new Error("CARD_SETUP_NOT_FOUND");
+    }
+
+    const setup = await CardSetupModel.findOne({
+      _id: setupId,
+      user: userId,
+    }).select("status savedCard errorCode errorMessage expiresAt");
 
     if (!setup) {
       throw new Error("CARD_SETUP_NOT_FOUND");

@@ -9,6 +9,8 @@ router.post("/setup", auth, cardSetupController.create);
 
 router.get("/setup/checkout/:id", cardSetupController.checkout);
 
+router.get("/setup/:id/status", auth, cardSetupController.status);
+
 router.post("/setup/confirm", cardSetupController.confirm);
 
 router.get("/setup/return", cardSetupController.returnPage);

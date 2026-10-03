@@ -461,7 +461,11 @@ class NetopiaService {
 
     const actionValue = deepFind(root, ["action"]);
 
-    const errorCodeValue = deepFind(root, ["errorCode", "error_code"]);
+    const errorCodeValue = deepFind(root, [
+      "errorCode",
+      "error_code",
+      "@_code",
+    ]);
 
     const errorMessageValue = deepFind(root, ["errorMessage", "error_message"]);
 
@@ -472,18 +476,28 @@ class NetopiaService {
 
     const currencyValue = deepFind(root, ["currency"]);
 
-    const tokenIdValue = deepFind(root, ["token_id", "tokenId"]);
+    const tokenIdValue = deepFind(root, [
+      "token_id",
+      "tokenId",
+      "@_token_id",
+    ]);
 
-    const panMaskedValue = deepFind(root, ["pan_masked", "panMasked"]);
+    const panMaskedValue = deepFind(root, [
+      "pan_masked",
+      "panMasked",
+      "@_pan_masked",
+    ]);
 
     const paymentInstrumentIdValue = deepFind(root, [
       "payment_instrument_id",
       "paymentInstrumentId",
+      "@_payment_instrument_id",
     ]);
 
     const tokenExpirationDateValue = deepFind(root, [
       "token_expiration_date",
       "tokenExpirationDate",
+      "@_token_expiration_date",
     ]);
 
     const errorCode = Number(errorCodeValue ?? 0);
