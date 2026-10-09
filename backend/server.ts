@@ -39,6 +39,8 @@ import {
   startScheduledPromotions,
 } from "./jobs/scheduledPromotions.js";
 
+import samedayRoutes from "./modules/sameday/sameday.routes.js";
+
 import mongoose from "mongoose";
 
 import { setSocketIO } from "./sockets/socket.io.js";
@@ -104,6 +106,8 @@ app.use("/notifications", notificationRoutes);
 app.use("/payments/cards", savedCardRoutes);
 
 app.use("/payments", paymentRoutes);
+
+app.use("/sameday", samedayRoutes);
 
 app.use("/admin", adminRoutes);
 
