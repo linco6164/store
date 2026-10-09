@@ -51,21 +51,47 @@ export interface SamedayPickupPoint {
 
   alias?: string;
 
-  city?: {
+  country?: {
     id?: number;
     name?: string;
+    code?: string;
   };
 
   county?: {
     id?: number;
     name?: string;
+    code?: string;
+  };
+
+  city?: {
+    id?: number;
+    name?: string;
+
+    samedayDeliveryAgency?: string;
+    samedayPickupAgency?: string;
+
+    extraKM?: number;
   };
 
   address?: string;
 
   postalCode?: string;
 
-  contactPersons?: SamedayContactPerson[];
+  cutOff?: string;
+
+  defaultPickupPoint?: boolean;
+
+  pickupPointContactPerson?: Array<{
+    id: number;
+
+    name?: string;
+
+    phoneNumber?: string;
+
+    defaultContactPerson?: boolean;
+  }>;
+
+  status?: boolean;
 
   [key: string]: unknown;
 }

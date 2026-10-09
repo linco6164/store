@@ -40,6 +40,7 @@ import {
 } from "./jobs/scheduledPromotions.js";
 
 import samedayRoutes from "./modules/sameday/sameday.routes.js";
+import samedayShipmentRoutes from "./modules/sameday/sameday-shipment.routes.js";
 
 import mongoose from "mongoose";
 
@@ -108,6 +109,11 @@ app.use("/payments/cards", savedCardRoutes);
 app.use("/payments", paymentRoutes);
 
 app.use("/sameday", samedayRoutes);
+
+app.use(
+  "/sameday/shipments",
+  samedayShipmentRoutes,
+);
 
 app.use("/admin", adminRoutes);
 
