@@ -3,15 +3,15 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 
-import Order from "../order/order.model.js";
 import User from "../../models/Users.js";
+
+import Order from "../order/order.model.js";
+
 import { ListingModel } from "../listing/listing.model.js";
 
 import SamedayShipmentModel from "./sameday-shipment.model.js";
 
-import {
-  samedayService,
-} from "./sameday.service.js";
+import { samedayService } from "./sameday.service.js";
 
 import type {
   SamedayCreateAwbPayload,
@@ -25,8 +25,6 @@ import type {
 
 interface CreateLockerShipmentInput {
   orderId: string;
-
-  destinationLockerId: number;
 
   packageType?: SamedayPackageType;
 
@@ -43,80 +41,45 @@ interface CreateLockerShipmentInput {
 // HELPERS
 // ============================================================
 
-function requiredNumberEnv(
-  name: string,
-): number {
-  const value =
-    process.env[name];
+function requiredNumberEnv(name: string): number {
+  const value = process.env[name];
 
-  if (
-    !value ||
-    !value.trim()
-  ) {
-    throw new Error(
-      `${name}_MISSING`,
-    );
+  if (!value || !value.trim()) {
+    throw new Error(`${name}_MISSING`);
   }
 
-  const parsed =
-    Number(value);
+  const parsed = Number(value);
 
-  if (
-    !Number.isInteger(parsed) ||
-    parsed <= 0
-  ) {
-    throw new Error(
-      `${name}_INVALID`,
-    );
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name}_INVALID`);
   }
 
   return parsed;
 }
 
-function normalizeName(
-  fullName: unknown,
-  username: unknown,
-): string {
-  const name =
-    String(
-      fullName ?? "",
-    ).trim();
+function normalizeName(fullName: unknown, username: unknown): string {
+  const name = String(fullName ?? "").trim();
 
   if (name) {
     return name;
   }
 
-  const fallback =
-    String(
-      username ?? "",
-    ).trim();
+  const fallback = String(username ?? "").trim();
 
-  return (
-    fallback ||
-    "Utilizator Nexora"
-  );
+  return fallback || "Utilizator Nexora";
 }
 
-function normalizePhone(
-  value: unknown,
-): string {
-  return String(
-    value ?? "",
-  )
+function normalizePhone(value: unknown): string {
+  return String(value ?? "")
     .trim()
     .replace(/\s+/g, "");
 }
 
-function generateInternalReference(
-  orderId: string,
-): string {
+function generateInternalReference(orderId: string): string {
   return (
-    `NX-SD-` +
+    "NX-SD-" +
     `${orderId}-` +
-    crypto
-      .randomBytes(5)
-      .toString("hex")
-      .toUpperCase()
+    crypto.randomBytes(5).toString("hex").toUpperCase()
   );
 }
 
@@ -129,71 +92,69 @@ class SamedayShipmentService {
   // CREATE LOCKER NEXTDAY SHIPMENT
   // ==========================================================
 
-  async createLockerShipment(
-    input: CreateLockerShipmentInput,
-  ) {
+  async createLockerShipment(input: CreateLockerShipmentInput) {
     // ========================================================
-    // VALIDATE ORDER ID
+    // ORDER ID
     // ========================================================
 
-    if (
-      !mongoose.isValidObjectId(
-        input.orderId,
-      )
-    ) {
-      throw new Error(
-        "ORDER_NOT_FOUND",
-      );
-    }
-
-    if (
-      !Number.isInteger(
-        input.destinationLockerId,
-      ) ||
-      input.destinationLockerId <= 0
-    ) {
-      throw new Error(
-        "INVALID_DESTINATION_LOCKER",
-      );
-    }
-
-    if (
-      !Number.isFinite(
-        input.packageWeight,
-      ) ||
-      input.packageWeight <= 0
-    ) {
-      throw new Error(
-        "INVALID_PACKAGE_WEIGHT",
-      );
-    }
-
-    const packageType =
-      input.packageType ?? 0;
-
-    if (
-      packageType !== 0 &&
-      packageType !== 1 &&
-      packageType !== 2
-    ) {
-      throw new Error(
-        "INVALID_PACKAGE_TYPE",
-      );
+    if (!mongoose.isValidObjectId(input.orderId)) {
+      throw new Error("ORDER_NOT_FOUND");
     }
 
     // ========================================================
-    // IDEMPOTENCY
+    // PACKAGE WEIGHT
+    // ========================================================
+
+    if (!Number.isFinite(input.packageWeight) || input.packageWeight <= 0) {
+      throw new Error("INVALID_PACKAGE_WEIGHT");
+    }
+
+    // ========================================================
+    // PACKAGE TYPE
+    // ========================================================
+
+    const packageType = input.packageType ?? 0;
+
+    if (packageType !== 0 && packageType !== 1 && packageType !== 2) {
+      throw new Error("INVALID_PACKAGE_TYPE");
+    }
+
+    // ========================================================
+    // DIMENSIONS
+    // ========================================================
+
+    if (
+      input.width !== undefined &&
+      (!Number.isFinite(input.width) || input.width <= 0)
+    ) {
+      throw new Error("INVALID_PACKAGE_WIDTH");
+    }
+
+    if (
+      input.length !== undefined &&
+      (!Number.isFinite(input.length) || input.length <= 0)
+    ) {
+      throw new Error("INVALID_PACKAGE_LENGTH");
+    }
+
+    if (
+      input.height !== undefined &&
+      (!Number.isFinite(input.height) || input.height <= 0)
+    ) {
+      throw new Error("INVALID_PACKAGE_HEIGHT");
+    }
+
+    // ========================================================
+    // EXISTING SHIPMENT
     //
     // Nu generăm două AWB-uri pentru aceeași comandă.
     // ========================================================
 
-    const existingShipment =
-      await SamedayShipmentModel
-        .findOne({
-          order: input.orderId,
-        });
+    const existingShipment = await SamedayShipmentModel.findOne({
+      order: input.orderId,
+    });
 
-    if (existingShipment) {
+    if (existingShipment && existingShipment.status !== "failed") {
       return existingShipment;
     }
 
@@ -201,541 +162,449 @@ class SamedayShipmentService {
     // ORDER
     // ========================================================
 
-    const order =
-      await Order.findById(
-        input.orderId,
-      );
+    const order = await Order.findById(input.orderId);
 
     if (!order) {
-      throw new Error(
-        "ORDER_NOT_FOUND",
-      );
+      throw new Error("ORDER_NOT_FOUND");
     }
 
-    if (
-      order.status ===
-        "cancelled" ||
-      order.status ===
-        "refunded"
-    ) {
-      throw new Error(
-        "ORDER_NOT_SHIPPABLE",
-      );
+    // ========================================================
+    // ORDER STATUS
+    // ========================================================
+
+    if (order.status === "cancelled" || order.status === "refunded") {
+      throw new Error("ORDER_NOT_SHIPPABLE");
     }
 
-    // AWB-ul trebuie generat numai
-    // pentru o comandă deja plătită.
-    if (
-      order.status !== "paid" &&
-      order.status !== "processing"
-    ) {
-      throw new Error(
-        "ORDER_NOT_PAID",
-      );
+    if (order.status !== "paid" && order.status !== "processing") {
+      throw new Error("ORDER_NOT_PAID");
+    }
+
+    // ========================================================
+    // DELIVERY METHOD
+    // ========================================================
+
+    if (order.deliveryMethod !== "pickup_point") {
+      throw new Error("ORDER_NOT_EASYBOX_DELIVERY");
+    }
+
+    // ========================================================
+    // DESTINATION EASYBOX
+    //
+    // Easybox-ul NU vine din request.
+    //
+    // Este cel ales de cumpărător la checkout și salvat
+    // permanent în Order după confirmarea plății.
+    // ========================================================
+
+    const destinationLockerId = Number(order.destinationLockerId);
+
+    if (!Number.isInteger(destinationLockerId) || destinationLockerId <= 0) {
+      throw new Error("ORDER_EASYBOX_MISSING");
     }
 
     // ========================================================
     // USERS + LISTING
     // ========================================================
 
-    const [
-      buyer,
-      seller,
-      listing,
-    ] =
-      await Promise.all([
-        User.findById(
-          order.buyer,
-        ),
+    const [buyer, seller, listing] = await Promise.all([
+      User.findById(order.buyer),
 
-        User.findById(
-          order.seller,
-        ),
+      User.findById(order.seller),
 
-        ListingModel.findById(
-          order.listing,
-        ),
-      ]);
+      ListingModel.findById(order.listing),
+    ]);
 
     if (!buyer) {
-      throw new Error(
-        "BUYER_NOT_FOUND",
-      );
+      throw new Error("BUYER_NOT_FOUND");
     }
 
     if (!seller) {
-      throw new Error(
-        "SELLER_NOT_FOUND",
-      );
+      throw new Error("SELLER_NOT_FOUND");
     }
 
     if (!listing) {
-      throw new Error(
-        "LISTING_NOT_FOUND",
-      );
+      throw new Error("LISTING_NOT_FOUND");
     }
 
     // ========================================================
     // BUYER CONTACT
     // ========================================================
 
-    const buyerPhone =
-      normalizePhone(
-        buyer.phone,
-      );
+    const buyerPhone = normalizePhone(buyer.phone);
 
     if (!buyerPhone) {
-      throw new Error(
-        "BUYER_PHONE_REQUIRED",
-      );
+      throw new Error("BUYER_PHONE_REQUIRED");
     }
 
-    if (
-      !buyer.email ||
-      !buyer.email.trim()
-    ) {
-      throw new Error(
-        "BUYER_EMAIL_REQUIRED",
-      );
+    const buyerEmail = String(buyer.email ?? "").trim();
+
+    if (!buyerEmail) {
+      throw new Error("BUYER_EMAIL_REQUIRED");
     }
 
     // ========================================================
-    // VERIFY DESTINATION EASYBOX
+    // VERIFY DESTINATION EASYBOX WITH SAMEDAY
     //
-    // Nu avem încredere într-un ID trimis pur și simplu
-    // de Flutter.
-    //
-    // Îl verificăm direct în API-ul Sameday.
+    // Chiar dacă ID-ul este salvat în Order, verificăm din nou
+    // că locația există și este încă disponibilă.
     // ========================================================
 
-    const lockerResponse =
-      await samedayService
-        .getOohLocations({
-          listingType: 0,
+    const lockerResponse = await samedayService.getOohLocations({
+      listingType: 0,
 
-          oohList:
-            String(
-              input.destinationLockerId,
-            ),
+      oohList: String(destinationLockerId),
 
-          countryCode: "RO",
+      countryCode: "RO",
 
-          page: 1,
+      page: 1,
 
-          countPerPage: 100,
-        });
+      countPerPage: 100,
+    });
 
-    const destinationLocker:
-      SamedayOohLocation | undefined =
+    const destinationLocker: SamedayOohLocation | undefined =
       lockerResponse.data.find(
         (location) =>
-          Number(
-            location.oohId,
-          ) ===
-          input.destinationLockerId,
+          Number(location.oohId) === destinationLockerId &&
+          location.oohType === 0 &&
+          location.clientVisible !== 0,
       );
 
     if (!destinationLocker) {
-      throw new Error(
-        "DESTINATION_LOCKER_NOT_FOUND",
-      );
-    }
-
-    if (
-      destinationLocker.oohType !== 0
-    ) {
-      throw new Error(
-        "DESTINATION_NOT_EASYBOX",
-      );
+      throw new Error("DESTINATION_LOCKER_NOT_FOUND");
     }
 
     // ========================================================
-    // VERIFY LOCKER NEXTDAY SERVICE
+    // LOCKER NEXTDAY SERVICE
     // ========================================================
 
-    const services =
-      await samedayService
-        .getServices(
-          1,
-          500,
-        );
+    const services = await samedayService.getServices(1, 500);
 
-    const lockerService =
-      services.data.find(
-        (service) =>
-          Number(
-            service.id,
-          ) === 15,
-      );
+    const lockerService = services.data.find(
+      (service) => Number(service.id) === 15,
+    );
 
     if (!lockerService) {
-      throw new Error(
-        "SAMEDAY_LOCKER_NEXTDAY_NOT_ENABLED",
-      );
+      throw new Error("SAMEDAY_LOCKER_NEXTDAY_NOT_ENABLED");
     }
 
     // ========================================================
     // PDO
     //
-    // Pentru predare personală în Easybox,
-    // căutăm PDO pentru packageType-ul folosit.
+    // Pentru ca vânzătorul să poată depune coletul personal
+    // într-un Easybox, contul trebuie să aibă PDO activ
+    // pentru Locker NextDay și packageType-ul respectiv.
     // ========================================================
 
-    const pdoTax =
-      lockerService
-        .serviceOptionalTaxes
-        ?.find(
-          (tax) =>
-            String(
-              tax.taxCode ??
-                tax.code ??
-                "",
-            ).toUpperCase() ===
-              "PDO" &&
-            Number(
-              tax.packageType,
-            ) ===
-              packageType,
-        );
+    const pdoTax = lockerService.serviceOptionalTaxes?.find(
+      (tax) =>
+        String(tax.taxCode ?? tax.code ?? "")
+          .trim()
+          .toUpperCase() === "PDO" && Number(tax.packageType) === packageType,
+    );
 
     if (!pdoTax) {
-      throw new Error(
-        "SAMEDAY_PDO_NOT_ENABLED_FOR_LOCKER_NEXTDAY",
-      );
+      throw new Error("SAMEDAY_PDO_NOT_ENABLED_FOR_LOCKER_NEXTDAY");
     }
 
-    const pdoTaxId =
-      Number(
-        pdoTax.id,
-      );
+    const pdoTaxId = Number(pdoTax.id);
 
-    if (
-      !Number.isInteger(
-        pdoTaxId,
-      ) ||
-      pdoTaxId <= 0
-    ) {
-      throw new Error(
-        "SAMEDAY_PDO_ID_INVALID",
-      );
+    if (!Number.isInteger(pdoTaxId) || pdoTaxId <= 0) {
+      throw new Error("SAMEDAY_PDO_ID_INVALID");
     }
 
     // ========================================================
-    // PICKUP POINT / CONTACT PERSON
+    // PICKUP POINT + CONTACT PERSON
     // ========================================================
 
-    const pickupPointId =
-      requiredNumberEnv(
-        "SAMEDAY_PICKUP_POINT_ID",
-      );
+    const pickupPointId = requiredNumberEnv("SAMEDAY_PICKUP_POINT_ID");
 
-    const contactPersonId =
-      requiredNumberEnv(
-        "SAMEDAY_CONTACT_PERSON_ID",
-      );
+    const contactPersonId = requiredNumberEnv("SAMEDAY_CONTACT_PERSON_ID");
 
     // ========================================================
-    // CLIENT INTERNAL REFERENCE
+    // INTERNAL REFERENCE
     // ========================================================
 
-    const clientInternalReference =
-      generateInternalReference(
-        order._id.toString(),
-      );
+    const clientInternalReference = generateInternalReference(
+      order._id.toString(),
+    );
 
     // ========================================================
-    // PACKAGE
+    // PARCEL
     // ========================================================
 
     const parcel: {
       weight: number;
+
       width?: number;
+
       length?: number;
+
       height?: number;
     } = {
-      weight:
-        input.packageWeight,
+      weight: input.packageWeight,
     };
 
-    if (
-      input.width !== undefined
-    ) {
-      parcel.width =
-        input.width;
+    if (input.width !== undefined) {
+      parcel.width = input.width;
     }
 
-    if (
-      input.length !== undefined
-    ) {
-      parcel.length =
-        input.length;
+    if (input.length !== undefined) {
+      parcel.length = input.length;
     }
 
-    if (
-      input.height !== undefined
-    ) {
-      parcel.height =
-        input.height;
+    if (input.height !== undefined) {
+      parcel.height = input.height;
     }
 
     // ========================================================
-    // AWB PAYLOAD
+    // SAMEDAY AWB PAYLOAD
     // ========================================================
 
-    const payload:
-      SamedayCreateAwbPayload = {
-      pickupPoint:
-        pickupPointId,
+    const payload: SamedayCreateAwbPayload = {
+      // ------------------------------------------------------
+      // ACCOUNT
+      // ------------------------------------------------------
 
-      contactPerson:
-        contactPersonId,
+      pickupPoint: pickupPointId,
+
+      contactPerson: contactPersonId,
+
+      // ------------------------------------------------------
+      // PACKAGE
+      // ------------------------------------------------------
 
       packageType,
 
       packageNumber: 1,
 
-      packageWeight:
-        input.packageWeight,
+      packageWeight: input.packageWeight,
 
-      /**
-       * Locker NextDay
-       */
+      parcels: [parcel],
+
+      // ------------------------------------------------------
+      // SERVICE
+      // Locker NextDay
+      // ------------------------------------------------------
+
       service: 15,
 
-      /**
-       * Contractantul Sameday
-       * plătește transportul.
-       */
       awbPayment: 1,
 
-      /**
-       * Plata produsului se face
-       * prin Nexora / NETOPIA.
-       *
-       * Nu avem ramburs.
-       */
+      // ------------------------------------------------------
+      // ORDER IS ALREADY PAID THROUGH NEXORA
+      // ------------------------------------------------------
+
       cashOnDelivery: 0,
 
-      /**
-       * Folosim valoarea produsului
-       * ca valoare asigurată.
-       */
-      insuredValue:
-        Math.max(
-          Number(
-            listing.price ?? 0,
-          ),
-          0,
-        ),
+      // ------------------------------------------------------
+      // INSURANCE
+      // ------------------------------------------------------
 
-      /**
-       * PDO folosește pickup point-ul
-       * contului, nu thirdParty pickup.
-       */
+      insuredValue: Math.max(Number(listing.price ?? 0), 0),
+
+      // ------------------------------------------------------
+      // PDO
+      // ------------------------------------------------------
+
       thirdPartyPickup: 0,
 
+      serviceTaxes: [`PDO ${pdoTaxId}`],
+
+      // ------------------------------------------------------
+      // RECIPIENT
+      // ------------------------------------------------------
+
       awbRecipient: {
-        county:
-          destinationLocker
-            .countyId,
+        county: destinationLocker.countyId,
 
-        city:
-          destinationLocker
-            .cityId,
+        city: destinationLocker.cityId,
 
-        countyString:
-          destinationLocker
-            .county,
+        countyString: destinationLocker.county,
 
-        cityString:
-          destinationLocker
-            .city,
+        cityString: destinationLocker.city,
 
-        address:
-          destinationLocker
-            .address,
+        address: destinationLocker.address,
 
-        postalCode:
-          destinationLocker
-            .postalCode,
+        postalCode: destinationLocker.postalCode,
 
-        name:
-          normalizeName(
-            buyer.fullName,
-            buyer.username,
-          ),
+        name: normalizeName(buyer.fullName, buyer.username),
 
-        phoneNumber:
-          buyerPhone,
+        phoneNumber: buyerPhone,
 
-        email:
-          buyer.email,
+        email: buyerEmail,
 
         personType: 0,
       },
 
-      parcels: [
-        parcel,
-      ],
+      // ------------------------------------------------------
+      // INTERNAL REFERENCES
+      // ------------------------------------------------------
 
       clientInternalReference,
 
-      orderNumber:
-        order._id.toString(),
+      orderNumber: order._id.toString(),
 
-      observation:
-        `Nexora - ${listing.title}`,
+      observation: `Nexora - ${listing.title}`,
 
-      /**
-       * PDO + ID-ul specific
-       * acestui cont și packageType.
-       */
-      serviceTaxes: [
-        `PDO ${pdoTaxId}`,
-      ],
+      // ------------------------------------------------------
+      // DESTINATION EASYBOX
+      // ------------------------------------------------------
 
-      /**
-       * Easybox-ul REAL ales
-       * de cumpărător pe hartă.
-       */
-      oohLastMile:
-        destinationLocker.oohId,
+      oohLastMile: destinationLocker.oohId,
     };
 
     // ========================================================
-    // CREATE LOCAL SHIPMENT FIRST
+    // FAILED SHIPMENT RETRY
     // ========================================================
 
-    const shipment =
-      await SamedayShipmentModel.create({
-        order:
-          order._id,
-
-        buyer:
-          order.buyer,
-
-        seller:
-          order.seller,
-
-        provider:
-          "sameday",
-
-        serviceId: 15,
-
-        clientInternalReference,
-
-        pickupPointId,
-
-        contactPersonId,
-
-        oohLastMile:
-          destinationLocker.oohId,
-
-        destinationLockerName:
-          destinationLocker.name,
-
-        destinationLockerAddress:
-          destinationLocker.address,
-
-        destinationLockerCity:
-          destinationLocker.city,
-
-        destinationLockerCounty:
-          destinationLocker.county,
-
-        destinationLockerLat:
-          destinationLocker.lat,
-
-        destinationLockerLng:
-          destinationLocker.lng,
-
-        packageType,
-
-        packageNumber: 1,
-
-        packageWeight:
-          input.packageWeight,
-
-        width:
-          input.width ?? null,
-
-        length:
-          input.length ?? null,
-
-        height:
-          input.height ?? null,
-
-        pdoEnabled: true,
-
-        pdoTaxId,
-
-        labelFree: false,
-
-        status: "pending",
+    if (existingShipment && existingShipment.status === "failed") {
+      await SamedayShipmentModel.deleteOne({
+        _id: existingShipment._id,
       });
+    }
 
     // ========================================================
-    // CREATE AWB
+    // CREATE LOCAL SHIPMENT
+    // ========================================================
+
+    const shipment = await SamedayShipmentModel.create({
+      // --------------------------------------------------
+      // REFERENCES
+      // --------------------------------------------------
+
+      order: order._id,
+
+      buyer: order.buyer,
+
+      seller: order.seller,
+
+      // --------------------------------------------------
+      // PROVIDER
+      // --------------------------------------------------
+
+      provider: "sameday",
+
+      serviceId: 15,
+
+      clientInternalReference,
+
+      // --------------------------------------------------
+      // ACCOUNT
+      // --------------------------------------------------
+
+      pickupPointId,
+
+      contactPersonId,
+
+      // --------------------------------------------------
+      // EASYBOX
+      // --------------------------------------------------
+
+      oohLastMile: destinationLocker.oohId,
+
+      destinationLockerName: destinationLocker.name,
+
+      destinationLockerAddress: destinationLocker.address,
+
+      destinationLockerCity: destinationLocker.city,
+
+      destinationLockerCounty: destinationLocker.county,
+
+      destinationLockerLat: destinationLocker.lat,
+
+      destinationLockerLng: destinationLocker.lng,
+
+      // --------------------------------------------------
+      // PACKAGE
+      // --------------------------------------------------
+
+      packageType,
+
+      packageNumber: 1,
+
+      packageWeight: input.packageWeight,
+
+      width: input.width ?? null,
+
+      length: input.length ?? null,
+
+      height: input.height ?? null,
+
+      // --------------------------------------------------
+      // PDO
+      // --------------------------------------------------
+
+      pdoEnabled: true,
+
+      pdoTaxId,
+
+      // --------------------------------------------------
+      // LABEL FREE
+      // Standard flow momentan = AWB PDF printat.
+      // --------------------------------------------------
+
+      labelFree: false,
+
+      // --------------------------------------------------
+      // STATUS
+      // --------------------------------------------------
+
+      status: "pending",
+    });
+
+    // ========================================================
+    // CREATE SAMEDAY AWB
     // ========================================================
 
     try {
-      const awb =
-        await samedayService
-          .createAwb(
-            payload,
-          );
+      const awb = await samedayService.createAwb(payload);
 
-      shipment.awbNumber =
-        awb.awbNumber;
+      // ======================================================
+      // AWB DATA
+      // ======================================================
 
-      shipment.awbCost =
-        awb.awbCost;
+      shipment.awbNumber = awb.awbNumber;
 
-      shipment.pdfLink =
-        awb.pdfLink ?? null;
+      shipment.awbCost = awb.awbCost;
 
-      shipment.parcelAwbNumbers =
-        (
-          awb.parcels ?? []
-        )
-          .map(
-            (parcel) =>
-              parcel.awbNumber,
-          )
-          .filter(Boolean);
+      shipment.pdfLink = awb.pdfLink ?? null;
 
-      shipment.status =
-        "ready_for_dropoff";
+      shipment.parcelAwbNumbers = (awb.parcels ?? [])
+        .map((parcelItem) => parcelItem.awbNumber)
+        .filter(Boolean);
 
-      shipment.rawResponse =
-        awb as unknown as Record<
-          string,
-          unknown
-        >;
+      // ======================================================
+      // SHIPMENT STATUS
+      // ======================================================
 
-      shipment.errorMessage =
-        null;
+      shipment.status = "ready_for_dropoff";
+
+      shipment.rawResponse = awb as unknown as Record<string, unknown>;
+
+      shipment.errorMessage = null;
 
       await shipment.save();
 
-      // Comanda intră în procesare.
-      order.status =
-        "processing";
+      // ======================================================
+      // ORDER STATUS
+      // ======================================================
+
+      order.status = "processing";
 
       await order.save();
 
       return shipment;
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      // ======================================================
+      // FAILURE
+      // ======================================================
 
-      shipment.status =
-        "failed";
+      const message = error instanceof Error ? error.message : String(error);
 
-      shipment.errorMessage =
-        message;
+      shipment.status = "failed";
+
+      shipment.errorMessage = message;
 
       await shipment.save();
 
@@ -747,29 +616,17 @@ class SamedayShipmentService {
   // GET SHIPMENT BY ORDER
   // ==========================================================
 
-  async getShipmentByOrder(
-    orderId: string,
-  ) {
-    if (
-      !mongoose.isValidObjectId(
-        orderId,
-      )
-    ) {
-      throw new Error(
-        "SHIPMENT_NOT_FOUND",
-      );
+  async getShipmentByOrder(orderId: string) {
+    if (!mongoose.isValidObjectId(orderId)) {
+      throw new Error("SHIPMENT_NOT_FOUND");
     }
 
-    const shipment =
-      await SamedayShipmentModel
-        .findOne({
-          order: orderId,
-        });
+    const shipment = await SamedayShipmentModel.findOne({
+      order: orderId,
+    });
 
     if (!shipment) {
-      throw new Error(
-        "SHIPMENT_NOT_FOUND",
-      );
+      throw new Error("SHIPMENT_NOT_FOUND");
     }
 
     return shipment;
@@ -779,34 +636,29 @@ class SamedayShipmentService {
   // GET SELLER SHIPMENTS
   // ==========================================================
 
-  async getSellerShipments(
-    sellerId: string,
-  ) {
-    return SamedayShipmentModel
-      .find({
-        seller: sellerId,
-      })
-      .sort({
-        createdAt: -1,
-      });
+  async getSellerShipments(sellerId: string) {
+    return SamedayShipmentModel.find({
+      seller: sellerId,
+    }).sort({
+      createdAt: -1,
+    });
   }
 
   // ==========================================================
   // GET BUYER SHIPMENTS
   // ==========================================================
 
-  async getBuyerShipments(
-    buyerId: string,
-  ) {
-    return SamedayShipmentModel
-      .find({
-        buyer: buyerId,
-      })
-      .sort({
-        createdAt: -1,
-      });
+  async getBuyerShipments(buyerId: string) {
+    return SamedayShipmentModel.find({
+      buyer: buyerId,
+    }).sort({
+      createdAt: -1,
+    });
   }
 }
 
-export const samedayShipmentService =
-  new SamedayShipmentService();
+// ============================================================
+// SINGLETON
+// ============================================================
+
+export const samedayShipmentService = new SamedayShipmentService();

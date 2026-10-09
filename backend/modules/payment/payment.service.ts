@@ -2,50 +2,62 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 
 import User from "../../models/Users.js";
+
 import { ListingModel } from "../listing/listing.model.js";
+
 import Order from "../order/order.model.js";
+
 import WalletTransaction from "../wallet/wallet.model.js";
+
 import { AddressModel } from "../profile/address.model.js";
+
+import { samedayService } from "../sameday/sameday.service.js";
+
 import SavedCardModel from "./saved-card.model.js";
+
 import PaymentModel, { PaymentDocument } from "./payment.model.js";
+
 import { netopiaService } from "./netopia.service.js";
 
+// ============================================================
+// CONSTANTS
+// ============================================================
+
 const BUYER_PROTECTION_RATE = 0.05;
+
 const BUYER_PROTECTION_MIN = 2.99;
 
 const SHIPPING_COSTS = {
   courier: 14.99,
+
   pickup_point: 11.99,
 } as const;
 
+// ============================================================
+// TYPES
+// ============================================================
+
 type DeliveryMethod = "courier" | "pickup_point";
 
-type PaymentMethod =
-  | "card"
-  | "google_pay"
-  | "apple_pay";
+type PaymentMethod = "card" | "google_pay" | "apple_pay";
 
-function normalizeName(
-  value: string | undefined,
-  fallback: string,
-) {
+// ============================================================
+// HELPERS
+// ============================================================
+
+function normalizeName(value: string | undefined, fallback: string) {
   const clean = String(value ?? "").trim();
 
   return clean || fallback;
 }
 
-function splitName(
-  fullName: string,
-  username: string,
-) {
-  const parts = fullName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+function splitName(fullName: string, username: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
 
   if (parts.length === 0) {
     return {
       firstName: username || "Nexora",
+
       lastName: "User",
     };
   }
@@ -53,40 +65,69 @@ function splitName(
   if (parts.length === 1) {
     return {
       firstName: parts[0],
+
       lastName: username || "User",
     };
   }
 
   return {
     firstName: parts[0],
+
     lastName: parts.slice(1).join(" "),
   };
 }
 
+// ============================================================
+// PAYMENT SERVICE
+// ============================================================
+
 class PaymentService {
+  // ==========================================================
+  // CREATE NETOPIA PAYMENT
+  // ==========================================================
+
   async createNetopiaPayment(
     buyerId: string,
+
     listingId: string,
+
     addressId: string,
+
     deliveryMethod: DeliveryMethod,
+
     paymentMethod: PaymentMethod,
+
     savedCardId?: string,
+
+    destinationLockerId?: number,
   ) {
+    // ========================================================
+    // VALIDATE LISTING
+    // ========================================================
+
     if (!mongoose.isValidObjectId(listingId)) {
       throw new Error("INVALID_LISTING_ID");
     }
+
+    // ========================================================
+    // VALIDATE ADDRESS
+    // ========================================================
 
     if (!mongoose.isValidObjectId(addressId)) {
       throw new Error("INVALID_ADDRESS_ID");
     }
 
-    if (
-      deliveryMethod !== null &&
-      deliveryMethod !== "courier" &&
-      deliveryMethod !== "pickup_point"
-    ) {
+    // ========================================================
+    // VALIDATE DELIVERY METHOD
+    // ========================================================
+
+    if (deliveryMethod !== "courier" && deliveryMethod !== "pickup_point") {
       throw new Error("INVALID_DELIVERY_METHOD");
     }
+
+    // ========================================================
+    // VALIDATE PAYMENT METHOD
+    // ========================================================
 
     if (
       paymentMethod !== "card" &&
@@ -96,42 +137,75 @@ class PaymentService {
       throw new Error("INVALID_PAYMENT_METHOD");
     }
 
+    // ========================================================
+    // VALIDATE SAVED CARD
+    // ========================================================
+
     if (
       paymentMethod === "card" &&
-      (!savedCardId ||
-        !mongoose.isValidObjectId(savedCardId))
+      (!savedCardId || !mongoose.isValidObjectId(savedCardId))
     ) {
       throw new Error("SAVED_CARD_REQUIRED");
     }
 
-    const [buyer, listing, address] =
-      await Promise.all([
-        User.findById(buyerId).select(
-          "email fullName username phone city county postalCode country",
-        ),
+    // ========================================================
+    // LOAD BUYER + LISTING + ADDRESS
+    // ========================================================
 
-        ListingModel.findOne({
-          _id: listingId,
-          status: "active",
-        }),
+    const [buyer, listing, address] = await Promise.all([
+      User.findById(buyerId).select(
+        [
+          "email",
+          "fullName",
+          "username",
+          "phone",
+          "city",
+          "county",
+          "postalCode",
+          "country",
+        ].join(" "),
+      ),
 
-        AddressModel.findOne({
-          _id: addressId,
-          user: buyerId,
-        }),
-      ]);
+      ListingModel.findOne({
+        _id: listingId,
+
+        status: "active",
+      }),
+
+      AddressModel.findOne({
+        _id: addressId,
+
+        user: buyerId,
+      }),
+    ]);
+
+    // ========================================================
+    // BUYER
+    // ========================================================
 
     if (!buyer) {
       throw new Error("BUYER_NOT_FOUND");
     }
 
+    // ========================================================
+    // LISTING
+    // ========================================================
+
     if (!listing) {
       throw new Error("LISTING_NOT_AVAILABLE");
     }
 
+    // ========================================================
+    // ADDRESS
+    // ========================================================
+
     if (!address) {
       throw new Error("ADDRESS_NOT_FOUND");
     }
+
+    // ========================================================
+    // SELLER
+    // ========================================================
 
     const sellerId = listing.seller.toString();
 
@@ -139,47 +213,124 @@ class PaymentService {
       throw new Error("CANNOT_BUY_OWN_LISTING");
     }
 
+    // ========================================================
+    // SAMEDAY EASYBOX
+    // ========================================================
+
+    let verifiedLockerId: number | null = null;
+
+    let pickupPointId: string | null = null;
+
+    let pickupPointName: string | null = null;
+
+    let pickupPointAddress: string | null = null;
+
+    if (deliveryMethod === "pickup_point") {
+      const lockerId = Number(destinationLockerId);
+
+      if (!Number.isInteger(lockerId) || lockerId <= 0) {
+        throw new Error("EASYBOX_REQUIRED");
+      }
+
+      // ------------------------------------------------------
+      // Important:
+      // Nu avem încredere în numele/adresa primite din Flutter.
+      //
+      // Verificăm ID-ul direct la Sameday și salvăm datele
+      // returnate de Sameday.
+      // ------------------------------------------------------
+
+      const response = await samedayService.getOohLocations({
+        listingType: 0,
+
+        oohList: String(lockerId),
+
+        countryCode: "RO",
+
+        page: 1,
+
+        countPerPage: 20,
+      });
+
+      const locker = response.data.find(
+        (item) =>
+          item.oohId === lockerId &&
+          item.oohType === 0 &&
+          item.clientVisible !== 0,
+      );
+
+      if (!locker) {
+        throw new Error("EASYBOX_NOT_FOUND");
+      }
+
+      verifiedLockerId = locker.oohId;
+
+      pickupPointId = String(locker.oohId);
+
+      pickupPointName = String(locker.name ?? "").trim();
+
+      pickupPointAddress = [locker.address, locker.city, locker.county]
+        .map((value) => String(value ?? "").trim())
+        .filter((value) => value.length > 0)
+        .join(", ");
+
+      if (!pickupPointName) {
+        throw new Error("EASYBOX_INVALID_DATA");
+      }
+    }
+
+    // ========================================================
+    // PRICE
+    // ========================================================
+
     const itemPrice = Number(listing.price);
 
-    if (
-      !Number.isFinite(itemPrice) ||
-      itemPrice <= 0
-    ) {
+    if (!Number.isFinite(itemPrice) || itemPrice <= 0) {
       throw new Error("INVALID_LISTING_PRICE");
     }
 
-    const currency = String(
-      listing.currency ?? "RON",
-    ).toUpperCase();
+    const currency = String(listing.currency ?? "RON").toUpperCase();
 
     if (currency !== "RON") {
       throw new Error("UNSUPPORTED_CURRENCY");
     }
 
+    // ========================================================
+    // BUYER PROTECTION
+    // ========================================================
+
     const buyerProtectionFee = Math.max(
-      Number(
-        (itemPrice * BUYER_PROTECTION_RATE).toFixed(2),
-      ),
+      Number((itemPrice * BUYER_PROTECTION_RATE).toFixed(2)),
+
       BUYER_PROTECTION_MIN,
     );
 
-    const shippingCost =
-      SHIPPING_COSTS[deliveryMethod];
+    // ========================================================
+    // SHIPPING
+    // ========================================================
+
+    const shippingCost = SHIPPING_COSTS[deliveryMethod];
+
+    // ========================================================
+    // TOTAL
+    // ========================================================
 
     const amount = Number(
-      (
-        itemPrice +
-        buyerProtectionFee +
-        shippingCost
-      ).toFixed(2),
+      (itemPrice + buyerProtectionFee + shippingCost).toFixed(2),
     );
+
+    // ========================================================
+    // SAVED CARD
+    // ========================================================
 
     let savedCard: mongoose.Document | null = null;
 
     if (paymentMethod === "card") {
       savedCard = await SavedCardModel.findOne({
         _id: savedCardId,
+
         user: buyerId,
+
         provider: "netopia",
       });
 
@@ -188,122 +339,208 @@ class PaymentService {
       }
     }
 
-    const existingPayment =
-      await PaymentModel.findOne({
-        buyer: buyerId,
-        listing: listingId,
-        status: "pending",
-      }).sort({
-        createdAt: -1,
-      });
+    // ========================================================
+    // EXISTING PAYMENT
+    // ========================================================
+
+    /**
+     * Nu reutilizăm automat orice payment pending.
+     *
+     * Payment-ul trebuie să aibă aceeași:
+     * - adresă
+     * - metodă de livrare
+     * - Easybox
+     * - metodă de plată
+     * - card
+     *
+     * Altfel riscăm ca utilizatorul să aleagă Easybox și să
+     * primească un payment pending creat anterior pentru curier.
+     */
+
+    const existingPayment = await PaymentModel.findOne({
+      buyer: buyerId,
+
+      listing: listingId,
+
+      address: address._id,
+
+      status: "pending",
+
+      deliveryMethod,
+
+      paymentMethod,
+
+      destinationLockerId:
+        deliveryMethod === "pickup_point" ? verifiedLockerId : null,
+
+      savedCard: paymentMethod === "card" ? savedCard?._id : null,
+    }).sort({
+      createdAt: -1,
+    });
 
     if (existingPayment) {
       return await this.getCheckoutData(
         existingPayment,
+
         buyer,
+
         listing,
       );
     }
 
-    const providerOrderId =
-      `NX-${Date.now()}-${crypto
-        .randomBytes(6)
-        .toString("hex")
-        .toUpperCase()}`;
+    // ========================================================
+    // PROVIDER ORDER ID
+    // ========================================================
 
-    const payment =
-      await PaymentModel.create({
-        buyer: buyerId,
-        seller: sellerId,
-        listing: listingId,
-        address: address._id,
+    const providerOrderId = `NX-${Date.now()}-${crypto
+      .randomBytes(6)
+      .toString("hex")
+      .toUpperCase()}`;
 
-        deliveryMethod,
+    // ========================================================
+    // CREATE PAYMENT
+    // ========================================================
 
-        paymentMethod,
+    const payment = await PaymentModel.create({
+      buyer: buyerId,
 
-        savedCard:
-          paymentMethod === "card"
-            ? savedCard?._id
-            : null,
+      seller: sellerId,
 
-        itemPrice,
-        buyerProtectionFee,
-        shippingCost,
-        amount,
+      listing: listingId,
 
-        currency,
+      address: address._id,
 
-        provider: "netopia",
-        providerOrderId,
+      // ----------------------------------------------------
+      // DELIVERY
+      // ----------------------------------------------------
 
-        status: "pending",
-      });
+      deliveryMethod,
+
+      pickupPointId,
+
+      pickupPointName,
+
+      pickupPointAddress,
+
+      destinationLockerId: verifiedLockerId,
+
+      // ----------------------------------------------------
+      // PAYMENT METHOD
+      // ----------------------------------------------------
+
+      paymentMethod,
+
+      savedCard: paymentMethod === "card" ? savedCard?._id : null,
+
+      // ----------------------------------------------------
+      // PRICE
+      // ----------------------------------------------------
+
+      itemPrice,
+
+      buyerProtectionFee,
+
+      shippingCost,
+
+      amount,
+
+      currency,
+
+      // ----------------------------------------------------
+      // PROVIDER
+      // ----------------------------------------------------
+
+      provider: "netopia",
+
+      providerOrderId,
+
+      status: "pending",
+    });
+
+    // ========================================================
+    // CREATE NETOPIA CHECKOUT
+    // ========================================================
 
     try {
       return await this.getCheckoutData(
         payment,
+
         buyer,
+
         listing,
       );
     } catch (error) {
-      await PaymentModel.findByIdAndDelete(
-        payment._id,
-      );
+      await PaymentModel.findByIdAndDelete(payment._id);
 
       throw error;
     }
   }
 
+  // ==========================================================
+  // GET CHECKOUT DATA
+  // ==========================================================
+
   async getCheckoutData(
     payment: PaymentDocument,
+
     buyer?: any,
+
     listing?: any,
   ) {
-    const confirmUrl = String(
-      process.env.NETOPIA_CONFIRM_URL ?? "",
-    ).trim();
+    // ========================================================
+    // NETOPIA URLS
+    // ========================================================
 
-    const returnUrl = String(
-      process.env.NETOPIA_RETURN_URL ?? "",
-    ).trim();
+    const confirmUrl = String(process.env.NETOPIA_CONFIRM_URL ?? "").trim();
+
+    const returnUrl = String(process.env.NETOPIA_RETURN_URL ?? "").trim();
 
     if (!confirmUrl) {
-      throw new Error(
-        "Lipsește NETOPIA_CONFIRM_URL.",
-      );
+      throw new Error("Lipsește NETOPIA_CONFIRM_URL.");
     }
 
     if (!returnUrl) {
-      throw new Error(
-        "Lipsește NETOPIA_RETURN_URL.",
-      );
+      throw new Error("Lipsește NETOPIA_RETURN_URL.");
     }
+
+    // ========================================================
+    // BUYER NAME
+    // ========================================================
 
     const buyerFullName = normalizeName(
       buyer?.fullName,
+
       buyer?.username ?? "Nexora User",
     );
 
-    const { firstName, lastName } =
-      splitName(
-        buyerFullName,
-        buyer?.username ?? "User",
-      );
+    const { firstName, lastName } = splitName(
+      buyerFullName,
 
-    const details =
-      `Nexora Store - ${
-        listing?.title ?? "Produs"
-      }`;
+      buyer?.username ?? "User",
+    );
+
+    // ========================================================
+    // PAYMENT DETAILS
+    // ========================================================
+
+    const details = `Nexora Store - ${listing?.title ?? "Produs"}`;
+
+    // ========================================================
+    // TOKENIZED CARD
+    // ========================================================
 
     let tokenId: string | undefined;
+
     let panMasked: string | undefined;
 
     if (payment.paymentMethod === "card") {
-      const buyerId = buyer?._id ?? payment.buyer;
+      const paymentBuyerId = buyer?._id ?? payment.buyer;
+
       const savedCard = await SavedCardModel.findOne({
         _id: payment.savedCard,
-        user: buyerId,
+
+        user: paymentBuyerId,
+
         provider: "netopia",
       });
 
@@ -312,6 +549,7 @@ class PaymentService {
       }
 
       tokenId = savedCard.providerReference;
+
       panMasked = savedCard.panMasked;
 
       if (!tokenId || !panMasked) {
@@ -319,496 +557,506 @@ class PaymentService {
       }
     }
 
-    const checkout =
-      netopiaService.createCheckoutEnvelope({
-        orderId: payment.providerOrderId,
+    // ========================================================
+    // NETOPIA ENVELOPE
+    // ========================================================
 
-        amount: payment.amount,
+    const checkout = netopiaService.createCheckoutEnvelope({
+      orderId: payment.providerOrderId,
 
-        currency: payment.currency,
+      amount: payment.amount,
 
-        details,
+      currency: payment.currency,
 
-        customerId: String(buyer?._id ?? payment.buyer),
+      details,
 
-        tokenId,
+      customerId: String(buyer?._id ?? payment.buyer),
 
-        panMasked,
+      tokenId,
 
-        oneClick: payment.paymentMethod === "card",
+      panMasked,
 
-        confirmUrl,
+      oneClick: payment.paymentMethod === "card",
 
-        returnUrl:
-          `${returnUrl}${
-            returnUrl.includes("?")
-              ? "&"
-              : "?"
-          }paymentId=${
-            payment._id.toString()
-          }`,
+      confirmUrl,
 
-        billing: {
-          email: buyer?.email ?? "",
+      returnUrl: `${returnUrl}${
+        returnUrl.includes("?") ? "&" : "?"
+      }paymentId=${payment._id.toString()}`,
 
-          firstName,
+      billing: {
+        email: buyer?.email ?? "",
 
-          lastName,
+        firstName,
 
-          phone: buyer?.phone,
+        lastName,
 
-          city: buyer?.city,
+        phone: buyer?.phone,
 
-          county: buyer?.county,
+        city: buyer?.city,
 
-          postalCode:
-            buyer?.postalCode,
+        county: buyer?.county,
 
-          country:
-            buyer?.country ?? "RO",
-        },
-      });
+        postalCode: buyer?.postalCode,
+
+        country: buyer?.country ?? "RO",
+      },
+    });
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
 
     return {
-      paymentId:
-        payment._id.toString(),
+      paymentId: payment._id.toString(),
 
-      orderId:
-        payment.providerOrderId,
+      orderId: payment.providerOrderId,
 
-      amount:
-        payment.amount,
+      amount: payment.amount,
 
-      currency:
-        payment.currency,
+      currency: payment.currency,
 
-      itemPrice:
-        payment.itemPrice,
+      itemPrice: payment.itemPrice,
 
-      buyerProtectionFee:
-        payment.buyerProtectionFee,
+      buyerProtectionFee: payment.buyerProtectionFee,
 
-      shippingCost:
-        payment.shippingCost,
+      shippingCost: payment.shippingCost,
 
-      deliveryMethod:
-        payment.deliveryMethod,
+      // ------------------------------------------------------
+      // DELIVERY
+      // ------------------------------------------------------
 
-      paymentMethod:
-        payment.paymentMethod,
+      deliveryMethod: payment.deliveryMethod,
 
-      status:
-        payment.status,
+      destinationLockerId: payment.destinationLockerId ?? null,
+
+      pickupPointId: payment.pickupPointId ?? null,
+
+      pickupPointName: payment.pickupPointName ?? null,
+
+      pickupPointAddress: payment.pickupPointAddress ?? null,
+
+      // ------------------------------------------------------
+      // PAYMENT
+      // ------------------------------------------------------
+
+      paymentMethod: payment.paymentMethod,
+
+      status: payment.status,
 
       checkout,
     };
   }
 
+  // ==========================================================
+  // HANDLE NETOPIA NOTIFICATION
+  // ==========================================================
+
   async handleNotification(input: {
     envKey: string;
+
     data: string;
+
     cipher?: string;
+
     iv?: string;
   }) {
-    const notification =
-      netopiaService.decryptNotification(
-        input,
-      );
+    const notification = netopiaService.decryptNotification(input);
 
-    const payment =
-      await PaymentModel.findOne({
-        providerOrderId:
-          notification.orderId,
+    const payment = await PaymentModel.findOne({
+      providerOrderId: notification.orderId,
 
-        provider: "netopia",
-      });
+      provider: "netopia",
+    });
 
     if (!payment) {
-      throw new Error(
-        "PAYMENT_NOT_FOUND",
-      );
+      throw new Error("PAYMENT_NOT_FOUND");
     }
 
     return this.applyNotification(
       payment,
+
       notification,
     );
   }
 
+  // ==========================================================
+  // APPLY NETOPIA NOTIFICATION
+  // ==========================================================
+
   private async applyNotification(
     payment: PaymentDocument,
-    notification: ReturnType<
-      typeof netopiaService.decryptNotification
-    >,
+
+    notification: ReturnType<typeof netopiaService.decryptNotification>,
   ) {
-    const action =
-      (
-        notification.action ?? ""
-      ).toLowerCase();
+    const action = (notification.action ?? "").toLowerCase();
+
+    // ========================================================
+    // CONFIRMED
+    // ========================================================
 
     const isConfirmed =
       notification.errorCode === 0 &&
-      (
-        action === "confirmed" ||
-        action === "paid"
-      );
+      (action === "confirmed" || action === "paid");
+
+    // ========================================================
+    // PENDING
+    // ========================================================
 
     const isPending =
       notification.errorCode === 0 &&
-      (
-        action === "confirmed_pending" ||
-        action === "paid_pending"
-      );
+      (action === "confirmed_pending" || action === "paid_pending");
+
+    // ========================================================
+    // PAYMENT STILL PENDING
+    // ========================================================
 
     if (isPending) {
       await PaymentModel.findByIdAndUpdate(
         payment._id,
+
         {
           $set: {
-            action:
-              notification.action ?? null,
+            action: notification.action ?? null,
 
-            ntpId:
-              notification.ntpId ?? null,
+            ntpId: notification.ntpId ?? null,
 
-            processedAmount:
-              notification.processedAmount ??
-              null,
+            processedAmount: notification.processedAmount ?? null,
 
-            errorCode:
-              notification.errorCode,
+            errorCode: notification.errorCode,
 
-            errorMessage:
-              notification.errorMessage ??
-              null,
+            errorMessage: notification.errorMessage ?? null,
 
-            rawNotification:
-              notification.raw,
+            rawNotification: notification.raw,
           },
         },
       );
 
       return {
-        paymentStatus:
-          "pending" as const,
+        paymentStatus: "pending" as const,
 
-        message:
-          notification.action ??
-          "pending",
+        message: notification.action ?? "pending",
       };
     }
 
+    // ========================================================
+    // FAILED / CANCELLED
+    // ========================================================
+
     if (!isConfirmed) {
       const failedStatus =
-        action === "canceled" ||
-        action === "credit"
-          ? "cancelled"
-          : "failed";
+        action === "canceled" || action === "credit" ? "cancelled" : "failed";
 
       await PaymentModel.findByIdAndUpdate(
         payment._id,
+
         {
           $set: {
             status: failedStatus,
 
-            action:
-              notification.action ??
-              null,
+            action: notification.action ?? null,
 
-            ntpId:
-              notification.ntpId ??
-              null,
+            ntpId: notification.ntpId ?? null,
 
-            processedAmount:
-              notification.processedAmount ??
-              null,
+            processedAmount: notification.processedAmount ?? null,
 
-            errorCode:
-              notification.errorCode,
+            errorCode: notification.errorCode,
 
-            errorMessage:
-              notification.errorMessage ??
-              null,
+            errorMessage: notification.errorMessage ?? null,
 
-            rawNotification:
-              notification.raw,
+            rawNotification: notification.raw,
           },
         },
       );
 
       return {
-        paymentStatus:
-          failedStatus,
+        paymentStatus: failedStatus,
 
         message:
-          notification.errorMessage ??
-          notification.action ??
-          "Plata a eșuat.",
+          notification.errorMessage ?? notification.action ?? "Plata a eșuat.",
       };
     }
 
-    const processedAmount =
-      Number(
-        notification.processedAmount ??
-          payment.amount,
-      );
+    // ========================================================
+    // PROCESSED AMOUNT
+    // ========================================================
 
-    if (
-      !Number.isFinite(
-        processedAmount,
-      ) ||
-      processedAmount <= 0
-    ) {
-      throw new Error(
-        "INVALID_PROCESSED_AMOUNT",
-      );
+    const processedAmount = Number(
+      notification.processedAmount ?? payment.amount,
+    );
+
+    if (!Number.isFinite(processedAmount) || processedAmount <= 0) {
+      throw new Error("INVALID_PROCESSED_AMOUNT");
     }
 
-    if (
-      Math.abs(
-        processedAmount -
-          payment.amount,
-      ) > 0.009
-    ) {
+    // ========================================================
+    // AMOUNT VALIDATION
+    // ========================================================
+
+    if (Math.abs(processedAmount - payment.amount) > 0.009) {
       await PaymentModel.findByIdAndUpdate(
         payment._id,
+
         {
           $set: {
             status: "conflict",
 
-            action:
-              notification.action ??
-              null,
+            action: notification.action ?? null,
 
-            ntpId:
-              notification.ntpId ??
-              null,
+            ntpId: notification.ntpId ?? null,
 
             processedAmount,
 
-            errorCode:
-              notification.errorCode,
+            errorCode: notification.errorCode,
 
-            errorMessage:
-              "Suma confirmată diferă de suma comandată.",
+            errorMessage: "Suma confirmată diferă de suma comandată.",
 
-            rawNotification:
-              notification.raw,
+            rawNotification: notification.raw,
           },
         },
       );
 
-      throw new Error(
-        "PAYMENT_AMOUNT_MISMATCH",
-      );
+      throw new Error("PAYMENT_AMOUNT_MISMATCH");
     }
 
-    const session =
-      await mongoose.startSession();
+    // ========================================================
+    // TRANSACTION
+    // ========================================================
+
+    const session = await mongoose.startSession();
 
     try {
-      let orderId:
-        string | null = null;
+      let orderId: string | null = null;
 
-      await session.withTransaction(
-        async () => {
-          const lockedPayment =
-            await PaymentModel.findOne({
-              _id: payment._id,
-            }).session(session);
+      await session.withTransaction(async () => {
+        // ==================================================
+        // LOCK PAYMENT
+        // ==================================================
 
-          if (!lockedPayment) {
-            throw new Error(
-              "PAYMENT_NOT_FOUND",
-            );
-          }
+        const lockedPayment = await PaymentModel.findOne({
+          _id: payment._id,
+        }).session(session);
 
-          if (
-            lockedPayment.status ===
-            "paid"
-          ) {
-            orderId =
-              lockedPayment.order
-                ? lockedPayment.order.toString()
-                : null;
+        if (!lockedPayment) {
+          throw new Error("PAYMENT_NOT_FOUND");
+        }
 
-            return;
-          }
+        // ==================================================
+        // ALREADY PAID
+        // ==================================================
 
-          const listing =
-            await ListingModel.findOneAndUpdate(
-              {
-                _id:
-                  lockedPayment.listing,
+        if (lockedPayment.status === "paid") {
+          orderId = lockedPayment.order ? lockedPayment.order.toString() : null;
 
-                status: "active",
-              },
-              {
-                $set: {
-                  status: "sold",
-                },
-              },
-              {
-                new: true,
-                session,
-              },
-            );
+          return;
+        }
 
-          if (!listing) {
-            await PaymentModel.findByIdAndUpdate(
-              lockedPayment._id,
-              {
-                $set: {
-                  status: "conflict",
+        // ==================================================
+        // MARK LISTING SOLD
+        // ==================================================
 
-                  action:
-                    notification.action ??
-                    null,
+        const listing = await ListingModel.findOneAndUpdate(
+          {
+            _id: lockedPayment.listing,
 
-                  ntpId:
-                    notification.ntpId ??
-                    null,
+            status: "active",
+          },
 
-                  processedAmount,
-
-                  errorMessage:
-                    "Produsul nu mai este disponibil la confirmarea plății.",
-
-                  rawNotification:
-                    notification.raw,
-                },
-              },
-              {
-                session,
-              },
-            );
-
-            throw new Error(
-              "LISTING_ALREADY_SOLD",
-            );
-          }
-
-          if (
-            listing.seller.toString() !==
-            lockedPayment.seller.toString()
-          ) {
-            throw new Error(
-              "SELLER_MISMATCH",
-            );
-          }
-
-          const [order] =
-            await Order.create(
-              [
-                {
-                  buyer:
-                    lockedPayment.buyer,
-
-                  seller:
-                    lockedPayment.seller,
-
-                  listing:
-                    lockedPayment.listing,
-
-                  amount:
-                    lockedPayment.amount,
-
-                  currency:
-                    lockedPayment.currency,
-
-                  status: "paid",
-                },
-              ],
-              {
-                session,
-              },
-            );
-
-          await User.findByIdAndUpdate(
-            lockedPayment.seller,
-            {
-              $inc: {
-                balance:
-                  lockedPayment.amount,
-              },
+          {
+            $set: {
+              status: "sold",
             },
-            {
-              session,
-              new: true,
-            },
-          );
+          },
 
-          await WalletTransaction.create(
-            [
-              {
-                user:
-                  lockedPayment.seller,
+          {
+            new: true,
 
-                type: "sale",
-
-                amount:
-                  lockedPayment.amount,
-
-                currency:
-                  lockedPayment.currency,
-
-                status:
-                  "completed",
-
-                order:
-                  order._id,
-
-                description:
-                  `Vânzare: ${listing.title}`,
-              },
-            ],
-            {
-              session,
-            },
-          );
-
-          lockedPayment.status =
-            "paid";
-
-          lockedPayment.order =
-            order._id;
-
-          lockedPayment.ntpId =
-            notification.ntpId ??
-            null;
-
-          lockedPayment.action =
-            notification.action ??
-            null;
-
-          lockedPayment.processedAmount =
-            processedAmount;
-
-          lockedPayment.errorCode =
-            notification.errorCode;
-
-          lockedPayment.errorMessage =
-            notification.errorMessage ??
-            null;
-
-          lockedPayment.rawNotification =
-            notification.raw;
-
-          lockedPayment.paidAt =
-            new Date();
-
-          await lockedPayment.save({
             session,
-          });
+          },
+        );
 
-          orderId =
-            order._id.toString();
-        },
-      );
+        if (!listing) {
+          await PaymentModel.findByIdAndUpdate(
+            lockedPayment._id,
+
+            {
+              $set: {
+                status: "conflict",
+
+                action: notification.action ?? null,
+
+                ntpId: notification.ntpId ?? null,
+
+                processedAmount,
+
+                errorMessage:
+                  "Produsul nu mai este disponibil la confirmarea plății.",
+
+                rawNotification: notification.raw,
+              },
+            },
+
+            {
+              session,
+            },
+          );
+
+          throw new Error("LISTING_ALREADY_SOLD");
+        }
+
+        // ==================================================
+        // VERIFY SELLER
+        // ==================================================
+
+        if (listing.seller.toString() !== lockedPayment.seller.toString()) {
+          throw new Error("SELLER_MISMATCH");
+        }
+
+        // ==================================================
+        // CREATE ORDER
+        // ==================================================
+
+        const order = new Order({
+          // ========================================================
+          // USERS
+          // ========================================================
+
+          buyer: lockedPayment.buyer,
+
+          seller: lockedPayment.seller,
+
+          // ========================================================
+          // LISTING
+          // ========================================================
+
+          listing: lockedPayment.listing,
+
+          // ========================================================
+          // DELIVERY
+          // ========================================================
+
+          address: lockedPayment.address ?? null,
+
+          deliveryMethod: lockedPayment.deliveryMethod,
+
+          destinationLockerId:
+            lockedPayment.deliveryMethod === "pickup_point"
+              ? (lockedPayment.destinationLockerId ?? null)
+              : null,
+
+          pickupPointId:
+            lockedPayment.deliveryMethod === "pickup_point"
+              ? (lockedPayment.pickupPointId ?? null)
+              : null,
+
+          pickupPointName:
+            lockedPayment.deliveryMethod === "pickup_point"
+              ? (lockedPayment.pickupPointName ?? null)
+              : null,
+
+          pickupPointAddress:
+            lockedPayment.deliveryMethod === "pickup_point"
+              ? (lockedPayment.pickupPointAddress ?? null)
+              : null,
+
+          // ========================================================
+          // PRICE
+          // ========================================================
+
+          amount: lockedPayment.amount,
+
+          currency: lockedPayment.currency,
+
+          // ========================================================
+          // STATUS
+          // ========================================================
+
+          status: "paid",
+        });
+
+        await order.save({
+          session,
+        });
+
+        // ==================================================
+        // SELLER BALANCE
+        // ==================================================
+
+        await User.findByIdAndUpdate(
+          lockedPayment.seller,
+
+          {
+            $inc: {
+              balance: lockedPayment.amount,
+            },
+          },
+
+          {
+            session,
+
+            new: true,
+          },
+        );
+
+        // ==================================================
+        // WALLET TRANSACTION
+        // ==================================================
+
+        await WalletTransaction.create(
+          [
+            {
+              user: lockedPayment.seller,
+
+              type: "sale",
+
+              amount: lockedPayment.amount,
+
+              currency: lockedPayment.currency,
+
+              status: "completed",
+
+              order: order._id,
+
+              description: `Vânzare: ${listing.title}`,
+            },
+          ],
+
+          {
+            session,
+          },
+        );
+
+        // ==================================================
+        // PAYMENT PAID
+        // ==================================================
+
+        lockedPayment.status = "paid";
+
+        lockedPayment.order = order._id;
+
+        lockedPayment.ntpId = notification.ntpId ?? null;
+
+        lockedPayment.action = notification.action ?? null;
+
+        lockedPayment.processedAmount = processedAmount;
+
+        lockedPayment.errorCode = notification.errorCode;
+
+        lockedPayment.errorMessage = notification.errorMessage ?? null;
+
+        lockedPayment.rawNotification = notification.raw;
+
+        lockedPayment.paidAt = new Date();
+
+        await lockedPayment.save({
+          session,
+        });
+
+        orderId = order._id.toString();
+      });
 
       return {
-        paymentStatus:
-          "paid" as const,
+        paymentStatus: "paid" as const,
 
         orderId,
       };
@@ -817,80 +1065,96 @@ class PaymentService {
     }
   }
 
+  // ==========================================================
+  // GET PAYMENT
+  // ==========================================================
+
   async getPayment(
     userId: string,
+
     paymentId: string,
   ) {
-    if (
-      !mongoose.isValidObjectId(
-        paymentId,
-      )
-    ) {
-      throw new Error(
-        "PAYMENT_NOT_FOUND",
-      );
+    if (!mongoose.isValidObjectId(paymentId)) {
+      throw new Error("PAYMENT_NOT_FOUND");
     }
 
-    const payment =
-      await PaymentModel.findOne({
-        _id: paymentId,
-        buyer: userId,
-      })
-        .populate(
-          "listing",
-          "title price currency status images",
-        )
-        .populate(
-          "order",
-          "amount currency status listing",
-        )
-        .populate(
-          "address",
-          "county city street number building staircase floor apartment postalCode",
-        )
-        .populate(
-          "savedCard",
-          "provider brand last4 expMonth expYear isDefault",
-        );
+    const payment = await PaymentModel.findOne({
+      _id: paymentId,
+
+      buyer: userId,
+    })
+      .populate(
+        "listing",
+
+        ["title", "price", "currency", "status", "images"].join(" "),
+      )
+      .populate(
+        "order",
+
+        ["amount", "currency", "status", "listing"].join(" "),
+      )
+      .populate(
+        "address",
+
+        [
+          "county",
+          "city",
+          "street",
+          "number",
+          "building",
+          "staircase",
+          "floor",
+          "apartment",
+          "postalCode",
+        ].join(" "),
+      )
+      .populate(
+        "savedCard",
+
+        ["provider", "brand", "last4", "expMonth", "expYear", "isDefault"].join(
+          " ",
+        ),
+      );
 
     if (!payment) {
-      throw new Error(
-        "PAYMENT_NOT_FOUND",
-      );
+      throw new Error("PAYMENT_NOT_FOUND");
     }
 
     return payment;
   }
 
-  async getPublicPayment(
-    paymentId: string,
-  ) {
-    if (
-      !mongoose.isValidObjectId(
-        paymentId,
-      )
-    ) {
-      throw new Error(
-        "PAYMENT_NOT_FOUND",
-      );
+  // ==========================================================
+  // GET PUBLIC PAYMENT
+  // ==========================================================
+
+  async getPublicPayment(paymentId: string) {
+    if (!mongoose.isValidObjectId(paymentId)) {
+      throw new Error("PAYMENT_NOT_FOUND");
     }
 
-    const payment =
-      await PaymentModel.findById(
-        paymentId,
-      ).select(
-        "status amount currency providerOrderId paidAt errorCode errorMessage action",
-      );
+    const payment = await PaymentModel.findById(paymentId).select(
+      [
+        "status",
+        "amount",
+        "currency",
+        "providerOrderId",
+        "paidAt",
+        "errorCode",
+        "errorMessage",
+        "action",
+      ].join(" "),
+    );
 
     if (!payment) {
-      throw new Error(
-        "PAYMENT_NOT_FOUND",
-      );
+      throw new Error("PAYMENT_NOT_FOUND");
     }
 
     return payment;
   }
 }
 
-export const paymentService =
-  new PaymentService();
+// ============================================================
+// SINGLETON
+// ============================================================
+
+export const paymentService = new PaymentService();

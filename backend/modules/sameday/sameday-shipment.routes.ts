@@ -1,6 +1,8 @@
 // backend/modules/sameday/sameday-shipment.routes.ts
 
-import { Router } from "express";
+import {
+  Router,
+} from "express";
 
 import auth from "../../middleware/auth.js";
 
@@ -8,36 +10,51 @@ import {
   samedayShipmentController,
 } from "./sameday-shipment.controller.ts.js";
 
-const router = Router();
+const router =
+  Router();
 
 // ============================================================
-// CREATE SHIPMENT
+// CREATE SAMEDAY EASYBOX SHIPMENT
 // ============================================================
 
 /**
- * Creează transportul Sameday pentru o comandă.
+ * Generează AWB-ul Sameday pentru o comandă Easybox.
  *
- * Cumpărătorul trebuie:
- * - să fie autentificat
- * - să fie proprietarul comenzii
- * - să fi ales Easybox-ul
- * - comanda să fie plătită
+ * IMPORTANT:
  *
- * POST /sameday/shipments/orders/:orderId
+ * - Easybox-ul a fost deja ales de cumpărător la checkout.
+ * - destinationLockerId este salvat în Order.
+ * - destinationLockerId NU se mai trimite în acest request.
+ * - Numai vânzătorul comenzii poate genera AWB-ul.
+ *
+ * POST
+ * /sameday/shipments/orders/:orderId
  *
  * Body:
+ *
  * {
- *   "destinationLockerId": 12345,
  *   "packageType": 0,
- *   "packageWeight": 1,
- *   "width": 20,
- *   "length": 30,
- *   "height": 10
+ *   "packageWeight": 1.2,
+ *   "width": 25,
+ *   "length": 35,
+ *   "height": 15
  * }
+ *
+ * packageType:
+ *
+ * 0 = colet standard
+ * 1 = colet mic
+ * 2 = colet oversized
+ *
+ * width / length / height sunt opționale.
+ *
+ * packageWeight este obligatoriu.
  */
 router.post(
   "/orders/:orderId",
+
   auth,
+
   samedayShipmentController
     .createLockerShipment,
 );
@@ -47,22 +64,39 @@ router.post(
 // ============================================================
 
 /**
- * Expedierile pentru produsele vândute de utilizator.
+ * Returnează transporturile pentru produsele
+ * vândute de utilizatorul autentificat.
  *
- * Aici vânzătorul va vedea:
- * - AWB
+ * GET
+ * /sameday/shipments/selling
+ *
+ * Folosit în aplicația vânzătorului pentru:
+ *
+ * - AWB number
  * - PDF AWB
  * - Easybox destinație
- * - status
+ * - status transport
+ * - greutate / dimensiuni
  *
- * Mai târziu:
- * - QR / PIN label-free dacă Sameday îl activează
+ * Flow standard actual:
  *
- * GET /sameday/shipments/selling
+ * seller
+ *   ↓
+ * generează AWB
+ *   ↓
+ * descarcă PDF
+ *   ↓
+ * printează eticheta
+ *   ↓
+ * lipește eticheta pe colet
+ *   ↓
+ * depune coletul în Easybox
  */
 router.get(
   "/selling",
+
   auth,
+
   samedayShipmentController
     .getMySellingShipments,
 );
@@ -72,13 +106,23 @@ router.get(
 // ============================================================
 
 /**
- * Livrările cumpărătorului.
+ * Returnează transporturile cumpărătorului.
  *
- * GET /sameday/shipments/buying
+ * GET
+ * /sameday/shipments/buying
+ *
+ * Folosit pentru:
+ *
+ * - Easybox destinație
+ * - AWB
+ * - status colet
+ * - tracking
  */
 router.get(
   "/buying",
+
   auth,
+
   samedayShipmentController
     .getMyBuyingShipments,
 );
@@ -88,19 +132,27 @@ router.get(
 // ============================================================
 
 /**
- * Transportul asociat unei anumite comenzi.
+ * Returnează transportul unei comenzi.
  *
  * Acces:
- * - cumpărător
- * - vânzător
  *
- * GET /sameday/shipments/orders/:orderId
+ * - cumpărătorul comenzii
+ * - vânzătorul comenzii
+ *
+ * GET
+ * /sameday/shipments/orders/:orderId
  */
 router.get(
   "/orders/:orderId",
+
   auth,
+
   samedayShipmentController
     .getShipmentByOrder,
 );
+
+// ============================================================
+// EXPORT
+// ============================================================
 
 export default router;

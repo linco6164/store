@@ -7,14 +7,9 @@ export type PaymentStatus =
   | "cancelled"
   | "conflict";
 
-export type PaymentDeliveryMethod =
-  | "courier"
-  | "pickup_point";
+export type PaymentDeliveryMethod = "courier" | "pickup_point";
 
-export type PaymentMethod =
-  | "card"
-  | "google_pay"
-  | "apple_pay";
+export type PaymentMethod = "card" | "google_pay" | "apple_pay";
 
 export interface PaymentDocument extends Document {
   buyer: mongoose.Types.ObjectId;
@@ -33,6 +28,8 @@ export interface PaymentDocument extends Document {
   pickupPointId?: string | null;
   pickupPointName?: string | null;
   pickupPointAddress?: string | null;
+
+  destinationLockerId?: number | null;
 
   paymentMethod: PaymentMethod;
 
@@ -142,6 +139,13 @@ const paymentSchema = new Schema<PaymentDocument>(
       default: null,
     },
 
+    destinationLockerId: {
+      type: Number,
+      default: null,
+      min: 1,
+      index: true,
+    },
+
     paymentMethod: {
       type: String,
       enum: ["card", "google_pay", "apple_pay"],
@@ -216,13 +220,7 @@ const paymentSchema = new Schema<PaymentDocument>(
 
     status: {
       type: String,
-      enum: [
-        "pending",
-        "paid",
-        "failed",
-        "cancelled",
-        "conflict",
-      ],
+      enum: ["pending", "paid", "failed", "cancelled", "conflict"],
       default: "pending",
       required: true,
       index: true,
