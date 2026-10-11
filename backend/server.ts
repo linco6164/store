@@ -42,6 +42,10 @@ import {
 import samedayRoutes from "./modules/sameday/sameday.routes.js";
 import samedayShipmentRoutes from "./modules/sameday/sameday-shipment.routes.js";
 
+import {
+  startSamedayStatusSync,
+} from "./jobs/samedayStatusSync.js";
+
 import mongoose from "mongoose";
 
 import { setSocketIO } from "./sockets/socket.io.js";
@@ -133,6 +137,8 @@ async function start() {
   startPromotionScheduler();
 
   startScheduledPromotions();
+
+  startSamedayStatusSync();
 
   const PORT = Number(process.env.PORT) || 5000;
 
