@@ -652,6 +652,14 @@ class SamedayShipmentService {
     }
 
     // ========================================================
+    // CONVERT ISO DATE -> UNIX EPOCH SECONDS
+    // ========================================================
+
+    const startEpoch = Math.floor(startDate.getTime() / 1000);
+
+    const endEpoch = Math.floor(endDate.getTime() / 1000);
+
+    // ========================================================
     // PAGINATION
     // ========================================================
 
@@ -665,9 +673,9 @@ class SamedayShipmentService {
 
     do {
       const response = await samedayService.getStatusSync({
-        startTimestamp: start,
+        startTimestamp: String(startEpoch),
 
-        endTimestamp: end,
+        endTimestamp: String(endEpoch),
 
         page,
 
@@ -842,6 +850,10 @@ class SamedayShipmentService {
       startTimestamp: start,
 
       endTimestamp: end,
+
+      startEpoch,
+
+      endEpoch,
 
       pages: totalPages,
 
