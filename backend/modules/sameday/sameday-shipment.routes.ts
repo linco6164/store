@@ -1,17 +1,14 @@
 // backend/modules/sameday/sameday-shipment.routes.ts
 
-import {
-  Router,
-} from "express";
+import { Router } from "express";
 
 import auth from "../../middleware/auth.js";
 
-import {
-  samedayShipmentController,
-} from "./sameday-shipment.controller.ts.js";
+import { samedayShipmentController } from "./sameday-shipment.controller.js";
 
-const router =
-  Router();
+import staffAccess from "../../middleware/staffAccess.js";
+
+const router = Router();
 
 // ============================================================
 // CREATE SAMEDAY EASYBOX SHIPMENT
@@ -55,8 +52,7 @@ router.post(
 
   auth,
 
-  samedayShipmentController
-    .createLockerShipment,
+  samedayShipmentController.createLockerShipment,
 );
 
 // ============================================================
@@ -97,8 +93,7 @@ router.get(
 
   auth,
 
-  samedayShipmentController
-    .getMySellingShipments,
+  samedayShipmentController.getMySellingShipments,
 );
 
 // ============================================================
@@ -123,8 +118,7 @@ router.get(
 
   auth,
 
-  samedayShipmentController
-    .getMyBuyingShipments,
+  samedayShipmentController.getMyBuyingShipments,
 );
 
 // ============================================================
@@ -147,8 +141,38 @@ router.get(
 
   auth,
 
-  samedayShipmentController
-    .getShipmentByOrder,
+  samedayShipmentController.getShipmentByOrder,
+);
+
+// ============================================================
+// INTERNAL STATUS SYNC
+// ============================================================
+
+/**
+ * Sincronizează manual statusurile Sameday.
+ *
+ * GET
+ * /sameday/shipments/internal/sync-statuses
+ *
+ * Query:
+ *
+ * startTimestamp
+ * endTimestamp
+ *
+ * Interval maxim:
+ * 2 ore
+ *
+ * Acces:
+ * admin / staff
+ */
+router.get(
+  "/internal/sync-statuses",
+
+  auth,
+
+  staffAccess,
+
+  samedayShipmentController.syncStatuses,
 );
 
 // ============================================================

@@ -613,6 +613,245 @@ class SamedayShipmentService {
   }
 
   // ==========================================================
+  // SYNC SAMEDAY STATUSES
+  // ==========================================================
+
+  async syncStatuses(startTimestamp: string, endTimestamp: string) {
+    const start = String(startTimestamp ?? "").trim();
+
+    const end = String(endTimestamp ?? "").trim();
+
+    // ========================================================
+    // VALIDATE DATES
+    // ========================================================
+
+    if (!start || !end) {
+      throw new Error("SAMEDAY_STATUS_SYNC_DATES_REQUIRED");
+    }
+
+    const startDate = new Date(start);
+
+    const endDate = new Date(end);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      throw new Error("SAMEDAY_STATUS_SYNC_INVALID_DATES");
+    }
+
+    if (endDate.getTime() <= startDate.getTime()) {
+      throw new Error("SAMEDAY_STATUS_SYNC_INVALID_RANGE");
+    }
+
+    // ========================================================
+    // SAMEDAY MAXIMUM INTERVAL = 2 HOURS
+    // ========================================================
+
+    const maxIntervalMs = 2 * 60 * 60 * 1000;
+
+    if (endDate.getTime() - startDate.getTime() > maxIntervalMs) {
+      throw new Error("SAMEDAY_STATUS_SYNC_RANGE_TOO_LARGE");
+    }
+
+    // ========================================================
+    // PAGINATION
+    // ========================================================
+
+    let page = 1;
+
+    let totalPages = 1;
+
+    let receivedEvents = 0;
+
+    const touchedShipmentIds = new Set<string>();
+
+    do {
+      const response = await samedayService.getStatusSync({
+        startTimestamp: start,
+
+        endTimestamp: end,
+
+        page,
+
+        countPerPage: 500,
+      });
+
+      totalPages = Number(response.pages ?? 1) || 1;
+
+      const events = Array.isArray(response.data) ? response.data : [];
+
+      receivedEvents += events.length;
+
+      // ======================================================
+      // PROCESS EVENTS
+      // ======================================================
+
+      for (const event of events) {
+        const awbNumber = String(event.awbNumber ?? "").trim();
+
+        if (!awbNumber) {
+          continue;
+        }
+
+        // ====================================================
+        // FIND LOCAL SHIPMENT
+        // ====================================================
+
+        const shipment = await SamedayShipmentModel.findOne({
+          awbNumber,
+        });
+
+        if (!shipment) {
+          continue;
+        }
+
+        // ====================================================
+        // STATUS
+        // ====================================================
+
+        const status =
+          event.status === undefined || event.status === null
+            ? null
+            : String(event.status).trim() || null;
+
+        // ====================================================
+        // STATUS ID
+        // ====================================================
+
+        let validStatusId: number | null = null;
+
+        if (event.statusId !== undefined && event.statusId !== null) {
+          const parsedStatusId = Number(event.statusId);
+
+          if (Number.isFinite(parsedStatusId)) {
+            validStatusId = parsedStatusId;
+          }
+        }
+
+        // ====================================================
+        // STATUS DATE
+        // ====================================================
+
+        const rawStatusDate = String(event.statusDate ?? "").trim();
+
+        let statusDate: Date | null = null;
+
+        if (rawStatusDate) {
+          const parsedDate = new Date(rawStatusDate);
+
+          if (!Number.isNaN(parsedDate.getTime())) {
+            statusDate = parsedDate;
+          }
+        }
+
+        // ====================================================
+        // INITIALIZE TRACKING EVENTS
+        // ====================================================
+
+        if (!shipment.trackingEvents) {
+          shipment.trackingEvents = [];
+        }
+
+        // ====================================================
+        // CHECK DUPLICATE
+        // ====================================================
+
+        const alreadyExists = shipment.trackingEvents.some((existing) => {
+          const existingStatus = existing.status ?? null;
+
+          const existingStatusId = existing.statusId ?? null;
+
+          const existingDate = existing.statusDate?.getTime() ?? null;
+
+          const incomingDate = statusDate?.getTime() ?? null;
+
+          return (
+            existingStatus === status &&
+            existingStatusId === validStatusId &&
+            existingDate === incomingDate
+          );
+        });
+
+        // ====================================================
+        // ADD TRACKING EVENT
+        // ====================================================
+
+        if (!alreadyExists) {
+          shipment.trackingEvents.push({
+            status,
+            statusId: validStatusId,
+            statusDate,
+          });
+        }
+
+        // ====================================================
+        // UPDATE CURRENT SAMEDAY STATUS
+        // ====================================================
+
+        const currentStatusDate = shipment.samedayStatusDate?.getTime() ?? null;
+
+        const incomingStatusDate = statusDate?.getTime() ?? null;
+
+        let shouldUpdateCurrent = false;
+
+        if (incomingStatusDate !== null) {
+          shouldUpdateCurrent =
+            currentStatusDate === null ||
+            incomingStatusDate >= currentStatusDate;
+        } else if (shipment.samedayStatus == null) {
+          shouldUpdateCurrent = true;
+        }
+
+        if (shouldUpdateCurrent) {
+          shipment.samedayStatus = status;
+
+          shipment.samedayStatusId = validStatusId;
+
+          shipment.samedayStatusDate = statusDate;
+        }
+
+        // ====================================================
+        // SORT TRACKING EVENTS
+        // ====================================================
+
+        shipment.trackingEvents.sort((a, b) => {
+          const aDate = a.statusDate?.getTime() ?? 0;
+
+          const bDate = b.statusDate?.getTime() ?? 0;
+
+          return aDate - bDate;
+        });
+
+        // ====================================================
+        // SAVE
+        // ====================================================
+
+        await shipment.save();
+
+        touchedShipmentIds.add(shipment._id.toString());
+      }
+
+      page++;
+    } while (page <= totalPages);
+
+    // ========================================================
+    // RESULT
+    // ========================================================
+
+    return {
+      success: true,
+
+      startTimestamp: start,
+
+      endTimestamp: end,
+
+      pages: totalPages,
+
+      receivedEvents,
+
+      updatedShipments: touchedShipmentIds.size,
+    };
+  }
+
+  // ==========================================================
   // GET SHIPMENT BY ORDER
   // ==========================================================
 
