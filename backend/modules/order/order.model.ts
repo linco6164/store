@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 // ============================================================
 // ORDER SCHEMA
@@ -173,6 +173,8 @@ const OrderSchema = new mongoose.Schema(
         "processing",
         "shipped",
         "delivered",
+        "issue_reported",
+        "refund_pending",
         "completed",
         "cancelled",
         "refunded",
@@ -213,6 +215,85 @@ const OrderSchema = new mongoose.Schema(
       enum: ["buyer_confirmed", "auto_completed"],
 
       default: null,
+    },
+
+    // ======================================================
+    // BUYER ISSUE / DISPUTE
+    // ======================================================
+
+    issueReportedAt: {
+      type: Date,
+      default: null,
+    },
+
+    issueReason: {
+      type: String,
+
+      enum: [
+        "item_not_as_described",
+        "damaged",
+        "wrong_item",
+        "missing_item",
+        "counterfeit",
+        "other",
+      ],
+
+      default: null,
+    },
+
+    issueDetails: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 2000,
+    },
+
+    issueStatus: {
+      type: String,
+
+      enum: ["open", "resolved", "rejected"],
+
+      default: null,
+    },
+
+    issueResolvedAt: {
+      type: Date,
+      default: null,
+    },
+
+    issueResolution: {
+      type: String,
+      enum: ["buyer_refund", "seller_release"],
+      default: null,
+    },
+
+    issueResolutionNote: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 2000,
+    },
+
+    issueResolvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Store",
+      default: null,
+    },
+
+    refundRequestedAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundCompletedAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundAmount: {
+      type: Number,
+      default: null,
+      min: 0,
     },
   },
 

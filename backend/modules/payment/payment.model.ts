@@ -5,6 +5,7 @@ export type PaymentStatus =
   | "paid"
   | "failed"
   | "cancelled"
+  | "refunded"
   | "conflict";
 
 export type PaymentDeliveryMethod = "courier" | "pickup_point";
@@ -220,7 +221,7 @@ const paymentSchema = new Schema<PaymentDocument>(
 
     status: {
       type: String,
-      enum: ["pending", "paid", "failed", "cancelled", "conflict"],
+      enum: ["pending", "paid", "failed", "cancelled", "refunded", "conflict"],
       default: "pending",
       required: true,
       index: true,

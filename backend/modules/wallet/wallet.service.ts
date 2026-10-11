@@ -7,14 +7,17 @@ import { ListingModel } from "../listing/listing.model.js";
 
 class WalletService {
   async getWallet(userId: string) {
-    const user = await User.findById(userId).select("balance");
+    const user = await User.findById(userId).select("balance pendingBalance");
 
     if (!user) {
       throw new Error("USER_NOT_FOUND");
     }
 
     return {
-      balance: user.balance ?? 0,
+      balance: Number(user.balance ?? 0),
+
+      pendingBalance: Number(user.pendingBalance ?? 0),
+
       currency: "RON",
     };
   }

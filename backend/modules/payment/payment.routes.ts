@@ -2,8 +2,41 @@ import { Router } from "express";
 
 import auth from "../../middleware/auth.js";
 import { paymentController } from "./payment.controller.js";
+import { googlePayController } from "./google-pay.controller.js";
 
 const router = Router();
+
+router.get(
+  "/google-pay/config",
+  auth,
+  googlePayController.configuration,
+);
+
+router.post(
+  "/google-pay/complete",
+  auth,
+  googlePayController.complete,
+);
+
+router.get(
+  "/google-pay/action/:id",
+  googlePayController.action,
+);
+
+router.get(
+  "/google-pay/3ds-return/:id",
+  googlePayController.threeDsReturn,
+);
+
+router.post(
+  "/google-pay/3ds-return/:id",
+  googlePayController.threeDsReturn,
+);
+
+router.post(
+  "/google-pay/notify",
+  googlePayController.notify,
+);
 
 /**
  * Creează o plată NETOPIA pentru checkout.

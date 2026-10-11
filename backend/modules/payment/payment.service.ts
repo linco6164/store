@@ -19,6 +19,10 @@ import PaymentModel, { PaymentDocument } from "./payment.model.js";
 
 import { netopiaService } from "./netopia.service.js";
 
+import { googlePayService } from "./google-pay.service.js";
+
+import { notificationService } from "../notification/notification.service.js";
+
 // ============================================================
 // CONSTANTS
 // ============================================================
@@ -379,6 +383,10 @@ class PaymentService {
     });
 
     if (existingPayment) {
+      if (paymentMethod === "google_pay") {
+        return this.getPaymentSummary(existingPayment);
+      }
+
       return await this.getCheckoutData(
         existingPayment,
 
@@ -462,6 +470,10 @@ class PaymentService {
     // ========================================================
 
     try {
+      if (paymentMethod === "google_pay") {
+        return this.getPaymentSummary(payment);
+      }
+
       return await this.getCheckoutData(
         payment,
 
@@ -474,6 +486,25 @@ class PaymentService {
 
       throw error;
     }
+  }
+
+  private getPaymentSummary(payment: PaymentDocument) {
+    return {
+      paymentId: payment._id.toString(),
+      orderId: payment.providerOrderId,
+      amount: payment.amount,
+      currency: payment.currency,
+      itemPrice: payment.itemPrice,
+      buyerProtectionFee: payment.buyerProtectionFee,
+      shippingCost: payment.shippingCost,
+      deliveryMethod: payment.deliveryMethod,
+      destinationLockerId: payment.destinationLockerId ?? null,
+      pickupPointId: payment.pickupPointId ?? null,
+      pickupPointName: payment.pickupPointName ?? null,
+      pickupPointAddress: payment.pickupPointAddress ?? null,
+      paymentMethod: payment.paymentMethod,
+      status: payment.status,
+    };
   }
 
   // ==========================================================
@@ -649,6 +680,393 @@ class PaymentService {
   }
 
   // ==========================================================
+  // GOOGLE PAY
+  // ==========================================================
+
+  getGooglePayConfiguration() {
+    return googlePayService.getConfiguration();
+  }
+
+  async processGooglePay(input: {
+    buyerId: string;
+    listingId: string;
+    addressId: string;
+    deliveryMethod: DeliveryMethod;
+    destinationLockerId?: number;
+    expectedAmount: number;
+    paymentData: unknown;
+    apiBaseUrl: string;
+    userAgent?: string;
+    ipAddress?: string;
+  }) {
+    const gatewayToken = googlePayService.extractGatewayToken(
+      input.paymentData,
+    );
+    const paymentSummary = await this.createNetopiaPayment(
+      input.buyerId,
+      input.listingId,
+      input.addressId,
+      input.deliveryMethod,
+      "google_pay",
+      undefined,
+      input.destinationLockerId,
+    );
+    const paymentId = String(paymentSummary.paymentId ?? "");
+    const payment = await PaymentModel.findOne({
+      _id: paymentId,
+      buyer: input.buyerId,
+      paymentMethod: "google_pay",
+    });
+
+    if (!payment) {
+      throw new Error("PAYMENT_NOT_FOUND");
+    }
+
+    if (payment.status === "paid") {
+      return {
+        paymentId: payment._id.toString(),
+        status: "paid" as const,
+        orderId: payment.order?.toString() ?? null,
+      };
+    }
+
+    if (Math.abs(Number(input.expectedAmount) - payment.amount) > 0.009) {
+      throw new Error("CHECKOUT_TOTAL_CHANGED");
+    }
+
+    if (payment.action === "google_pay_3ds_required") {
+      const state = googlePayService.createActionState(
+        payment._id.toString(),
+        payment.providerOrderId,
+      );
+
+      return {
+        paymentId: payment._id.toString(),
+        status: "requires_action" as const,
+        actionUrl:
+          `${input.apiBaseUrl}/payments/google-pay/action/` +
+          `${encodeURIComponent(payment._id.toString())}?state=${state}`,
+      };
+    }
+
+    const [buyer, listing, address] = await Promise.all([
+      User.findById(input.buyerId).select(
+        ["email", "fullName", "username", "phone"].join(" "),
+      ),
+      ListingModel.findById(payment.listing).select(
+        ["title", "category", "price", "currency"].join(" "),
+      ),
+      AddressModel.findOne({
+        _id: payment.address,
+        user: input.buyerId,
+      }),
+    ]);
+
+    if (!buyer) {
+      throw new Error("BUYER_NOT_FOUND");
+    }
+
+    if (!listing) {
+      throw new Error("LISTING_NOT_AVAILABLE");
+    }
+
+    if (!address) {
+      throw new Error("ADDRESS_NOT_FOUND");
+    }
+
+    const buyerFullName = normalizeName(
+      buyer.fullName,
+      buyer.username ?? "Nexora User",
+    );
+    const { firstName, lastName } = splitName(
+      buyerFullName,
+      buyer.username ?? "User",
+    );
+    const state = googlePayService.createActionState(
+      payment._id.toString(),
+      payment.providerOrderId,
+    );
+    const addressDetails = [
+      `${address.street} ${address.number}`.trim(),
+      address.building ? `bl. ${address.building}` : "",
+      address.staircase ? `sc. ${address.staircase}` : "",
+      address.floor ? `et. ${address.floor}` : "",
+      address.apartment ? `ap. ${address.apartment}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const providerResponse = await googlePayService.startPayment({
+      paymentId: payment._id.toString(),
+      providerOrderId: payment.providerOrderId,
+      amount: payment.amount,
+      currency: payment.currency,
+      gatewayToken,
+      notifyUrl: `${input.apiBaseUrl}/payments/google-pay/notify`,
+      redirectUrl:
+        `${input.apiBaseUrl}/payments/google-pay/3ds-return/` +
+        `${encodeURIComponent(payment._id.toString())}?state=${state}`,
+      buyer: {
+        id: buyer._id.toString(),
+        email: String(buyer.email ?? ""),
+        firstName,
+        lastName,
+        phone: String(buyer.phone ?? ""),
+      },
+      address: {
+        city: address.city,
+        county: address.county,
+        postalCode: address.postalCode,
+        details: addressDetails,
+      },
+      product: {
+        name: listing.title,
+        code: listing._id.toString(),
+        category: listing.category,
+        price: Number(listing.price),
+      },
+      userAgent: input.userAgent,
+      ipAddress: input.ipAddress,
+    });
+
+    return this.applyGooglePayProviderResponse(
+      payment,
+      providerResponse,
+      input.apiBaseUrl,
+    );
+  }
+
+  async getGooglePayAction(paymentId: string, state: string) {
+    if (!mongoose.isValidObjectId(paymentId)) {
+      throw new Error("PAYMENT_NOT_FOUND");
+    }
+
+    const payment = await PaymentModel.findOne({
+      _id: paymentId,
+      paymentMethod: "google_pay",
+    });
+
+    if (!payment) {
+      throw new Error("PAYMENT_NOT_FOUND");
+    }
+
+    if (
+      !googlePayService.verifyActionState(
+        payment._id.toString(),
+        payment.providerOrderId,
+        state,
+      )
+    ) {
+      throw new Error("GOOGLE_PAY_ACTION_INVALID");
+    }
+
+    if (
+      payment.status !== "pending" ||
+      payment.action !== "google_pay_3ds_required"
+    ) {
+      throw new Error("GOOGLE_PAY_ACTION_FINISHED");
+    }
+
+    const raw = payment.rawNotification as Record<string, any> | null;
+    const payload = raw?.googlePayResponse;
+    const customerAction = payload?.customerAction;
+    const actionUrl = String(customerAction?.url ?? "").trim();
+    const formData = customerAction?.formData;
+
+    if (!actionUrl || !formData || typeof formData !== "object") {
+      throw new Error("GOOGLE_PAY_ACTION_INVALID");
+    }
+
+    const parsedActionUrl = new URL(actionUrl);
+    const actionHostname = parsedActionUrl.hostname.toLowerCase();
+    const allowedHost =
+      parsedActionUrl.protocol === "https:" &&
+      (actionHostname === "netopia-payments.com" ||
+        actionHostname.endsWith(".netopia-payments.com") ||
+        actionHostname === "mobilpay.ro" ||
+        actionHostname.endsWith(".mobilpay.ro"));
+
+    if (!allowedHost) {
+      throw new Error("GOOGLE_PAY_ACTION_INVALID");
+    }
+
+    return {
+      actionUrl: parsedActionUrl.toString(),
+      formData: Object.fromEntries(
+        Object.entries(formData)
+          .filter(([, value]) =>
+            ["string", "number", "boolean"].includes(typeof value),
+          )
+          .map(([key, value]) => [key, String(value)]),
+      ),
+    };
+  }
+
+  async completeGooglePay3ds(input: {
+    paymentId: string;
+    state: string;
+    paRes: string;
+    apiBaseUrl: string;
+  }) {
+    if (!mongoose.isValidObjectId(input.paymentId)) {
+      throw new Error("PAYMENT_NOT_FOUND");
+    }
+
+    const payment = await PaymentModel.findOne({
+      _id: input.paymentId,
+      paymentMethod: "google_pay",
+    });
+
+    if (!payment) {
+      throw new Error("PAYMENT_NOT_FOUND");
+    }
+
+    if (
+      !googlePayService.verifyActionState(
+        payment._id.toString(),
+        payment.providerOrderId,
+        input.state,
+      )
+    ) {
+      throw new Error("GOOGLE_PAY_ACTION_INVALID");
+    }
+
+    if (payment.status === "paid") {
+      return {
+        paymentId: payment._id.toString(),
+        status: "paid" as const,
+        orderId: payment.order?.toString() ?? null,
+      };
+    }
+
+    const raw = payment.rawNotification as Record<string, any> | null;
+    const payload = raw?.googlePayResponse;
+    const authenticationToken = String(
+      payload?.customerAction?.authenticationToken ?? "",
+    ).trim();
+    const ntpId = String(payload?.payment?.ntpID ?? payment.ntpId ?? "").trim();
+    const providerResponse = await googlePayService.verifyAuthentication({
+      authenticationToken,
+      ntpId,
+      paRes: input.paRes,
+    });
+
+    return this.applyGooglePayProviderResponse(
+      payment,
+      providerResponse,
+      input.apiBaseUrl,
+    );
+  }
+
+  private async applyGooglePayProviderResponse(
+    payment: PaymentDocument,
+    response: Record<string, any>,
+    apiBaseUrl: string,
+  ) {
+    const payload = googlePayService.unwrapResponse(response);
+    const providerPayment =
+      payload.payment && typeof payload.payment === "object"
+        ? payload.payment
+        : {};
+    const providerError =
+      payload.error && typeof payload.error === "object" ? payload.error : {};
+    const providerStatus = Number(providerPayment.status);
+    const providerCode = String(providerError.code ?? "").trim();
+    const providerMessage = String(
+      providerError.message ?? "Plata nu a fost aprobată.",
+    ).trim();
+    const ntpId = String(providerPayment.ntpID ?? "").trim();
+    const processedAmount = Number(providerPayment.amount ?? payment.amount);
+
+    if (
+      (providerCode === "00" || providerCode === "0") &&
+      (providerStatus === 3 || providerStatus === 5)
+    ) {
+      const notification = {
+        orderId: payment.providerOrderId,
+        ntpId: ntpId || undefined,
+        action: "confirmed",
+        errorCode: 0,
+        errorMessage: providerMessage || undefined,
+        processedAmount,
+        currency: String(providerPayment.currency ?? payment.currency),
+        raw: {
+          source: "google_pay",
+          error: providerError,
+          payment: {
+            amount: processedAmount,
+            currency: providerPayment.currency ?? payment.currency,
+            ntpID: ntpId,
+            status: providerStatus,
+            data: providerPayment.data ?? {},
+          },
+        },
+      };
+      const result = await this.applyNotification(payment, notification);
+
+      return {
+        paymentId: payment._id.toString(),
+        status: result.paymentStatus,
+        orderId: "orderId" in result ? result.orderId : null,
+      };
+    }
+
+    if (providerCode === "100" && providerStatus === 15) {
+      await PaymentModel.findByIdAndUpdate(payment._id, {
+        $set: {
+          action: "google_pay_3ds_required",
+          ntpId: ntpId || null,
+          errorCode: 100,
+          errorMessage: providerMessage,
+          rawNotification: {
+            googlePayResponse: payload,
+          },
+        },
+      });
+      const state = googlePayService.createActionState(
+        payment._id.toString(),
+        payment.providerOrderId,
+      );
+
+      return {
+        paymentId: payment._id.toString(),
+        status: "requires_action" as const,
+        actionUrl:
+          `${apiBaseUrl}/payments/google-pay/action/` +
+          `${encodeURIComponent(payment._id.toString())}?state=${state}`,
+        message: "Confirmă plata în pagina securizată a băncii.",
+      };
+    }
+
+    await PaymentModel.findByIdAndUpdate(payment._id, {
+      $set: {
+        status: "failed",
+        action: "google_pay_declined",
+        ntpId: ntpId || null,
+        processedAmount: Number.isFinite(processedAmount)
+          ? processedAmount
+          : null,
+        errorCode: Number.isFinite(Number(providerCode))
+          ? Number(providerCode)
+          : null,
+        errorMessage: providerMessage,
+        rawNotification: {
+          source: "google_pay",
+          error: providerError,
+          payment: {
+            amount: providerPayment.amount ?? null,
+            currency: providerPayment.currency ?? null,
+            ntpID: ntpId || null,
+            status: Number.isFinite(providerStatus) ? providerStatus : null,
+          },
+        },
+      },
+    });
+
+    throw new Error(`NETOPIA_GOOGLE_PAY_DECLINED:${providerMessage}`);
+  }
+
+  // ==========================================================
   // HANDLE NETOPIA NOTIFICATION
   // ==========================================================
 
@@ -740,12 +1158,348 @@ class PaymentService {
     }
 
     // ========================================================
+    // REFUND / CREDIT
+    // ========================================================
+
+    if (action === "credit") {
+      // ======================================================
+      // CREDIT FAILED
+      //
+      // Nu schimbăm plata din "paid" în "cancelled".
+      // Comanda rămâne refund_pending pentru intervenție/retry.
+      // ======================================================
+
+      if (notification.errorCode !== 0) {
+        await PaymentModel.findByIdAndUpdate(payment._id, {
+          $set: {
+            action: notification.action ?? null,
+
+            ntpId: notification.ntpId ?? null,
+
+            processedAmount: notification.processedAmount ?? null,
+
+            errorCode: notification.errorCode,
+
+            errorMessage:
+              notification.errorMessage ?? "Refund-ul nu a fost confirmat.",
+
+            rawNotification: notification.raw,
+          },
+        });
+
+        return {
+          paymentStatus: payment.status,
+
+          message:
+            notification.errorMessage ??
+            "Refund-ul NETOPIA nu a fost confirmat.",
+        };
+      }
+
+      // ======================================================
+      // REFUNDED AMOUNT
+      // ======================================================
+
+      const refundedAmount = Number(
+        notification.processedAmount ?? payment.amount,
+      );
+
+      if (!Number.isFinite(refundedAmount) || refundedAmount <= 0) {
+        throw new Error("INVALID_REFUND_AMOUNT");
+      }
+
+      // Pentru moment Nexora face doar refund integral.
+      if (Math.abs(refundedAmount - payment.amount) > 0.009) {
+        await PaymentModel.findByIdAndUpdate(payment._id, {
+          $set: {
+            status: "conflict",
+
+            action: notification.action ?? null,
+
+            ntpId: notification.ntpId ?? null,
+
+            processedAmount: refundedAmount,
+
+            errorCode: notification.errorCode,
+
+            errorMessage:
+              "Suma rambursată diferă de suma aprobată pentru refund.",
+
+            rawNotification: notification.raw,
+          },
+        });
+
+        return {
+          paymentStatus: "conflict" as const,
+
+          message: "REFUND_AMOUNT_MISMATCH",
+        };
+      }
+
+      // ======================================================
+      // TRANSACTION
+      // ======================================================
+
+      const session = await mongoose.startSession();
+
+      try {
+        let orderId: string | null = null;
+
+        let refundedNow = false;
+
+        let buyerId: string | null = null;
+
+        let sellerId: string | null = null;
+
+        await session.withTransaction(async () => {
+          // ================================================
+          // LOCK PAYMENT
+          // ================================================
+
+          const lockedPayment = await PaymentModel.findById(
+            payment._id,
+          ).session(session);
+
+          if (!lockedPayment) {
+            throw new Error("PAYMENT_NOT_FOUND");
+          }
+
+          // ================================================
+          // IDEMPOTENCY
+          // ================================================
+
+          if (lockedPayment.status === "refunded") {
+            orderId = lockedPayment.order?.toString() ?? null;
+
+            return;
+          }
+
+          if (lockedPayment.status !== "paid") {
+            throw new Error("PAYMENT_NOT_REFUNDABLE");
+          }
+
+          if (!lockedPayment.order) {
+            throw new Error("ORDER_NOT_FOUND");
+          }
+
+          // ================================================
+          // ORDER
+          // ================================================
+
+          const order = await Order.findById(lockedPayment.order).session(
+            session,
+          );
+
+          if (!order) {
+            throw new Error("ORDER_NOT_FOUND");
+          }
+
+          if (
+            order.status !== "refund_pending" ||
+            order.issueResolution !== "buyer_refund"
+          ) {
+            throw new Error("ORDER_REFUND_NOT_APPROVED");
+          }
+
+          const approvedRefundAmount = Number(
+            order.refundAmount ?? lockedPayment.amount,
+          );
+
+          if (
+            !Number.isFinite(approvedRefundAmount) ||
+            Math.abs(approvedRefundAmount - refundedAmount) > 0.009
+          ) {
+            throw new Error("REFUND_AMOUNT_MISMATCH");
+          }
+
+          // ================================================
+          // SELLER SALE TRANSACTION
+          // ================================================
+
+          const saleTransaction = await WalletTransaction.findOne({
+            order: order._id,
+
+            user: order.seller,
+
+            type: "sale",
+          }).session(session);
+
+          if (!saleTransaction) {
+            throw new Error("SALE_TRANSACTION_NOT_FOUND");
+          }
+
+          if (saleTransaction.status !== "pending") {
+            throw new Error("SALE_TRANSACTION_NOT_REFUNDABLE");
+          }
+
+          const sellerAmount = Number(saleTransaction.amount);
+
+          if (!Number.isFinite(sellerAmount) || sellerAmount <= 0) {
+            throw new Error("INVALID_SELLER_AMOUNT");
+          }
+
+          // ================================================
+          // REMOVE SELLER HELD FUNDS
+          //
+          // Nu intră în balance, deoarece vânzarea
+          // a fost rambursată cumpărătorului.
+          // ================================================
+
+          const seller = await User.findOneAndUpdate(
+            {
+              _id: order.seller,
+
+              pendingBalance: {
+                $gte: sellerAmount,
+              },
+            },
+
+            {
+              $inc: {
+                pendingBalance: -sellerAmount,
+              },
+            },
+
+            {
+              new: true,
+              session,
+            },
+          );
+
+          if (!seller) {
+            throw new Error("INSUFFICIENT_PENDING_BALANCE");
+          }
+
+          // ================================================
+          // REJECT SALE TRANSACTION
+          // ================================================
+
+          saleTransaction.status = "rejected";
+
+          saleTransaction.description = saleTransaction.description.replace(
+            "Vânzare în așteptare:",
+            "Vânzare rambursată:",
+          );
+
+          saleTransaction.set("metadata.refundedAt", new Date());
+
+          saleTransaction.set("metadata.refundAmount", refundedAmount);
+
+          saleTransaction.set("metadata.refundProvider", "netopia");
+
+          await saleTransaction.save({
+            session,
+          });
+
+          // ================================================
+          // PAYMENT REFUNDED
+          // ================================================
+
+          lockedPayment.status = "refunded";
+
+          lockedPayment.action = notification.action ?? null;
+
+          lockedPayment.ntpId =
+            notification.ntpId ?? lockedPayment.ntpId ?? null;
+
+          lockedPayment.processedAmount = refundedAmount;
+
+          lockedPayment.errorCode = notification.errorCode;
+
+          lockedPayment.errorMessage = notification.errorMessage ?? null;
+
+          lockedPayment.rawNotification = notification.raw;
+
+          await lockedPayment.save({
+            session,
+          });
+
+          // ================================================
+          // ORDER REFUNDED
+          // ================================================
+
+          const now = new Date();
+
+          order.status = "refunded";
+
+          order.refundCompletedAt = now;
+
+          order.refundAmount = refundedAmount;
+
+          order.autoCompleteAt = null;
+
+          await order.save({
+            session,
+          });
+
+          orderId = order._id.toString();
+
+          buyerId = order.buyer.toString();
+
+          sellerId = order.seller.toString();
+
+          refundedNow = true;
+        });
+
+        // ======================================================
+        // REFUND NOTIFICATIONS
+        //
+        // Trimitem numai după commit-ul tranzacției.
+        // ======================================================
+
+        if (refundedNow && orderId && buyerId && sellerId) {
+          const metadata = {
+            route: "order_details",
+            orderId,
+            status: "refunded",
+            provider: "netopia",
+          };
+
+          await Promise.allSettled([
+            notificationService.create({
+              user: buyerId,
+
+              type: "system",
+
+              title: "Rambursare finalizată",
+
+              message:
+                "Rambursarea comenzii a fost confirmată. Suma a fost restituită prin metoda de plată folosită la cumpărare.",
+
+              metadata,
+            }),
+
+            notificationService.create({
+              user: sellerId,
+
+              type: "sale",
+
+              title: "Comandă rambursată",
+
+              message:
+                "Rambursarea către cumpărător a fost confirmată. Fondurile blocate pentru această vânzare au fost retrase din soldul în așteptare.",
+
+              metadata,
+            }),
+          ]);
+        }
+
+        return {
+          paymentStatus: "refunded" as const,
+
+          orderId,
+        };
+      } finally {
+        await session.endSession();
+      }
+    }
+
+    // ========================================================
     // FAILED / CANCELLED
     // ========================================================
 
     if (!isConfirmed) {
-      const failedStatus =
-        action === "canceled" || action === "credit" ? "cancelled" : "failed";
+      const failedStatus = action === "canceled" ? "cancelled" : "failed";
 
       await PaymentModel.findByIdAndUpdate(
         payment._id,

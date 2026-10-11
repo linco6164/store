@@ -39,6 +39,10 @@ import {
   startScheduledPromotions,
 } from "./jobs/scheduledPromotions.js";
 
+import {
+  startOrderAutoCompleteScheduler,
+} from "./jobs/orderAutoComplete.js";
+
 import samedayRoutes from "./modules/sameday/sameday.routes.js";
 import samedayShipmentRoutes from "./modules/sameday/sameday-shipment.routes.js";
 
@@ -139,6 +143,8 @@ async function start() {
   startScheduledPromotions();
 
   startSamedayStatusSync();
+
+  startOrderAutoCompleteScheduler();
 
   const PORT = Number(process.env.PORT) || 5000;
 
