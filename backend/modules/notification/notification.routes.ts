@@ -6,7 +6,6 @@ import {
     notificationController,
 } from "./notification.controller.js";
 
-import staffAccess from "../../middleware/staffAccess.js";
 
 const router = Router();
 
@@ -38,17 +37,6 @@ router.delete(
     "/:id",
     auth,
     notificationController.remove
-);
-
-// ============================================================
-// INTERNAL TEST - SAMEDAY ORDER NOTIFICATION
-// ============================================================
-
-router.post(
-  "/internal/test-sameday-order/:orderId",
-  auth,
-  staffAccess,
-  notificationController.testSamedayOrderNotification,
 );
 
 router.post(

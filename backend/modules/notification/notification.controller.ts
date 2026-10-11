@@ -4,8 +4,6 @@ import { AuthRequest } from "../../middleware/auth.js";
 
 import { notificationService } from "./notification.service.js";
 
-import Order from "../order/order.model.js";
-
 class NotificationController {
   async getAll(req: AuthRequest, res: Response) {
     try {
@@ -154,71 +152,6 @@ class NotificationController {
       return res.status(500).json({
         success: false,
         message: "Failed to delete notification.",
-      });
-    }
-  }
-
-  async testSamedayOrderNotification(req: AuthRequest, res: Response) {
-    try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
-
-      const orderId = String(req.params.orderId ?? "").trim();
-
-      const order = await Order.findById(orderId).select("_id buyer seller");
-
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          message: "Comanda nu a fost găsită.",
-        });
-      }
-
-      const notification = await notificationService.create({
-        user: order.buyer.toString(),
-
-        type: "system",
-
-        title: "Test transport Sameday",
-
-        message: "Coletul tău are o actualizare de transport.",
-
-        metadata: {
-          route: "order_details",
-
-          orderId: order._id.toString(),
-
-          provider: "sameday",
-
-          status: "test",
-
-          statusId: 999999,
-        },
-      });
-
-      return res.json({
-        success: true,
-
-        message: "Notificarea de test a fost trimisă cumpărătorului.",
-
-        data: {
-          notificationId: notification._id,
-
-          buyerId: order.buyer,
-
-          orderId: order._id,
-        },
-      });
-    } catch (error) {
-      console.error("TEST SAMEDAY NOTIFICATION ERROR:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Nu am putut trimite notificarea de test.",
       });
     }
   }
