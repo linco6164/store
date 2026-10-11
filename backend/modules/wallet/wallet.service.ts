@@ -59,6 +59,10 @@ class WalletService {
       let result;
 
       await session.withTransaction(async () => {
+        // ==================================================
+        // LISTING
+        // ==================================================
+
         const listing = await ListingModel.findOne({
           _id: listingId,
           status: "active",
@@ -80,22 +84,27 @@ class WalletService {
           throw new Error("INVALID_LISTING_PRICE");
         }
 
-        /*
-         * Debitează soldul cumpărătorului
-         * doar dacă are suficienți bani.
-         */
+        const currency = listing.currency ?? "RON";
+
+        // ==================================================
+        // DEBIT BUYER
+        // ==================================================
+
         const buyer = await User.findOneAndUpdate(
           {
             _id: buyerId,
+
             balance: {
               $gte: amount,
             },
           },
+
           {
             $inc: {
               balance: -amount,
             },
           },
+
           {
             new: true,
             session,
@@ -106,19 +115,22 @@ class WalletService {
           throw new Error("INSUFFICIENT_BALANCE");
         }
 
-        /*
-         * Marcăm anunțul ca vândut.
-         */
+        // ==================================================
+        // MARK LISTING SOLD
+        // ==================================================
+
         const updatedListing = await ListingModel.findOneAndUpdate(
           {
             _id: listingId,
             status: "active",
           },
+
           {
             $set: {
               status: "sold",
             },
           },
+
           {
             new: true,
             session,
@@ -129,49 +141,131 @@ class WalletService {
           throw new Error("LISTING_ALREADY_SOLD");
         }
 
-        /*
-         * Creăm comanda.
-         */
+        // ==================================================
+        // CREATE ORDER
+        // ==================================================
+
         const [order] = await Order.create(
           [
             {
               buyer: buyerId,
+
               seller: sellerId,
+
               listing: listingId,
+
               amount,
-              currency: listing.currency ?? "RON",
+
+              currency,
+
               status: "paid",
             },
           ],
+
           {
             session,
           },
         );
 
-        /*
-         * Tranzacția cumpărătorului.
-         */
+        // ==================================================
+        // BUYER TRANSACTION
+        // ==================================================
+
         const [transaction] = await WalletTransaction.create(
           [
             {
               user: buyerId,
+
               type: "purchase",
+
               amount,
-              currency: listing.currency ?? "RON",
+
+              currency,
+
               status: "completed",
+
               order: order._id,
+
               description: `Cumpărare: ${listing.title}`,
+
+              metadata: {
+                paymentMethod: "wallet",
+              },
             },
           ],
+
           {
             session,
           },
         );
 
+        // ==================================================
+        // SELLER PENDING BALANCE
+        // ==================================================
+
+        const seller = await User.findByIdAndUpdate(
+          sellerId,
+
+          {
+            $inc: {
+              pendingBalance: amount,
+            },
+          },
+
+          {
+            new: true,
+            session,
+          },
+        );
+
+        if (!seller) {
+          throw new Error("SELLER_NOT_FOUND");
+        }
+
+        // ==================================================
+        // SELLER SALE TRANSACTION
+        // ==================================================
+
+        await WalletTransaction.create(
+          [
+            {
+              user: sellerId,
+
+              type: "sale",
+
+              amount,
+
+              currency,
+
+              status: "pending",
+
+              order: order._id,
+
+              description: `Vânzare în așteptare: ${listing.title}`,
+
+              metadata: {
+                paymentMethod: "wallet",
+              },
+            },
+          ],
+
+          {
+            session,
+          },
+        );
+
+        // ==================================================
+        // RESULT
+        // ==================================================
+
         result = {
           order,
+
           transaction,
+
           balance: buyer.balance,
+
+          sellerPendingBalance: seller.pendingBalance,
         };
       });
 

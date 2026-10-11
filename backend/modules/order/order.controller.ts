@@ -155,6 +155,20 @@ export async function confirmOrderReceived(req: AuthRequest, res: Response) {
       });
     }
 
+    if (message === "SALE_TRANSACTION_NOT_RELEASABLE") {
+      return res.status(409).json({
+        success: false,
+        message: "Fondurile acestei vânzări nu mai pot fi eliberate.",
+      });
+    }
+
+    if (message === "SALE_TRANSACTION_NOT_FOUND") {
+      return res.status(409).json({
+        success: false,
+        message: "Tranzacția vânzătorului nu a fost găsită.",
+      });
+    }
+
     return res.status(400).json({
       success: false,
       message,
@@ -364,10 +378,57 @@ export async function resolveIssueBuyerRefund(req: AuthRequest, res: Response) {
       note,
     );
 
-    return res.json({
-      success: true,
+    if (!order) {
+      return res.status(500).json({
+        success: false,
+        message: "Comanda nu a putut fi actualizată.",
+      });
+    }
+
+    // ======================================================
+    // WALLET REFUND COMPLETED
+    // ======================================================
+
+    if (order.status === "refunded") {
+      return res.json({
+        success: true,
+
+        message:
+          "Rambursarea a fost finalizată. Suma a fost returnată cumpărătorului.",
+
+        refundStatus: "completed",
+
+        data: order,
+      });
+    }
+
+    // ======================================================
+    // NETOPIA REFUND PENDING
+    // ======================================================
+
+    if (order.status === "refund_pending") {
+      return res.json({
+        success: true,
+
+        message:
+          "Disputa a fost soluționată în favoarea cumpărătorului. Rambursarea este în așteptarea confirmării procesatorului de plată.",
+
+        refundStatus: "pending",
+
+        data: order,
+      });
+    }
+
+    // ======================================================
+    // UNEXPECTED STATE
+    // ======================================================
+
+    return res.status(409).json({
+      success: false,
+
       message:
-        "Disputa a fost soluționată în favoarea cumpărătorului. Rambursarea este în așteptare.",
+        "Comanda a ajuns într-o stare neașteptată după soluționarea disputei.",
+
       data: order,
     });
   } catch (error: any) {
@@ -375,72 +436,96 @@ export async function resolveIssueBuyerRefund(req: AuthRequest, res: Response) {
 
     const message = error?.message ?? "Disputa nu a putut fi soluționată.";
 
-    if (message === "ORDER_NOT_FOUND") {
-      return res.status(404).json({
-        success: false,
-        message: "Comanda nu există.",
-      });
-    }
+    switch (message) {
+      case "ORDER_NOT_FOUND":
+        return res.status(404).json({
+          success: false,
+          message: "Comanda nu există.",
+        });
 
-    if (message === "ORDER_HAS_NO_OPEN_ISSUE") {
-      return res.status(409).json({
-        success: false,
-        message: "Comanda nu are o problemă deschisă.",
-      });
-    }
+      case "INVALID_RESOLVER":
+        return res.status(400).json({
+          success: false,
+          message: "Utilizatorul care soluționează disputa este invalid.",
+        });
 
-    if (message === "ORDER_ISSUE_ALREADY_RESOLVED") {
-      return res.status(409).json({
-        success: false,
-        message: "Problema acestei comenzi a fost deja soluționată.",
-      });
-    }
+      case "ORDER_HAS_NO_OPEN_ISSUE":
+        return res.status(409).json({
+          success: false,
+          message: "Comanda nu are o problemă deschisă.",
+        });
 
-    if (message === "PAYMENT_NOT_FOUND") {
-      return res.status(409).json({
-        success: false,
-        message: "Plata asociată comenzii nu a fost găsită.",
-      });
-    }
+      case "ORDER_ISSUE_ALREADY_RESOLVED":
+        return res.status(409).json({
+          success: false,
+          message: "Problema acestei comenzi a fost deja soluționată.",
+        });
 
-    if (message === "PAYMENT_NOT_REFUNDABLE") {
-      return res.status(409).json({
-        success: false,
-        message: "Plata nu poate fi rambursată.",
-      });
-    }
+      case "PAYMENT_NOT_REFUNDABLE":
+        return res.status(409).json({
+          success: false,
+          message: "Plata NETOPIA nu poate fi rambursată.",
+        });
 
-    if (message === "SALE_TRANSACTION_NOT_FOUND") {
-      return res.status(409).json({
-        success: false,
-        message: "Tranzacția vânzătorului nu a fost găsită.",
-      });
-    }
+      case "PAYMENT_SOURCE_NOT_FOUND":
+        return res.status(409).json({
+          success: false,
+          message: "Nu a fost găsită sursa plății pentru această comandă.",
+        });
 
-    if (message === "SALE_TRANSACTION_NOT_REFUNDABLE") {
-      return res.status(409).json({
-        success: false,
-        message: "Fondurile vânzătorului nu mai sunt blocate.",
-      });
-    }
+      case "WALLET_PURCHASE_NOT_REFUNDABLE":
+        return res.status(409).json({
+          success: false,
+          message: "Plata făcută din sold nu poate fi rambursată.",
+        });
 
-    if (message === "INVALID_REFUND_AMOUNT") {
-      return res.status(409).json({
-        success: false,
-        message: "Suma de rambursat este invalidă.",
-      });
-    }
+      case "SALE_TRANSACTION_NOT_FOUND":
+        return res.status(409).json({
+          success: false,
+          message: "Tranzacția vânzătorului nu a fost găsită.",
+        });
 
-    if (message === "ISSUE_RESOLUTION_NOTE_TOO_LONG") {
-      return res.status(400).json({
-        success: false,
-        message: "Nota de soluționare este prea lungă.",
-      });
-    }
+      case "SALE_TRANSACTION_NOT_REFUNDABLE":
+        return res.status(409).json({
+          success: false,
+          message: "Fondurile vânzătorului nu mai pot fi rambursate.",
+        });
 
-    return res.status(400).json({
-      success: false,
-      message,
-    });
+      case "INVALID_REFUND_AMOUNT":
+        return res.status(409).json({
+          success: false,
+          message: "Suma de rambursat este invalidă.",
+        });
+
+      case "INVALID_SELLER_AMOUNT":
+        return res.status(409).json({
+          success: false,
+          message: "Suma blocată pentru vânzător este invalidă.",
+        });
+
+      case "INSUFFICIENT_PENDING_BALANCE":
+        return res.status(409).json({
+          success: false,
+          message: "Soldul în așteptare al vânzătorului este insuficient.",
+        });
+
+      case "BUYER_NOT_FOUND":
+        return res.status(404).json({
+          success: false,
+          message: "Cumpărătorul nu a fost găsit.",
+        });
+
+      case "ISSUE_RESOLUTION_NOTE_TOO_LONG":
+        return res.status(400).json({
+          success: false,
+          message: "Nota de soluționare este prea lungă.",
+        });
+
+      default:
+        return res.status(500).json({
+          success: false,
+          message: "Disputa nu a putut fi soluționată.",
+        });
+    }
   }
 }

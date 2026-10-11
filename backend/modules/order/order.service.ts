@@ -5,6 +5,8 @@ import User from "../../models/Users.js";
 import WalletTransaction from "../wallet/wallet.model.js";
 import PaymentModel from "../payment/payment.model.js";
 
+import { ListingModel } from "../listing/listing.model.js";
+
 import { notificationService } from "../notification/notification.service.js";
 
 export async function getBuyerOrders(userId: string) {
@@ -145,6 +147,13 @@ export async function completeOrder(
 
       if (!saleTransaction) {
         throw new Error("SALE_TRANSACTION_NOT_FOUND");
+      }
+
+      if (
+        saleTransaction.status !== "pending" &&
+        saleTransaction.status !== "completed"
+      ) {
+        throw new Error("SALE_TRANSACTION_NOT_RELEASABLE");
       }
 
       // ==================================================
@@ -658,20 +667,22 @@ export async function resolveOrderIssueBuyerRefund(
   try {
     let resolvedOrder: any = null;
 
+    let walletRefundedNow = false;
+
+    let buyerId: string | null = null;
+
+    let sellerId: string | null = null;
+
     await session.withTransaction(async () => {
-      // ================================================
-      // LOAD ORDER
-      // ================================================
+      // ==================================================
+      // ORDER
+      // ==================================================
 
       const order = await OrderModel.findById(orderId).session(session);
 
       if (!order) {
         throw new Error("ORDER_NOT_FOUND");
       }
-
-      // ================================================
-      // ISSUE MUST STILL BE OPEN
-      // ================================================
 
       if (order.status !== "issue_reported") {
         throw new Error("ORDER_HAS_NO_OPEN_ISSUE");
@@ -681,38 +692,15 @@ export async function resolveOrderIssueBuyerRefund(
         throw new Error("ORDER_ISSUE_ALREADY_RESOLVED");
       }
 
-      // ================================================
-      // PAYMENT
-      //
-      // Refund-ul către cumpărător trebuie raportat la
-      // suma plătită efectiv, nu doar la suma vânzătorului.
-      // ================================================
-
-      const payment = await PaymentModel.findOne({
-        order: order._id,
-      }).session(session);
-
-      if (!payment) {
-        throw new Error("PAYMENT_NOT_FOUND");
-      }
-
-      if (payment.status !== "paid") {
-        throw new Error("PAYMENT_NOT_REFUNDABLE");
-      }
-
-      const refundAmount = Number(payment.amount);
-
-      if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
-        throw new Error("INVALID_REFUND_AMOUNT");
-      }
-
-      // ================================================
-      // SELLER MONEY MUST STILL BE HELD
-      // ================================================
+      // ==================================================
+      // SELLER SALE TRANSACTION
+      // ==================================================
 
       const saleTransaction = await WalletTransaction.findOne({
         order: order._id,
+
         user: order.seller,
+
         type: "sale",
       }).session(session);
 
@@ -724,18 +712,213 @@ export async function resolveOrderIssueBuyerRefund(
         throw new Error("SALE_TRANSACTION_NOT_REFUNDABLE");
       }
 
-      // ================================================
-      // MARK REFUND AS PENDING
-      //
-      // IMPORTANT:
-      // Nu modificăm încă pendingBalance.
-      // Nu marcăm încă payment ca refunded/cancelled.
-      // Așteptăm confirmarea reală NETOPIA.
-      // ================================================
+      const sellerAmount = Number(saleTransaction.amount);
+
+      if (!Number.isFinite(sellerAmount) || sellerAmount <= 0) {
+        throw new Error("INVALID_SELLER_AMOUNT");
+      }
+
+      // ==================================================
+      // CHECK NETOPIA PAYMENT
+      // ==================================================
+
+      const payment = await PaymentModel.findOne({
+        order: order._id,
+      }).session(session);
 
       const now = new Date();
 
-      order.status = "refund_pending";
+      // ==================================================
+      // NETOPIA PAYMENT
+      //
+      // Refund extern.
+      // Așteptăm confirmarea reală NETOPIA.
+      // ==================================================
+
+      if (payment) {
+        if (payment.status !== "paid") {
+          throw new Error("PAYMENT_NOT_REFUNDABLE");
+        }
+
+        const refundAmount = Number(payment.amount);
+
+        if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+          throw new Error("INVALID_REFUND_AMOUNT");
+        }
+
+        order.status = "refund_pending";
+
+        order.autoCompleteAt = null;
+
+        order.issueStatus = "resolved";
+
+        order.issueResolvedAt = now;
+
+        order.issueResolution = "buyer_refund";
+
+        order.issueResolutionNote = cleanNote || null;
+
+        order.issueResolvedBy = new mongoose.Types.ObjectId(resolvedById);
+
+        order.refundRequestedAt = now;
+
+        order.refundCompletedAt = null;
+
+        order.refundAmount = refundAmount;
+
+        order.refundReason = "buyer_issue";
+
+        await order.save({
+          session,
+        });
+
+        resolvedOrder = order;
+
+        return;
+      }
+
+      // ==================================================
+      // WALLET PURCHASE
+      // ==================================================
+
+      const purchaseTransaction = await WalletTransaction.findOne({
+        order: order._id,
+
+        user: order.buyer,
+
+        type: "purchase",
+      }).session(session);
+
+      if (!purchaseTransaction) {
+        throw new Error("PAYMENT_SOURCE_NOT_FOUND");
+      }
+
+      if (purchaseTransaction.status !== "completed") {
+        throw new Error("WALLET_PURCHASE_NOT_REFUNDABLE");
+      }
+
+      const refundAmount = Number(purchaseTransaction.amount);
+
+      if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+        throw new Error("INVALID_REFUND_AMOUNT");
+      }
+
+      // ==================================================
+      // REMOVE SELLER PENDING FUNDS
+      // ==================================================
+
+      const seller = await User.findOneAndUpdate(
+        {
+          _id: order.seller,
+
+          pendingBalance: {
+            $gte: sellerAmount,
+          },
+        },
+
+        {
+          $inc: {
+            pendingBalance: -sellerAmount,
+          },
+        },
+
+        {
+          new: true,
+
+          session,
+        },
+      );
+
+      if (!seller) {
+        throw new Error("INSUFFICIENT_PENDING_BALANCE");
+      }
+
+      // ==================================================
+      // RETURN MONEY TO BUYER WALLET
+      // ==================================================
+
+      const buyer = await User.findByIdAndUpdate(
+        order.buyer,
+
+        {
+          $inc: {
+            balance: refundAmount,
+          },
+        },
+
+        {
+          new: true,
+
+          session,
+        },
+      );
+
+      if (!buyer) {
+        throw new Error("BUYER_NOT_FOUND");
+      }
+
+      // ==================================================
+      // SELLER SALE -> REJECTED
+      // ==================================================
+
+      saleTransaction.status = "rejected";
+
+      saleTransaction.description = saleTransaction.description.replace(
+        "Vânzare în așteptare:",
+        "Vânzare rambursată:",
+      );
+
+      saleTransaction.set("metadata.refundedAt", now);
+
+      saleTransaction.set("metadata.refundAmount", refundAmount);
+
+      saleTransaction.set("metadata.refundProvider", "wallet");
+
+      await saleTransaction.save({
+        session,
+      });
+
+      // ==================================================
+      // BUYER REFUND TRANSACTION
+      // ==================================================
+
+      await WalletTransaction.create(
+        [
+          {
+            user: order.buyer,
+
+            type: "refund",
+
+            amount: refundAmount,
+
+            currency: purchaseTransaction.currency ?? order.currency ?? "RON",
+
+            status: "completed",
+
+            order: order._id,
+
+            description: "Rambursare comandă",
+
+            metadata: {
+              paymentMethod: "wallet",
+
+              originalTransactionId: purchaseTransaction._id.toString(),
+
+              refundedAt: now,
+            },
+          },
+        ],
+
+        {
+          session,
+        },
+      );
+
+      // ==================================================
+      // ORDER REFUNDED
+      // ==================================================
+
+      order.status = "refunded";
 
       order.autoCompleteAt = null;
 
@@ -751,18 +934,391 @@ export async function resolveOrderIssueBuyerRefund(
 
       order.refundRequestedAt = now;
 
-      order.refundCompletedAt = null;
+      order.refundCompletedAt = now;
 
       order.refundAmount = refundAmount;
+
+      order.refundReason = "buyer_issue";
 
       await order.save({
         session,
       });
 
       resolvedOrder = order;
+
+      buyerId = order.buyer.toString();
+
+      sellerId = order.seller.toString();
+
+      walletRefundedNow = true;
     });
 
+    // ====================================================
+    // WALLET REFUND NOTIFICATIONS
+    //
+    // Numai după commit.
+    // NETOPIA are notificările sale în payment.service.ts.
+    // ====================================================
+
+    if (walletRefundedNow && resolvedOrder && buyerId && sellerId) {
+      const currentOrderId = resolvedOrder._id.toString();
+
+      const metadata = {
+        route: "order_details",
+
+        orderId: currentOrderId,
+
+        status: "refunded",
+
+        provider: "wallet",
+      };
+
+      await Promise.allSettled([
+        notificationService.create({
+          user: buyerId,
+
+          type: "system",
+
+          title: "Rambursare finalizată",
+
+          message: "Suma comenzii a fost rambursată în soldul tău Nexora.",
+
+          metadata,
+        }),
+
+        notificationService.create({
+          user: sellerId,
+
+          type: "sale",
+
+          title: "Comandă rambursată",
+
+          message:
+            "Disputa a fost soluționată în favoarea cumpărătorului. Fondurile blocate pentru această vânzare au fost retrase din soldul în așteptare.",
+
+          metadata,
+        }),
+      ]);
+    }
+
     return resolvedOrder;
+  } finally {
+    await session.endSession();
+  }
+}
+
+export async function cancelOrder(orderId: string, buyerId: string) {
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new Error("ORDER_NOT_FOUND");
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(buyerId)) {
+    throw new Error("INVALID_BUYER");
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    let cancelledOrder: any = null;
+
+    await session.withTransaction(async () => {
+      // ==================================================
+      // ORDER
+      // ==================================================
+
+      const order = await OrderModel.findById(orderId).session(session);
+
+      if (!order) {
+        throw new Error("ORDER_NOT_FOUND");
+      }
+
+      if (order.buyer.toString() !== buyerId) {
+        throw new Error("ORDER_NOT_OWNED_BY_BUYER");
+      }
+
+      // ==================================================
+      // IDEMPOTENCY
+      // ==================================================
+
+      if (order.status === "cancelled") {
+        cancelledOrder = order;
+        return;
+      }
+
+      if (
+        order.status === "refund_pending" &&
+        order.refundReason === "order_cancelled"
+      ) {
+        cancelledOrder = order;
+        return;
+      }
+
+      // ==================================================
+      // ONLY BEFORE PROCESSING / SHIPPING
+      // ==================================================
+
+      if (order.status !== "paid") {
+        throw new Error("ORDER_CANNOT_BE_CANCELLED");
+      }
+
+      // ==================================================
+      // SELLER SALE
+      // ==================================================
+
+      const saleTransaction = await WalletTransaction.findOne({
+        order: order._id,
+        user: order.seller,
+        type: "sale",
+      }).session(session);
+
+      if (!saleTransaction) {
+        throw new Error("SALE_TRANSACTION_NOT_FOUND");
+      }
+
+      if (saleTransaction.status !== "pending") {
+        throw new Error("SALE_TRANSACTION_NOT_REFUNDABLE");
+      }
+
+      const sellerAmount = Number(saleTransaction.amount);
+
+      if (!Number.isFinite(sellerAmount) || sellerAmount <= 0) {
+        throw new Error("INVALID_SELLER_AMOUNT");
+      }
+
+      const now = new Date();
+
+      // ==================================================
+      // CHECK NETOPIA PAYMENT
+      // ==================================================
+
+      const payment = await PaymentModel.findOne({
+        order: order._id,
+      }).session(session);
+
+      // ==================================================
+      // NETOPIA
+      //
+      // Nu scoatem încă banii vânzătorului.
+      // Așteptăm confirmarea "credit".
+      // ==================================================
+
+      if (payment) {
+        if (payment.status !== "paid") {
+          throw new Error("PAYMENT_NOT_REFUNDABLE");
+        }
+
+        const refundAmount = Number(payment.amount);
+
+        if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+          throw new Error("INVALID_REFUND_AMOUNT");
+        }
+
+        order.status = "refund_pending";
+
+        order.refundReason = "order_cancelled";
+
+        order.refundRequestedAt = now;
+
+        order.refundCompletedAt = null;
+
+        order.refundAmount = refundAmount;
+
+        order.autoCompleteAt = null;
+
+        await order.save({
+          session,
+        });
+
+        cancelledOrder = order;
+
+        return;
+      }
+
+      // ==================================================
+      // WALLET PAYMENT
+      // ==================================================
+
+      const purchaseTransaction = await WalletTransaction.findOne({
+        order: order._id,
+
+        user: order.buyer,
+
+        type: "purchase",
+      }).session(session);
+
+      if (!purchaseTransaction) {
+        throw new Error("PAYMENT_SOURCE_NOT_FOUND");
+      }
+
+      if (purchaseTransaction.status !== "completed") {
+        throw new Error("WALLET_PURCHASE_NOT_REFUNDABLE");
+      }
+
+      const refundAmount = Number(purchaseTransaction.amount);
+
+      if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+        throw new Error("INVALID_REFUND_AMOUNT");
+      }
+
+      // ==================================================
+      // REMOVE SELLER PENDING MONEY
+      // ==================================================
+
+      const seller = await User.findOneAndUpdate(
+        {
+          _id: order.seller,
+
+          pendingBalance: {
+            $gte: sellerAmount,
+          },
+        },
+
+        {
+          $inc: {
+            pendingBalance: -sellerAmount,
+          },
+        },
+
+        {
+          new: true,
+          session,
+        },
+      );
+
+      if (!seller) {
+        throw new Error("INSUFFICIENT_PENDING_BALANCE");
+      }
+
+      // ==================================================
+      // REFUND BUYER WALLET
+      // ==================================================
+
+      const buyer = await User.findByIdAndUpdate(
+        order.buyer,
+
+        {
+          $inc: {
+            balance: refundAmount,
+          },
+        },
+
+        {
+          new: true,
+          session,
+        },
+      );
+
+      if (!buyer) {
+        throw new Error("BUYER_NOT_FOUND");
+      }
+
+      // ==================================================
+      // SELLER TRANSACTION
+      // ==================================================
+
+      saleTransaction.status = "rejected";
+
+      saleTransaction.description = saleTransaction.description.replace(
+        "Vânzare în așteptare:",
+        "Vânzare anulată:",
+      );
+
+      saleTransaction.set("metadata.refundedAt", now);
+
+      saleTransaction.set("metadata.refundAmount", refundAmount);
+
+      saleTransaction.set("metadata.refundProvider", "wallet");
+
+      saleTransaction.set("metadata.refundReason", "order_cancelled");
+
+      await saleTransaction.save({
+        session,
+      });
+
+      // ==================================================
+      // BUYER REFUND TRANSACTION
+      // ==================================================
+
+      await WalletTransaction.create(
+        [
+          {
+            user: order.buyer,
+
+            type: "refund",
+
+            amount: refundAmount,
+
+            currency: purchaseTransaction.currency ?? order.currency ?? "RON",
+
+            status: "completed",
+
+            order: order._id,
+
+            description: "Rambursare comandă anulată",
+
+            metadata: {
+              paymentMethod: "wallet",
+
+              refundReason: "order_cancelled",
+
+              originalTransactionId: purchaseTransaction._id.toString(),
+
+              refundedAt: now,
+            },
+          },
+        ],
+
+        {
+          session,
+        },
+      );
+
+      // ==================================================
+      // RELIST PRODUCT
+      // ==================================================
+
+      await ListingModel.updateOne(
+        {
+          _id: order.listing,
+
+          status: "sold",
+        },
+
+        {
+          $set: {
+            status: "active",
+          },
+        },
+
+        {
+          session,
+        },
+      );
+
+      // ==================================================
+      // ORDER CANCELLED
+      // ==================================================
+
+      order.status = "cancelled";
+
+      order.refundReason = "order_cancelled";
+
+      order.refundRequestedAt = now;
+
+      order.refundCompletedAt = now;
+
+      order.refundAmount = refundAmount;
+
+      order.autoCompleteAt = null;
+
+      await order.save({
+        session,
+      });
+
+      cancelledOrder = order;
+    });
+
+    return cancelledOrder;
   } finally {
     await session.endSession();
   }

@@ -1251,6 +1251,10 @@ class PaymentService {
 
         let sellerId: string | null = null;
 
+        let refundReason: "buyer_issue" | "order_cancelled" | null = null;
+
+        let finalOrderStatus: "refunded" | "cancelled" = "refunded";
+
         await session.withTransaction(async () => {
           // ================================================
           // LOCK PAYMENT
@@ -1294,12 +1298,23 @@ class PaymentService {
             throw new Error("ORDER_NOT_FOUND");
           }
 
+          if (order.status !== "refund_pending") {
+            throw new Error("ORDER_REFUND_NOT_APPROVED");
+          }
+
+          refundReason =
+            order.refundReason ??
+            (order.issueResolution === "buyer_refund" ? "buyer_issue" : null);
+
           if (
-            order.status !== "refund_pending" ||
-            order.issueResolution !== "buyer_refund"
+            refundReason !== "buyer_issue" &&
+            refundReason !== "order_cancelled"
           ) {
             throw new Error("ORDER_REFUND_NOT_APPROVED");
           }
+
+          finalOrderStatus =
+            refundReason === "order_cancelled" ? "cancelled" : "refunded";
 
           const approvedRefundAmount = Number(
             order.refundAmount ?? lockedPayment.amount,
@@ -1420,7 +1435,7 @@ class PaymentService {
 
           const now = new Date();
 
-          order.status = "refunded";
+          order.status = finalOrderStatus;
 
           order.refundCompletedAt = now;
 
@@ -1451,8 +1466,9 @@ class PaymentService {
           const metadata = {
             route: "order_details",
             orderId,
-            status: "refunded",
+            status: finalOrderStatus,
             provider: "netopia",
+            refundReason: refundReason ?? "buyer_issue",
           };
 
           await Promise.allSettled([
@@ -1461,10 +1477,15 @@ class PaymentService {
 
               type: "system",
 
-              title: "Rambursare finalizată",
+              title:
+                refundReason === "order_cancelled"
+                  ? "Comandă anulată"
+                  : "Rambursare finalizată",
 
               message:
-                "Rambursarea comenzii a fost confirmată. Suma a fost restituită prin metoda de plată folosită la cumpărare.",
+                refundReason === "order_cancelled"
+                  ? "Comanda a fost anulată, iar rambursarea a fost confirmată prin metoda de plată folosită."
+                  : "Rambursarea comenzii a fost confirmată. Suma a fost restituită prin metoda de plată folosită la cumpărare.",
 
               metadata,
             }),
@@ -1474,10 +1495,15 @@ class PaymentService {
 
               type: "sale",
 
-              title: "Comandă rambursată",
+              title:
+                refundReason === "order_cancelled"
+                  ? "Comandă anulată"
+                  : "Comandă rambursată",
 
               message:
-                "Rambursarea către cumpărător a fost confirmată. Fondurile blocate pentru această vânzare au fost retrase din soldul în așteptare.",
+                refundReason === "order_cancelled"
+                  ? "Comanda a fost anulată. Fondurile blocate pentru această vânzare au fost eliminate din soldul în așteptare."
+                  : "Rambursarea către cumpărător a fost confirmată. Fondurile blocate pentru această vânzare au fost retrase din soldul în așteptare.",
 
               metadata,
             }),

@@ -295,6 +295,14 @@ const OrderSchema = new mongoose.Schema(
       default: null,
       min: 0,
     },
+
+    refundReason: {
+      type: String,
+
+      enum: ["buyer_issue", "order_cancelled"],
+
+      default: null,
+    },
   },
 
   {
