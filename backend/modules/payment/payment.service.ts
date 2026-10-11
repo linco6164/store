@@ -979,15 +979,24 @@ class PaymentService {
         });
 
         // ==================================================
-        // SELLER BALANCE
+        // SELLER PENDING BALANCE
+        //
+        // Vânzătorul primește doar prețul produsului.
+        // Transportul și Buyer Protection NU intră în soldul lui.
         // ==================================================
+
+        const sellerAmount = Number(lockedPayment.itemPrice);
+
+        if (!Number.isFinite(sellerAmount) || sellerAmount <= 0) {
+          throw new Error("INVALID_SELLER_AMOUNT");
+        }
 
         await User.findByIdAndUpdate(
           lockedPayment.seller,
 
           {
             $inc: {
-              balance: lockedPayment.amount,
+              pendingBalance: sellerAmount,
             },
           },
 
@@ -1009,15 +1018,15 @@ class PaymentService {
 
               type: "sale",
 
-              amount: lockedPayment.amount,
+              amount: sellerAmount,
 
               currency: lockedPayment.currency,
 
-              status: "completed",
+              status: "pending",
 
               order: order._id,
 
-              description: `Vânzare: ${listing.title}`,
+              description: `Vânzare în așteptare: ${listing.title}`,
             },
           ],
 

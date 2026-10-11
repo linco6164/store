@@ -150,6 +150,12 @@ const StoreUserSchema = new mongoose.Schema(
       min: 0,
     },
 
+    pendingBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     notificationSettings: {
       push: {
         type: Boolean,

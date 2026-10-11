@@ -6,6 +6,7 @@ import {
   getMySellingOrders,
   getCompletedOrders,
   getOrder,
+  confirmOrderReceived,
 } from "./order.controller.js";
 
 const router = Router();
@@ -26,6 +27,12 @@ router.get(
   "/completed",
   auth,
   getCompletedOrders,
+);
+
+router.patch(
+  "/:id/confirm-received",
+  auth,
+  confirmOrderReceived,
 );
 
 router.get(
