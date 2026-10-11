@@ -172,6 +172,52 @@ class NotificationService {
                   conversationId: data.conversation,
                 }
               : {}),
+
+            // ======================================================
+            // METADATA
+            // ======================================================
+
+            ...(data.metadata?.orderId
+              ? {
+                  orderId: String(data.metadata.orderId),
+                }
+              : {}),
+
+            ...(data.metadata?.shipmentId
+              ? {
+                  shipmentId: String(data.metadata.shipmentId),
+                }
+              : {}),
+
+            ...(data.metadata?.awbNumber
+              ? {
+                  awbNumber: String(data.metadata.awbNumber),
+                }
+              : {}),
+
+            ...(data.metadata?.provider
+              ? {
+                  provider: String(data.metadata.provider),
+                }
+              : {}),
+
+            ...(data.metadata?.status
+              ? {
+                  shipmentStatus: String(data.metadata.status),
+                }
+              : {}),
+
+            ...(data.metadata?.statusId != null
+              ? {
+                  shipmentStatusId: String(data.metadata.statusId),
+                }
+              : {}),
+
+            ...(data.metadata?.route
+              ? {
+                  route: String(data.metadata.route),
+                }
+              : {}),
           },
         });
       } else {

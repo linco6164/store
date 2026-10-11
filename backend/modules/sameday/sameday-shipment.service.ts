@@ -13,6 +13,8 @@ import SamedayShipmentModel from "./sameday-shipment.model.js";
 
 import { samedayService } from "./sameday.service.js";
 
+import { notificationService } from "../notification/notification.service.js";
+
 import type {
   SamedayCreateAwbPayload,
   SamedayOohLocation,
@@ -693,6 +695,18 @@ class SamedayShipmentService {
       // ======================================================
 
       for (const event of events) {
+        console.log("[Sameday] Status event:", {
+          awbNumber: event.awbNumber,
+
+          parcelNumber: event.parcelNumber,
+
+          status: event.status,
+
+          statusId: event.statusId,
+
+          statusDate: event.statusDate,
+        });
+
         const awbNumber = String(event.awbNumber ?? "").trim();
 
         if (!awbNumber) {
@@ -788,6 +802,57 @@ class SamedayShipmentService {
             statusId: validStatusId,
             statusDate,
           });
+
+          // ====================================================
+          // NOTIFY BUYER + SELLER
+          // ====================================================
+
+          const statusMessage =
+            status ?? "Statusul transportului a fost actualizat.";
+
+          const metadata = {
+            route: "order_details",
+
+            orderId: shipment.order.toString(),
+
+            shipmentId: shipment._id.toString(),
+
+            awbNumber: shipment.awbNumber ?? null,
+
+            status,
+
+            statusId: validStatusId,
+
+            statusDate: statusDate?.toISOString() ?? null,
+
+            provider: "sameday",
+          };
+
+          await Promise.allSettled([
+            notificationService.create({
+              user: shipment.buyer.toString(),
+
+              type: "system",
+
+              title: "Actualizare livrare Sameday",
+
+              message: statusMessage,
+
+              metadata,
+            }),
+
+            notificationService.create({
+              user: shipment.seller.toString(),
+
+              type: "system",
+
+              title: "Actualizare expediere Sameday",
+
+              message: statusMessage,
+
+              metadata,
+            }),
+          ]);
         }
 
         // ====================================================
