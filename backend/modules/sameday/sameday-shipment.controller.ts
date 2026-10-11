@@ -396,16 +396,26 @@ export const samedayShipmentController = {
         });
       }
 
-      const startTimestamp = String(req.query.startTimestamp ?? "").trim();
+      // ======================================================
+      // OPTIONAL CUSTOM RANGE
+      // ======================================================
 
-      const endTimestamp = String(req.query.endTimestamp ?? "").trim();
+      let startTimestamp = String(req.query.startTimestamp ?? "").trim();
+
+      let endTimestamp = String(req.query.endTimestamp ?? "").trim();
+
+      // ======================================================
+      // DEFAULT = LAST 2 HOURS
+      // ======================================================
 
       if (!startTimestamp || !endTimestamp) {
-        return res.status(400).json({
-          success: false,
+        const endDate = new Date();
 
-          message: "startTimestamp și endTimestamp sunt obligatorii.",
-        });
+        const startDate = new Date(endDate.getTime() - 2 * 60 * 60 * 1000);
+
+        startTimestamp = startDate.toISOString();
+
+        endTimestamp = endDate.toISOString();
       }
 
       const result = await samedayShipmentService.syncStatuses(
@@ -427,30 +437,12 @@ export const samedayShipmentController = {
 
       switch (code) {
         case "SAMEDAY_STATUS_SYNC_DATES_REQUIRED":
-          return res.status(400).json({
-            success: false,
-            message: "Intervalul de sincronizare este obligatoriu.",
-            error: code,
-          });
-
         case "SAMEDAY_STATUS_SYNC_INVALID_DATES":
-          return res.status(400).json({
-            success: false,
-            message: "Datele pentru sincronizare nu sunt valide.",
-            error: code,
-          });
-
         case "SAMEDAY_STATUS_SYNC_INVALID_RANGE":
-          return res.status(400).json({
-            success: false,
-            message: "Intervalul de sincronizare nu este valid.",
-            error: code,
-          });
-
         case "SAMEDAY_STATUS_SYNC_RANGE_TOO_LARGE":
           return res.status(400).json({
             success: false,
-            message: "Intervalul maxim pentru status-sync este de 2 ore.",
+            message: "Intervalul pentru sincronizare nu este valid.",
             error: code,
           });
 
