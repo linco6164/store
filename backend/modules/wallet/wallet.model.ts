@@ -11,7 +11,14 @@ const WalletTransactionSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["purchase", "withdrawal", "refund", "fee", "sale"],
+      enum: [
+        "purchase",
+        "withdrawal",
+        "refund",
+        "fee",
+        "sale",
+        "referral_bonus",
+      ],
       required: true,
     },
 
@@ -62,6 +69,14 @@ const WalletTransactionSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+  },
+);
+
+WalletTransactionSchema.index(
+  { user: 1, type: 1, "metadata.referralId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: { type: "referral_bonus" },
   },
 );
 

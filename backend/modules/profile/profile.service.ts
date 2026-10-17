@@ -3,6 +3,12 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import { ListingModel } from "../listing/listing.model.js";
 import { ReviewModel } from "../review/review.model.js";
+import {
+  REFERRAL_REQUIRED_COMPLETED_SALES,
+  REFERRAL_REQUIRED_LISTINGS,
+  REFERRAL_REWARD_AMOUNT,
+  referralRewardService,
+} from "./referral-reward.service.js";
 
 class ProfileService {
   private async ensureReferralCode(userId: string) {
@@ -46,12 +52,29 @@ class ProfileService {
   }
 
   async getReferralInfo(userId: string) {
+    try {
+      await referralRewardService.evaluate(userId);
+    } catch (error) {
+      console.error("REFERRAL REWARD EVALUATION ERROR:", error);
+    }
+
     const code = await this.ensureReferralCode(userId);
     const invitedUsers = await User.find({ referredBy: userId })
-      .select("username avatar createdAt")
+      .select(
+        "username avatar createdAt referralAcceptedAt referralRewardGrantedAt",
+      )
       .sort({ referralAcceptedAt: -1, createdAt: -1 })
       .limit(20)
       .lean();
+
+    const [myProgress, invitedProgress] = await Promise.all([
+      referralRewardService.getProgress(userId),
+      Promise.all(
+        invitedUsers.map((user) =>
+          referralRewardService.getProgress(user._id.toString()),
+        ),
+      ),
+    ]);
 
     const publicAppUrl = (
       process.env.PUBLIC_APP_URL ||
@@ -66,11 +89,19 @@ class ProfileService {
       code,
       inviteUrl: `${publicAppUrl}/register?ref=${encodeURIComponent(code)}`,
       totalInvited: await User.countDocuments({ referredBy: userId }),
-      recentInvites: invitedUsers.map((user) => ({
+      program: {
+        rewardAmount: REFERRAL_REWARD_AMOUNT,
+        listingsRequired: REFERRAL_REQUIRED_LISTINGS,
+        completedSalesRequired: REFERRAL_REQUIRED_COMPLETED_SALES,
+        currency: "RON",
+      },
+      myProgress,
+      recentInvites: invitedUsers.map((user, index) => ({
         id: user._id,
         username: user.username,
         avatar: user.avatar,
-        joinedAt: user.createdAt,
+        joinedAt: user.referralAcceptedAt ?? user.createdAt,
+        progress: invitedProgress[index],
       })),
     };
   }

@@ -8,6 +8,7 @@ import PaymentModel from "../payment/payment.model.js";
 import { ListingModel } from "../listing/listing.model.js";
 
 import { notificationService } from "../notification/notification.service.js";
+import { referralRewardService } from "../profile/referral-reward.service.js";
 
 export async function getBuyerOrders(userId: string) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -312,6 +313,12 @@ export async function completeOrder(
           metadata,
         }),
       ]);
+
+      try {
+        await referralRewardService.evaluate(completedOrder.seller.toString());
+      } catch (error) {
+        console.error("REFERRAL REWARD ERROR:", error);
+      }
     }
 
     return completedOrder;
@@ -636,6 +643,14 @@ export async function resolveOrderIssueSellerRelease(
 
       resolvedOrder = order;
     });
+
+    if (resolvedOrder) {
+      try {
+        await referralRewardService.evaluate(resolvedOrder.seller.toString());
+      } catch (error) {
+        console.error("REFERRAL REWARD ERROR:", error);
+      }
+    }
 
     return resolvedOrder;
   } finally {

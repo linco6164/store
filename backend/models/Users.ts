@@ -175,6 +175,17 @@ const StoreUserSchema = new mongoose.Schema(
       type: Date,
     },
 
+    referralRewardGrantedAt: {
+      type: Date,
+      default: null,
+    },
+
+    referralQualifiedOrder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+    },
+
     notificationSettings: {
       push: {
         type: Boolean,
