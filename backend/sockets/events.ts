@@ -5,6 +5,8 @@ export const CHAT_EVENTS = {
 
     SEND_MESSAGE: "sendMessage",
     NEW_MESSAGE: "newMessage",
+    OFFER_UPDATED: "offerUpdated",
+    MESSAGE_DELETED: "messageDeleted",
 
     TYPING: "typing",
     STOP_TYPING: "stopTyping",

@@ -156,6 +156,25 @@ const StoreUserSchema = new mongoose.Schema(
       min: 0,
     },
 
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+      trim: true,
+      index: true,
+    },
+
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      index: true,
+    },
+
+    referralAcceptedAt: {
+      type: Date,
+    },
+
     notificationSettings: {
       push: {
         type: Boolean,

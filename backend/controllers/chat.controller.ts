@@ -2,6 +2,27 @@ import { Response } from "express";
 
 import chatService from "../services/chat.service.js";
 import { AuthRequest } from "../middleware/auth.js";
+import { getSocketIO } from "../sockets/socket.io.js";
+import { CHAT_EVENTS } from "../sockets/events.js";
+
+async function emitConversationUpdate(conversationId: string) {
+  const io = getSocketIO();
+  const conversation = await chatService.getConversationById(conversationId);
+
+  for (const participant of conversation?.participants ?? []) {
+    const participantId =
+      typeof participant === "object" &&
+      participant !== null &&
+      "_id" in participant
+        ? String((participant as any)._id)
+        : String(participant);
+
+    io.to(`user:${participantId}`).emit(
+      CHAT_EVENTS.CONVERSATION_UPDATED,
+      conversation,
+    );
+  }
+}
 
 class ChatController {
   async startConversation(req: AuthRequest, res: Response) {
@@ -165,6 +186,11 @@ class ChatController {
         amount,
       );
 
+      getSocketIO()
+        .to(conversationId)
+        .emit(CHAT_EVENTS.NEW_MESSAGE, message);
+      await emitConversationUpdate(conversationId);
+
       return res.status(201).json({
         success: true,
         message,
@@ -187,6 +213,14 @@ class ChatController {
 
       const offer = await chatService.acceptOffer(offerId, req.userId!);
 
+      getSocketIO()
+        .to(offer.conversation.toString())
+        .emit(CHAT_EVENTS.OFFER_UPDATED, {
+          conversationId: offer.conversation.toString(),
+          offerId: offer._id.toString(),
+          status: offer.status,
+        });
+
       return res.json({
         success: true,
         offer,
@@ -208,6 +242,14 @@ class ChatController {
         : req.params.offerId;
 
       const offer = await chatService.rejectOffer(offerId, req.userId!);
+
+      getSocketIO()
+        .to(offer.conversation.toString())
+        .emit(CHAT_EVENTS.OFFER_UPDATED, {
+          conversationId: offer.conversation.toString(),
+          offerId: offer._id.toString(),
+          status: offer.status,
+        });
 
       return res.json({
         success: true,
@@ -236,6 +278,16 @@ class ChatController {
         req.userId!,
         mode,
       );
+
+      if (result.mode === "everyone") {
+        getSocketIO()
+          .to(result.conversationId)
+          .emit(CHAT_EVENTS.MESSAGE_DELETED, {
+            conversationId: result.conversationId,
+            messageId: result.messageId,
+          });
+        await emitConversationUpdate(result.conversationId);
+      }
 
       return res.json({
         success: true,

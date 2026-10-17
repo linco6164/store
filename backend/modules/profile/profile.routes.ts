@@ -22,6 +22,8 @@ router.patch(
   profileController.updateNotificationSettings,
 );
 
+router.get("/referral", auth, profileController.referral);
+
 router.get("/:id", profileController.publicProfile);
 
 export default router;

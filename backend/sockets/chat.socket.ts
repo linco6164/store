@@ -36,9 +36,29 @@ export default function registerChatSocket(io: Server) {
     // CHAT
     // =========================================================
 
-    socket.on(CHAT_EVENTS.JOIN_CONVERSATION, (conversationId: string) => {
-      socket.join(conversationId);
-    });
+    socket.on(
+      CHAT_EVENTS.JOIN_CONVERSATION,
+      async (
+        conversationId: string,
+        callback?: (response: { success: boolean; message?: string }) => void,
+      ) => {
+        try {
+          if (!conversationId) {
+            throw new Error("INVALID_CONVERSATION_ID");
+          }
+
+          await chatService.getConversation(conversationId, socket.userId!);
+          await socket.join(conversationId);
+          callback?.({ success: true });
+        } catch (error) {
+          console.error("JOIN CONVERSATION ERROR:", error);
+          callback?.({
+            success: false,
+            message: "Nu ai acces la această conversație.",
+          });
+        }
+      },
+    );
 
     socket.on(CHAT_EVENTS.LEAVE_CONVERSATION, (conversationId: string) => {
       socket.leave(conversationId);
@@ -51,17 +71,37 @@ export default function registerChatSocket(io: Server) {
         text: string;
         images?: string[];
         replyTo?: string;
-      }) => {
+      },
+        callback?: (response: {
+          success: boolean;
+          data?: unknown;
+          message?: string;
+        }) => void,
+      ) => {
         try {
+          if (!data?.conversationId) {
+            throw new Error("INVALID_CONVERSATION_ID");
+          }
+
+          const text = data.text?.trim() ?? "";
+          const images = Array.isArray(data.images)
+            ? data.images.filter((image) => typeof image === "string" && image)
+            : [];
+
+          if (!text && images.length === 0) {
+            throw new Error("EMPTY_MESSAGE");
+          }
+
           const message = await chatService.sendMessage(
             data.conversationId,
             socket.userId!,
-            data.text,
-            data.images ?? [],
+            text,
+            images,
             data.replyTo,
           );
 
           io.to(data.conversationId).emit(CHAT_EVENTS.NEW_MESSAGE, message);
+          callback?.({ success: true, data: message });
 
           const conversation = await chatService.getConversationById(
             data.conversationId,
@@ -83,16 +123,26 @@ export default function registerChatSocket(io: Server) {
             );
           }
         } catch (error) {
-          console.error(error);
+          console.error("SEND MESSAGE ERROR:", error);
+          callback?.({
+            success: false,
+            message: "Mesajul nu a putut fi trimis.",
+          });
         }
       },
     );
 
     socket.on(CHAT_EVENTS.TYPING, (data: TypingPayload) => {
+      if (!data?.conversationId || !socket.rooms.has(data.conversationId)) {
+        return;
+      }
       socket.to(data.conversationId).emit(CHAT_EVENTS.TYPING, socket.userId);
     });
 
     socket.on(CHAT_EVENTS.STOP_TYPING, (data: TypingPayload) => {
+      if (!data?.conversationId || !socket.rooms.has(data.conversationId)) {
+        return;
+      }
       socket
         .to(data.conversationId)
         .emit(CHAT_EVENTS.STOP_TYPING, socket.userId);
@@ -101,6 +151,9 @@ export default function registerChatSocket(io: Server) {
     socket.on(
       CHAT_EVENTS.DELIVER_MESSAGE,
       (data: { conversationId: string; messageId: string }) => {
+        if (!data?.conversationId || !socket.rooms.has(data.conversationId)) {
+          return;
+        }
         socket
           .to(data.conversationId)
           .emit(CHAT_EVENTS.MESSAGE_DELIVERED, data.messageId);
@@ -111,9 +164,14 @@ export default function registerChatSocket(io: Server) {
       CHAT_EVENTS.SEEN,
       async (data: { conversationId: string; messageId: string }) => {
         try {
+          if (!data?.conversationId || !socket.rooms.has(data.conversationId)) {
+            return;
+          }
+
           await chatService.markAsSeen(data.conversationId, socket.userId!);
 
           io.to(data.conversationId).emit(CHAT_EVENTS.MESSAGES_SEEN, {
+            conversationId: data.conversationId,
             messageId: data.messageId,
             userId: socket.userId,
           });

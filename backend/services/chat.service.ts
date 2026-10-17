@@ -28,7 +28,11 @@ class ChatService {
     });
 
     if (conversation) {
-      return conversation;
+      await Conversation.updateOne(
+        { _id: conversation._id },
+        { $pull: { deletedFor: new Types.ObjectId(senderId) } },
+      );
+      return this.getConversation(conversation._id.toString(), senderId);
     }
 
     conversation = await Conversation.create({
@@ -42,7 +46,7 @@ class ChatService {
       unread: {},
     });
 
-    return conversation;
+    return this.getConversation(conversation._id.toString(), senderId);
   }
 
   async getConversations(userId: string) {
@@ -50,6 +54,9 @@ class ChatService {
         await Conversation.find({
             participants:
                 new Types.ObjectId(userId),
+            deletedFor: {
+                $nin: [new Types.ObjectId(userId)],
+            },
         })
             .populate(
                 "participants",
@@ -57,7 +64,7 @@ class ChatService {
             )
             .populate(
                 "listing",
-                "_id title price images"
+                "_id title price currency images"
             )
             .sort({
                 updatedAt: -1,
@@ -69,12 +76,15 @@ class ChatService {
             const lastMessage =
                 await Message.findOne({
                     conversation: conversation._id,
+                    deletedFor: {
+                        $ne: new Types.ObjectId(userId),
+                    },
                 })
                     .sort({
                         createdAt: -1,
                     })
                     .select(
-                        "_id sender deliveredTo seenBy createdAt text"
+                        "_id sender deliveredTo seenBy createdAt text images type isDeleted"
                     )
                     .lean();
 
@@ -125,8 +135,26 @@ class ChatService {
                 }
             }
 
+            let lastMessagePreview = conversation.lastMessage ?? "";
+
+            if (lastMessage) {
+                if (lastMessage.isDeleted) {
+                    lastMessagePreview = "Mesaj șters";
+                } else if (lastMessage.type === "offer") {
+                    lastMessagePreview = conversation.lastMessage || "Ofertă";
+                } else if (lastMessage.text?.trim()) {
+                    lastMessagePreview = lastMessage.text.trim();
+                } else if (lastMessage.images?.length) {
+                    lastMessagePreview = lastMessage.images.length > 1
+                        ? `${lastMessage.images.length} imagini`
+                        : "Imagine";
+                }
+            }
+
             return {
                 ...conversation,
+                lastMessage: lastMessagePreview,
+                lastMessageAt: lastMessage?.createdAt ?? conversation.lastMessageAt,
                 lastMessageStatus,
             };
         })
@@ -138,7 +166,7 @@ class ChatService {
   async getConversation(conversationId: string, userId: string) {
     const conversation = await Conversation.findById(conversationId)
       .populate("participants", "_id username avatar")
-      .populate("listing", "_id title price images");
+      .populate("listing", "_id title price currency images");
 
     if (!conversation) {
       throw new Error("Conversation not found");
@@ -158,7 +186,7 @@ class ChatService {
   async getConversationById(conversationId: string) {
     return Conversation.findById(conversationId)
       .populate("participants", "_id username avatar")
-      .populate("listing", "_id title price images")
+      .populate("listing", "_id title price currency images")
       .lean();
   }
 
@@ -245,11 +273,14 @@ class ChatService {
       }
     });
 
-    conversation.lastMessage = text;
+    conversation.lastMessage = text || (images.length > 1
+      ? `${images.length} imagini`
+      : "Imagine");
 
     conversation.lastMessageAt = new Date();
 
     conversation.unread = unread;
+    conversation.deletedFor = [];
 
     await conversation.save();
 
@@ -288,6 +319,8 @@ class ChatService {
   }
 
   async markAsDelivered(conversationId: string, userId: string) {
+    await this.getConversation(conversationId, userId);
+
     await Message.updateMany(
       {
         conversation: conversationId,
@@ -380,6 +413,7 @@ class ChatService {
 
     conversation.lastMessageAt = new Date();
     conversation.unread = unread;
+    conversation.deletedFor = [];
 
     await conversation.save();
 
@@ -393,6 +427,24 @@ class ChatService {
       deliveredTo: [senderId],
       seenBy: [senderId],
     });
+
+    try {
+      await notificationService.create({
+        user: sellerId,
+        type: "offer",
+        title: "Ofertă nouă",
+        message: `Ai primit o ofertă de ${amount.toFixed(2)} ${listing.currency ?? "RON"}.`,
+        actor: senderId,
+        conversation: conversationId,
+        listing: listing._id.toString(),
+        metadata: {
+          offerId: offer._id.toString(),
+          status: offer.status,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to create offer notification:", notificationError);
+    }
 
     return Message.findById(message._id)
       .populate("sender", "_id username avatar")
@@ -443,6 +495,24 @@ class ChatService {
 
     await offer.save();
 
+    try {
+      await notificationService.create({
+        user: offer.buyer.toString(),
+        type: "offer",
+        title: "Ofertă acceptată",
+        message: "Vânzătorul ți-a acceptat oferta.",
+        actor: userId,
+        conversation: offer.conversation.toString(),
+        listing: offer.listing.toString(),
+        metadata: {
+          offerId: offer._id.toString(),
+          status: offer.status,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to create offer notification:", notificationError);
+    }
+
     return offer;
   }
 
@@ -465,10 +535,30 @@ class ChatService {
 
     await offer.save();
 
+    try {
+      await notificationService.create({
+        user: offer.buyer.toString(),
+        type: "offer",
+        title: "Ofertă refuzată",
+        message: "Vânzătorul ți-a refuzat oferta.",
+        actor: userId,
+        conversation: offer.conversation.toString(),
+        listing: offer.listing.toString(),
+        metadata: {
+          offerId: offer._id.toString(),
+          status: offer.status,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to create offer notification:", notificationError);
+    }
+
     return offer;
   }
 
   async markAsSeen(conversationId: string, userId: string) {
+    await this.getConversation(conversationId, userId);
+
     await Message.updateMany(
       {
         conversation: conversationId,
@@ -543,6 +633,7 @@ class ChatService {
       return {
         mode: "me",
         messageId,
+        conversationId: conversation._id.toString(),
       };
     }
 
@@ -573,6 +664,7 @@ class ChatService {
     return {
       mode: "everyone",
       messageId,
+      conversationId: conversation._id.toString(),
     };
   }
 
@@ -605,9 +697,10 @@ class ChatService {
         throw new Error("ACCESS_DENIED");
     }
 
-    await Conversation.updateOne(
+    const deletion = await Conversation.updateOne(
         {
             _id: conversationId,
+            participants: new Types.ObjectId(userId),
         },
         {
             $addToSet: {
@@ -617,8 +710,13 @@ class ChatService {
         },
     );
 
+    if (deletion.matchedCount !== 1) {
+        throw new Error("CONVERSATION_NOT_FOUND");
+    }
+
     return {
         conversationId,
+        deleted: true,
     };
 }
 }

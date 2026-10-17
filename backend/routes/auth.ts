@@ -8,6 +8,7 @@ import User from "../models/Users.js";
 import { OAuth2Client } from "google-auth-library";
 
 import { createSession } from "../modules/auth/session.service.js";
+import { notificationService } from "../modules/notification/notification.service.js";
 
 import qs from "querystring";
 
@@ -78,7 +79,7 @@ async function createAuthToken(userId: string, req: ExpressRequest) {
 
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, referralCode } = req.body;
 
     const exists = await User.findOne({
       $or: [{ email }, { username }],
@@ -92,11 +93,44 @@ router.post("/register", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const normalizedReferralCode =
+      typeof referralCode === "string"
+        ? referralCode.trim().toUpperCase()
+        : "";
+    const referrer = normalizedReferralCode
+      ? await User.findOne({ referralCode: normalizedReferralCode }).select(
+          "_id",
+        )
+      : null;
+
+    if (normalizedReferralCode && !referrer) {
+      return res.status(400).json({
+        message: "Codul de invitație nu este valid.",
+      });
+    }
+
     const user = await User.create({
       username,
       email,
       password: hashedPassword,
+      referredBy: referrer?._id,
+      referralAcceptedAt: referrer ? new Date() : undefined,
     });
+
+    if (referrer) {
+      try {
+        await notificationService.create({
+          user: referrer._id.toString(),
+          type: "system",
+          title: "Invitație acceptată",
+          message: `${username} s-a alăturat comunității Nexora folosind invitația ta.`,
+          actor: user._id.toString(),
+          metadata: { route: "referrals" },
+        });
+      } catch (notificationError) {
+        console.error("REFERRAL NOTIFICATION ERROR:", notificationError);
+      }
+    }
 
     res.status(201).json({
       message: "Account created",

@@ -5,6 +5,37 @@ import { AuthRequest } from "../../middleware/auth.js";
 import { profileService } from "./profile.service.js";
 
 class ProfileController {
+  async referral(req: AuthRequest, res: Response) {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+
+      const referral = await profileService.getReferralInfo(req.userId);
+
+      return res.json({
+        success: true,
+        data: referral,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          message: "Utilizatorul nu a fost găsit.",
+        });
+      }
+
+      console.error("REFERRAL INFO ERROR:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Invitația nu a putut fi generată.",
+      });
+    }
+  }
+
   async me(req: AuthRequest, res: Response) {
     try {
       if (!req.userId) {

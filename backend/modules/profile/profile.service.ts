@@ -1,9 +1,80 @@
 import User from "../../models/Users.js";
+import crypto from "crypto";
 import mongoose from "mongoose";
 import { ListingModel } from "../listing/listing.model.js";
 import { ReviewModel } from "../review/review.model.js";
 
 class ProfileService {
+  private async ensureReferralCode(userId: string) {
+    const user = await User.findById(userId).select("referralCode");
+
+    if (!user) {
+      throw new Error("USER_NOT_FOUND");
+    }
+
+    if (user.referralCode) {
+      return user.referralCode;
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const code = `NX${crypto.randomBytes(5).toString("hex").toUpperCase()}`;
+      const existing = await User.exists({ referralCode: code });
+      if (existing) continue;
+
+      const updated = await User.findOneAndUpdate(
+        {
+          _id: userId,
+          $or: [
+            { referralCode: { $exists: false } },
+            { referralCode: null },
+            { referralCode: "" },
+          ],
+        },
+        { $set: { referralCode: code } },
+        { new: true },
+      ).select("referralCode");
+
+      if (updated?.referralCode) {
+        return updated.referralCode;
+      }
+
+      const current = await User.findById(userId).select("referralCode");
+      if (current?.referralCode) return current.referralCode;
+    }
+
+    throw new Error("REFERRAL_CODE_GENERATION_FAILED");
+  }
+
+  async getReferralInfo(userId: string) {
+    const code = await this.ensureReferralCode(userId);
+    const invitedUsers = await User.find({ referredBy: userId })
+      .select("username avatar createdAt")
+      .sort({ referralAcceptedAt: -1, createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    const publicAppUrl = (
+      process.env.PUBLIC_APP_URL ||
+      process.env.CLIENT_URL ||
+      "https://nx-store.com"
+    )
+      .split(",")[0]
+      .trim()
+      .replace(/\/$/, "");
+
+    return {
+      code,
+      inviteUrl: `${publicAppUrl}/register?ref=${encodeURIComponent(code)}`,
+      totalInvited: await User.countDocuments({ referredBy: userId }),
+      recentInvites: invitedUsers.map((user) => ({
+        id: user._id,
+        username: user.username,
+        avatar: user.avatar,
+        joinedAt: user.createdAt,
+      })),
+    };
+  }
+
   async getProfile(userId: string) {
     const user = await User.findById(userId).select(
       "-password -emailVerificationCode -emailVerificationExpires -emailChangeCode -emailChangeExpires",
