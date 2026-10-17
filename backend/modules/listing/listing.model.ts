@@ -20,6 +20,7 @@ export interface ListingDocument {
 
     category: string;
     subcategory?: string;
+    categoryDetail?: string;
 
     condition: ListingCondition;
 
@@ -35,6 +36,7 @@ export interface ListingDocument {
     brand?: string;
     color?: string;
     size?: string;
+    material?: string;
 
     shipping: boolean;
 
@@ -75,6 +77,12 @@ const ListingSchema = new Schema<ListingDocument>(
         },
 
         subcategory: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+
+        categoryDetail: {
             type: String,
             default: null,
             trim: true,
@@ -132,6 +140,12 @@ const ListingSchema = new Schema<ListingDocument>(
         },
 
         size: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+
+        material: {
             type: String,
             default: null,
             trim: true,

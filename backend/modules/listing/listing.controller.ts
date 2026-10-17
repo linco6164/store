@@ -126,6 +126,8 @@ class ListingController {
       const listings = await listingService.search({
         search: req.query.search as string,
         category: req.query.category as string,
+        subcategory: req.query.subcategory as string,
+        categoryDetail: req.query.categoryDetail as string,
         city: req.query.city as string,
         condition: req.query.condition as string,
 

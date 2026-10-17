@@ -106,6 +106,8 @@ export class ListingService {
   async search(filters: {
     search?: string;
     category?: string;
+    subcategory?: string;
+    categoryDetail?: string;
     city?: string;
     minPrice?: number;
     maxPrice?: number;
@@ -129,6 +131,8 @@ export class ListingService {
           { brand: regex },
           { city: regex },
           { category: regex },
+          { subcategory: regex },
+          { categoryDetail: regex },
         ];
       }
     }
@@ -140,6 +144,24 @@ export class ListingService {
       );
 
       query.category = new RegExp(`^${escapedCategory}$`, "i");
+    }
+
+    if (filters.subcategory) {
+      const escapedSubcategory = filters.subcategory.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+
+      query.subcategory = new RegExp(`^${escapedSubcategory}$`, "i");
+    }
+
+    if (filters.categoryDetail) {
+      const escapedCategoryDetail = filters.categoryDetail.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+
+      query.categoryDetail = new RegExp(`^${escapedCategoryDetail}$`, "i");
     }
 
     if (filters.city) {
