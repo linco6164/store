@@ -51,6 +51,7 @@ export async function getCheckout(
       listingId,
       addressId,
       deliveryMethod,
+      req.query.offerId,
     );
 
     return res.json({

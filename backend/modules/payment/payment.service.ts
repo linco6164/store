@@ -22,6 +22,7 @@ import { netopiaService } from "./netopia.service.js";
 import { googlePayService } from "./google-pay.service.js";
 
 import { notificationService } from "../notification/notification.service.js";
+import { resolvePurchasePrice } from "../../services/offer-pricing.service.js";
 
 // ============================================================
 // CONSTANTS
@@ -104,6 +105,7 @@ class PaymentService {
     savedCardId?: string,
 
     destinationLockerId?: number,
+    offerId?: unknown,
   ) {
     // ========================================================
     // VALIDATE LISTING
@@ -287,7 +289,13 @@ class PaymentService {
     // PRICE
     // ========================================================
 
-    const itemPrice = Number(listing.price);
+    const purchasePrice = await resolvePurchasePrice({
+      buyerId, listingId, sellerId,
+      listingPrice: listing.price,
+      currency: listing.currency,
+      offerId,
+    });
+    const itemPrice = purchasePrice.itemPrice;
 
     if (!Number.isFinite(itemPrice) || itemPrice <= 0) {
       throw new Error("INVALID_LISTING_PRICE");
@@ -363,6 +371,10 @@ class PaymentService {
 
     const existingPayment = await PaymentModel.findOne({
       buyer: buyerId,
+      offer: purchasePrice.offerId,
+      itemPrice,
+      amount,
+      currency,
 
       listing: listingId,
 
@@ -411,6 +423,7 @@ class PaymentService {
 
     const payment = await PaymentModel.create({
       buyer: buyerId,
+      offer: purchasePrice.offerId,
 
       seller: sellerId,
 
@@ -490,6 +503,7 @@ class PaymentService {
 
   private getPaymentSummary(payment: PaymentDocument) {
     return {
+      offerId: payment.offer?.toString() ?? null,
       paymentId: payment._id.toString(),
       orderId: payment.providerOrderId,
       amount: payment.amount,
@@ -641,6 +655,8 @@ class PaymentService {
     return {
       paymentId: payment._id.toString(),
 
+      offerId: payment.offer?.toString() ?? null,
+
       orderId: payment.providerOrderId,
 
       amount: payment.amount,
@@ -689,6 +705,7 @@ class PaymentService {
 
   async processGooglePay(input: {
     buyerId: string;
+    offerId?: unknown;
     listingId: string;
     addressId: string;
     deliveryMethod: DeliveryMethod;
@@ -710,6 +727,7 @@ class PaymentService {
       "google_pay",
       undefined,
       input.destinationLockerId,
+      input.offerId,
     );
     const paymentId = String(paymentSummary.paymentId ?? "");
     const payment = await PaymentModel.findOne({
@@ -823,7 +841,7 @@ class PaymentService {
         name: listing.title,
         code: listing._id.toString(),
         category: listing.category,
-        price: Number(listing.price),
+        price: Number(payment.itemPrice),
       },
       userAgent: input.userAgent,
       ipAddress: input.ipAddress,

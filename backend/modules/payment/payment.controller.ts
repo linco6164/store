@@ -7,6 +7,7 @@ import { paymentService } from "./payment.service.js";
 import { netopiaService } from "./netopia.service.js";
 
 import PaymentModel from "./payment.model.js";
+import { OfferCheckoutError } from "../../services/offer-pricing.service.js";
 
 // ============================================================
 // PAYMENT CONTROLLER
@@ -149,6 +150,7 @@ export const paymentController = {
         typeof savedCardId === "string" ? savedCardId.trim() : undefined,
 
         parsedDestinationLockerId,
+        req.body?.offerId,
       );
 
       // ======================================================
@@ -162,6 +164,9 @@ export const paymentController = {
       });
     } catch (error) {
       console.error("PAYMENT CREATE ERROR:", error);
+      if (error instanceof OfferCheckoutError) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
 
       if (error instanceof Error) {
         switch (error.message) {

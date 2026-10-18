@@ -219,7 +219,7 @@ class ChatService {
           },
           {
             path: "listing",
-            select: "_id title price images currency",
+            select: "_id title price images currency status",
           },
         ],
       })
@@ -461,7 +461,7 @@ class ChatService {
           },
           {
             path: "listing",
-            select: "_id title price images currency",
+            select: "_id title price images currency status",
           },
         ],
       });

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import { AuthRequest } from "../../middleware/auth.js";
 import { paymentService } from "./payment.service.js";
+import { OfferCheckoutError } from "../../services/offer-pricing.service.js";
 
 function publicApiBaseUrl(req: Request): string {
   const configured = String(process.env.API_PUBLIC_URL ?? "").trim();
@@ -112,6 +113,9 @@ function resultHtml(paymentId: string, success: boolean, message: string) {
 }
 
 function errorResponse(error: unknown) {
+  if (error instanceof OfferCheckoutError) {
+    return { status: 400, message: error.message };
+  }
   const code = error instanceof Error ? error.message : "";
 
   if (
@@ -227,6 +231,7 @@ export const googlePayController = {
 
       const result = await paymentService.processGooglePay({
         buyerId: req.userId,
+        offerId: req.body?.offerId,
         listingId: listingId.trim(),
         addressId: addressId.trim(),
         deliveryMethod,

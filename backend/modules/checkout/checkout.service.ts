@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { ListingModel } from "../listing/listing.model.js";
 import { AddressModel } from "../profile/address.model.js";
+import { resolvePurchasePrice } from "../../services/offer-pricing.service.js";
 
 const BUYER_PROTECTION_RATE = 0.05;
 const BUYER_PROTECTION_MIN = 2.99;
@@ -25,6 +26,7 @@ export async function calculateCheckout(
   listingId: string,
   addressId: string,
   deliveryMethod: "courier" | "pickup_point",
+  offerId?: unknown,
 ) {
   validateObjectId(userId, "ID utilizator invalid.");
   validateObjectId(listingId, "ID anunț invalid.");
@@ -58,7 +60,15 @@ export async function calculateCheckout(
     );
   }
 
-  const itemPrice = roundMoney(listing.price);
+  const price = await resolvePurchasePrice({
+    buyerId: userId,
+    listingId,
+    sellerId: listing.seller._id.toString(),
+    listingPrice: listing.price,
+    currency: listing.currency,
+    offerId,
+  });
+  const itemPrice = price.itemPrice;
 
   const buyerProtectionFee = roundMoney(
     Math.max(
@@ -78,6 +88,7 @@ export async function calculateCheckout(
   );
 
   return {
+    offer: price.offerId ? { id: price.offerId, amount: itemPrice, currency: listing.currency } : null,
     listing: {
       id: listing._id,
       title: listing.title,

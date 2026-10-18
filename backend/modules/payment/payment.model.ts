@@ -16,6 +16,7 @@ export interface PaymentDocument extends Document {
   buyer: mongoose.Types.ObjectId;
   seller: mongoose.Types.ObjectId;
   listing: mongoose.Types.ObjectId;
+  offer?: mongoose.Types.ObjectId | null;
   order?: mongoose.Types.ObjectId | null;
 
   // ============================================================
@@ -104,6 +105,12 @@ const paymentSchema = new Schema<PaymentDocument>(
     order: {
       type: Schema.Types.ObjectId,
       ref: "Order",
+      default: null,
+    },
+
+    offer: {
+      type: Schema.Types.ObjectId,
+      ref: "Offer",
       default: null,
     },
 
