@@ -557,6 +557,7 @@ class ChatService {
   }
 
   async markAsSeen(conversationId: string, userId: string) {
+    const readAt = new Date();
     await this.getConversation(conversationId, userId);
 
     await Message.updateMany(
@@ -580,6 +581,7 @@ class ChatService {
 
       await conversation.save();
     }
+    await notificationService.markConversationAsRead(userId, conversationId, readAt);
   }
 
   async deleteMessage(

@@ -77,6 +77,7 @@ export const pushNotificationService = {
                  * Nexora notification channel.
                  */
                 channelId: "nexora_notifications",
+                notificationCount: payload.badge,
 
                 /*
                  * Default system notification

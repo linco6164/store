@@ -253,7 +253,7 @@ class NotificationService {
     return pushNotificationService.sendBroadcast({ title, body, data });
   }
 
-  async getAll(userId: string) {
+  async getAll(userId: string, type?: NotificationType) {
     try {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         throw new Error(`Invalid notification userId: ${userId}`);
@@ -263,10 +263,12 @@ class NotificationService {
 
       const notifications = await NotificationModel.find({
         user: userObjectId,
+        ...(type ? { type } : {}),
       })
         .populate("actor", "username avatar")
         .populate("listing", "title images price")
         .sort({
+          read: 1,
           createdAt: -1,
         })
         .limit(50)
@@ -306,8 +308,45 @@ class NotificationService {
     }
   }
 
+  async getUnreadSummary(userId: string) {
+    const groups = await NotificationModel.aggregate<{ _id: string; count: number }>([
+      { $match: { user: this.toObjectId(userId), read: false } },
+      { $group: { _id: "$type", count: { $sum: 1 } } },
+    ]);
+    const byType: Record<string, number> = {};
+    let count = 0;
+    for (const group of groups) {
+      byType[group._id] = group.count;
+      count += group.count;
+    }
+    return { count, byType };
+  }
+
+  private async emitUnreadCount(userId: string) {
+    try {
+      const count = await this.getUnreadCount(userId);
+      getSocketIO().to(`user:${userId}`).emit("notification:unread-count", count);
+    } catch (error) {
+      console.error("Failed to synchronize unread notifications:", error);
+    }
+  }
+
+  async markConversationAsRead(userId: string, conversationId: string, before: Date) {
+    await NotificationModel.updateMany(
+      {
+        user: this.toObjectId(userId),
+        conversation: this.toObjectId(conversationId),
+        type: { $in: ["message", "offer"] },
+        read: false,
+        createdAt: { $lte: before },
+      },
+      { $set: { read: true } },
+    );
+    await this.emitUnreadCount(userId);
+  }
+
   async markAsRead(userId: string, notificationId: string) {
-    return NotificationModel.findOneAndUpdate(
+    const notification = await NotificationModel.findOneAndUpdate(
       {
         _id: notificationId,
 
@@ -324,14 +363,17 @@ class NotificationService {
         new: true,
       },
     );
+    if (notification) await this.emitUnreadCount(userId);
+    return notification;
   }
 
-  async markAllAsRead(userId: string) {
+  async markAllAsRead(userId: string, type?: NotificationType) {
     await NotificationModel.updateMany(
       {
         user: this.toObjectId(userId),
 
         read: false,
+        ...(type ? { type } : {}),
       },
 
       {
@@ -340,14 +382,17 @@ class NotificationService {
         },
       },
     );
+    await this.emitUnreadCount(userId);
   }
 
   async delete(userId: string, notificationId: string) {
-    return NotificationModel.findOneAndDelete({
+    const notification = await NotificationModel.findOneAndDelete({
       _id: notificationId,
 
       user: this.toObjectId(userId),
     });
+    if (notification) await this.emitUnreadCount(userId);
+    return notification;
   }
 
   async registerPushToken(

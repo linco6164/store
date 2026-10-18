@@ -158,6 +158,7 @@ class ChatController {
         : req.params.conversationId;
 
       await chatService.markAsSeen(conversationId, req.userId!);
+      await emitConversationUpdate(conversationId);
 
       return res.json({
         success: true,

@@ -3,6 +3,14 @@ import { Response } from "express";
 import { AuthRequest } from "../../middleware/auth.js";
 
 import { notificationService } from "./notification.service.js";
+import { NotificationType } from "./notification.model.js";
+
+function notificationType(value: unknown): NotificationType | undefined {
+  return typeof value === "string" &&
+    ["message", "favorite", "offer", "sale", "listing", "system"].includes(value)
+    ? value as NotificationType
+    : undefined;
+}
 
 class NotificationController {
   async getAll(req: AuthRequest, res: Response) {
@@ -14,7 +22,9 @@ class NotificationController {
         });
       }
 
-      const notifications = await notificationService.getAll(req.userId);
+      const notifications = await notificationService.getAll(
+        req.userId, notificationType(req.query.type),
+      );
 
       return res.json({
         success: true,
@@ -39,11 +49,11 @@ class NotificationController {
         });
       }
 
-      const count = await notificationService.getUnreadCount(req.userId);
+      const summary = await notificationService.getUnreadSummary(req.userId);
 
       return res.json({
         success: true,
-        count,
+        ...summary,
       });
     } catch (error) {
       console.error(error);
@@ -103,7 +113,7 @@ class NotificationController {
         });
       }
 
-      await notificationService.markAllAsRead(req.userId);
+      await notificationService.markAllAsRead(req.userId, notificationType(req.query.type));
 
       return res.json({
         success: true,

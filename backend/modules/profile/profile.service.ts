@@ -87,7 +87,9 @@ class ProfileService {
 
     return {
       code,
-      inviteUrl: `${publicAppUrl}/register?ref=${encodeURIComponent(code)}`,
+      // Folosim ruta rădăcină pentru compatibilitate cu orice hosting SPA.
+      // Parametrul `ref` deschide formularul web de înregistrare în Flutter.
+      inviteUrl: `${publicAppUrl}/?ref=${encodeURIComponent(code)}`,
       totalInvited: await User.countDocuments({ referredBy: userId }),
       program: {
         rewardAmount: REFERRAL_REWARD_AMOUNT,
